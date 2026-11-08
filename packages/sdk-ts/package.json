@@ -1,0 +1,8 @@
+{
+  "name": "@supagame/sdk-ts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reserved for the Supabase Game Services TypeScript SDK (Task 10)",
+  "type": "module",
+  "license": "MIT"
+}

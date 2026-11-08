@@ -1,0 +1,391 @@
+openapi: 3.1.0
+info:
+  title: Supabase Game Services API
+  version: 0.1.0
+  license:
+    name: MIT
+    identifier: MIT
+  description: |
+    Contract for a single game installed in the developer's own Supabase project.
+    Task 1 defines this contract; runtime endpoints are not yet implemented.
+    Every request includes the project's publishable key in the apikey header.
+    Player routes also require a verified Supabase Auth JWT (anonymous or permanent).
+    No request accepts a caller-supplied player identity for writes.
+    Scores are PostgreSQL BIGINT values restricted in JSON to Number.isSafeInteger(score).
+    JSON request bodies are limited to 4096 UTF-8 bytes. Errors are flat ApiError objects.
+servers:
+  - url: /functions/v1/supagame/v1
+paths:
+  /leaderboards:
+    get:
+      operationId: listLeaderboards
+      summary: List enabled leaderboards
+      security:
+        - PublishableKey: []
+      responses:
+        '200':
+          description: Enabled boards only; an empty list is valid.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaderboardSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /leaderboards/{id}/entries:
+    parameters:
+      - $ref: '#/components/parameters/LeaderboardId'
+    get:
+      operationId: getLeaderboardEntries
+      summary: Read a page of ranked, visible entries
+      description: |
+        asc means smaller scores are better; desc means larger scores are better.
+        Equal scores share competition rank (1, 1, 3). Display order is score,
+        achievedAt ascending, then playerId ascending. Hidden players are excluded.
+        Cursors encode board ID and the last score/achievement time/player ID tuple.
+        A malformed cursor or one for another board is rejected. Continuation is
+        deterministic for unchanged data; pages are not a snapshot across score updates.
+      security:
+        - PublishableKey: []
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of entries to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: cursor
+          in: query
+          description: Opaque continuation token from nextCursor; omit on the first page.
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        '200':
+          description: Ranked page with an opaque next cursor, or null at the end.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaderboardPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /leaderboards/{id}/me:
+    parameters:
+      - $ref: '#/components/parameters/LeaderboardId'
+    get:
+      operationId: getMyScore
+      summary: Read the authenticated player's visible best score and competition rank
+      security:
+        - PublishableKey: []
+          PlayerSession: []
+      responses:
+        '200':
+          description: The current player's entry, or null when no visible score exists.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/MyScore'
+                  - type: 'null'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /leaderboards/{id}/scores:
+    parameters:
+      - $ref: '#/components/parameters/LeaderboardId'
+    post:
+      operationId: submitScore
+      summary: Atomically submit a score for the authenticated player
+      description: |
+        Retains one personal best per board. Equal or worse scores return not_best.
+        The server derives identity from the verified JWT. Reusing a submissionKey
+        with the same score replays the original result; a different score conflicts.
+        Submissions are limited to 10 per player per board per rolling 60 seconds.
+        Board bounds and enabled state are enforced by the server. Range checks and
+        per-identity rate limits cannot prove legitimate gameplay or prevent account farming.
+      security:
+        - PublishableKey: []
+          PlayerSession: []
+      requestBody:
+        required: true
+        description: JSON body, at most 4096 UTF-8 bytes.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitScoreRequest'
+      responses:
+        '200':
+          description: Accepted best or valid non-improvement; replays return the original result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitScoreResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /players/me:
+    get:
+      operationId: getMyProfile
+      summary: Read or create the authenticated player's profile
+      security:
+        - PublishableKey: []
+          PlayerSession: []
+      responses:
+        '200':
+          description: The current player's profile; displayName is null until set.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      operationId: updateMyProfile
+      summary: Update the authenticated player's display name
+      description: Trim surrounding whitespace and validate 3–24 printable characters.
+      security:
+        - PublishableKey: []
+          PlayerSession: []
+      requestBody:
+        required: true
+        description: JSON body, at most 4096 UTF-8 bytes.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePlayerRequest'
+      responses:
+        '200':
+          description: The updated profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    PublishableKey:
+      type: apiKey
+      in: header
+      name: apikey
+      description: Supabase project publishable key; never a privileged key.
+    PlayerSession:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Valid, unexpired Supabase Auth JWT for an anonymous or permanent user.
+  parameters:
+    LeaderboardId:
+      name: id
+      in: path
+      required: true
+      description: Unique leaderboard slug.
+      schema:
+        type: string
+        minLength: 1
+  schemas:
+    SafeInteger:
+      type: integer
+      minimum: -9007199254740991
+      maximum: 9007199254740991
+      description: A JSON number satisfying Number.isSafeInteger; stored as BIGINT for scores.
+    LeaderboardSummary:
+      type: object
+      additionalProperties: false
+      required: [id, kind, sortDirection, minValue, maxValue]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        kind:
+          type: string
+          enum: [time, points]
+        sortDirection:
+          type: string
+          enum: [asc, desc]
+        minValue:
+          description: Inclusive configured minimum, or null for no additional minimum.
+          anyOf:
+            - $ref: '#/components/schemas/SafeInteger'
+            - type: 'null'
+        maxValue:
+          description: Inclusive configured maximum, or null for no additional maximum.
+          anyOf:
+            - $ref: '#/components/schemas/SafeInteger'
+            - type: 'null'
+    LeaderboardEntry:
+      type: object
+      additionalProperties: false
+      required: [playerId, displayName, score, rank, achievedAt]
+      properties:
+        playerId:
+          type: string
+          format: uuid
+        displayName:
+          anyOf:
+            - $ref: '#/components/schemas/DisplayName'
+            - type: 'null'
+        score:
+          $ref: '#/components/schemas/SafeInteger'
+        rank:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+          description: Competition rank; tied scores share rank (1, 1, 3).
+        achievedAt:
+          type: string
+          format: date-time
+          description: Authoritative server timestamp when this personal best was achieved.
+    LeaderboardPage:
+      type: object
+      additionalProperties: false
+      required: [entries, nextCursor]
+      properties:
+        entries:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/LeaderboardEntry'
+        nextCursor:
+          type: [string, 'null']
+          description: Opaque continuation token, or null when there are no more entries.
+    MyScore:
+      $ref: '#/components/schemas/LeaderboardEntry'
+    SubmitScoreRequest:
+      type: object
+      additionalProperties: false
+      required: [score, submissionKey]
+      properties:
+        score:
+          $ref: '#/components/schemas/SafeInteger'
+        submissionKey:
+          type: string
+          format: uuid
+          description: Client-generated UUID, reused unchanged when retrying the same submission.
+    SubmitScoreResult:
+      type: object
+      additionalProperties: false
+      required: [outcome, score, bestScore]
+      properties:
+        outcome:
+          type: string
+          enum: [best, not_best]
+        score:
+          $ref: '#/components/schemas/SafeInteger'
+        bestScore:
+          $ref: '#/components/schemas/SafeInteger'
+    DisplayName:
+      type: string
+      minLength: 3
+      maxLength: 24
+      pattern: '^[^\u0000-\u001F\u007F-\u009F]+$'
+      description: 3–24 printable characters after trimming surrounding whitespace.
+    PlayerProfile:
+      type: object
+      additionalProperties: false
+      required: [playerId, displayName, createdAt]
+      properties:
+        playerId:
+          type: string
+          format: uuid
+        displayName:
+          anyOf:
+            - $ref: '#/components/schemas/DisplayName'
+            - type: 'null'
+        createdAt:
+          type: string
+          format: date-time
+    UpdatePlayerRequest:
+      type: object
+      additionalProperties: false
+      required: [displayName]
+      properties:
+        displayName:
+          $ref: '#/components/schemas/DisplayName'
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code, as documented for each HTTP status.
+        message:
+          type: string
+          description: Public explanation without SQL details, credentials or tokens.
+  responses:
+    BadRequest:
+      description: INVALID_REQUEST, INVALID_SCORE, INVALID_CURSOR or INVALID_DISPLAY_NAME.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Unauthorized:
+      description: UNAUTHORIZED — missing/invalid project key or missing/invalid/expired required player JWT.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    NotFound:
+      description: LEADERBOARD_NOT_FOUND — board does not exist or is disabled.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Conflict:
+      description: DUPLICATE_KEY_CONFLICT — submissionKey was already used with a different score.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    PayloadTooLarge:
+      description: PAYLOAD_TOO_LARGE — request body exceeds 4096 UTF-8 bytes.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    RateLimited:
+      description: RATE_LIMITED — exceeded 10 submissions per player per board per rolling 60 seconds.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    InternalError:
+      description: INTERNAL_ERROR — generic failure with no internal implementation details.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
