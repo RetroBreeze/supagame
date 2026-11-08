@@ -5,10 +5,10 @@ Supabase project. The planned v0.1 provides anonymous player identities and
 leaderboards through a versioned HTTP API, a provisioning CLI, and a thin
 TypeScript SDK. There is no central service operated by this project.
 
-**Status: Tasks 1–3 implemented.** CLI help, the HTTP contract, shared DTOs,
-workspace tooling, database schema and authenticated profile operations are
+**Status: Tasks 1–4 implemented.** CLI help, the HTTP contract, shared DTOs,
+workspace tooling, database schema, profile operations and atomic score submission are
 implemented. Provisioning commands return `not yet implemented` with exit code 1.
-Score submission, HTTP handlers and the runtime SDK are future tasks.
+Ranking functions, HTTP handlers and the runtime SDK are future tasks.
 Nothing is deployed to a hosted project or published.
 `@supagame/*` and the `supagame` executable are provisional names; all packages
 are private until publication is separately approved.
@@ -71,7 +71,8 @@ pnpm db:stop    # stops this fixture and preserves its local database volume
 ```
 
 `pnpm test:db` runs `supabase test db` against the fixture with its dedicated
-network and both `tests/db/schema.test.sql` and `tests/db/players.test.sql`.
+network and `tests/db/schema.test.sql`, `tests/db/players.test.sql`, and
+`tests/db/submission.test.sql`.
 These pgTAP suites create synthetic Auth users and roll back their fixtures and
 temporary grants. They check schema constraints, RLS, grants, profile operations,
 name validation and actual allowed/denied queries as `anon` and as `authenticated`
@@ -79,16 +80,16 @@ with both anonymous and permanent user claims. This tests database authorization
 JWT verification and HTTP behavior belong to later tasks.
 
 After pgTAP, `pnpm test:db` also runs `pnpm test:db:concurrency`. This uses Docker
-to open two real `psql` sessions in the fixed local fixture container. Each case
-holds the first profile insert uncommitted and verifies the second request is
-waiting on a database lock before releasing it. All four get/update combinations
-must return one consistent profile. Synthetic users for these cases are committed
+to open real `psql` sessions in the fixed local fixture container. Profile cases
+hold the first insert uncommitted and verify the second request is waiting on a
+database lock before releasing it. All four get/update combinations must return
+one consistent profile; score concurrency cases are described below. Synthetic users are committed
 so both sessions can see them, then deleted in `finally` cleanup. Server timeouts
 bound failed tests. The harness does not accept a hosted database connection.
 
 `pnpm db:stage` copies module migrations into the fixture's ignored migrations
 directory with stable, globally unique versions. Core tables come before
-leaderboards, followed by the new profile functions. Existing identical copies
+leaderboards, followed by profile functions and score submission. Existing identical copies
 are left alone; differing copies fail
 instead of overwriting them. The migration ledger makes repeated installation
 a no-op. Raw SQL files are intentionally **apply-once**: an existing object with
@@ -103,7 +104,7 @@ The database foundation provides:
 - `game_best_scores`, with one row per board/player and two ranking indexes that
   preserve ascending achievement-time/player-ID tie order for both score directions.
 - `sg_private.game_submission_events`, keyed by player/board/submission UUID,
-  with an index for the future rate-limit window. No submission logic runs yet.
+  with a rate-window index and the original result's best score for exact replay.
 
 RLS permits reads of enabled boards, visible profiles and their scores. Explicit
 column grants keep moderation flags and submission keys out of public reads.
@@ -115,9 +116,7 @@ changing privileges on unrelated application objects.
 
 Scores and bounds use `BIGINT` constrained to JSON-safe integers. Trusted deletion
 of an Auth user or board cascades to dependent toolkit records, preventing
-orphans. There are no client delete permissions. Board-specific submission
-validation, atomic best-score updates, idempotent replay and rate limiting remain
-the responsibility of subsequent tasks.
+orphans. There are no client delete permissions.
 
 ## Player profile SQL operations
 
@@ -149,6 +148,57 @@ require the caller to retry serialization failures, as with other PostgreSQL wri
 No table grants or RLS policies were broadened. Hidden owners may read and rename
 their own profile, but cannot unhide it; it remains absent from public listings.
 Moderation flags are never included in either JSON response.
+
+## Score submission SQL operation
+
+`public.sg_submit_score(p_board_id text, p_score bigint, p_submission_key uuid)`
+returns exactly `{ outcome: 'best' | 'not_best', score, bestScore }`. It derives
+the player from `auth.uid()` and creates their profile if necessary. New submissions
+require an enabled board and a JSON-safe integer within its optional inclusive
+bounds. Smaller scores improve `asc` boards; larger scores improve `desc` boards.
+Equal or worse scores preserve the original best's timestamp and submission key.
+
+A transaction-scoped advisory lock serializes each player/board pair's replay
+lookup, quota check, conditional upsert and event insertion. Different pairs can
+proceed independently. Board configuration is held under a shared row lock while
+processing new submissions. Server processing time, rather than transaction start
+time, determines the rolling window and achievement timestamp.
+
+The limit is **10 accepted distinct submissions per player/board per rolling
+60 seconds**, including `not_best` results. Rejected requests consume no quota.
+An identical key/score replays its original complete response without spending
+quota, even after later improvements, board disablement or changed bounds.
+A valid score differing from a stored key's score raises `DUPLICATE_KEY_CONFLICT`.
+Keys are scoped to a player and board. Events currently remain until their player
+or board is deleted; no automatic retention/purge policy is implemented. Removing
+an event also removes that key's replay guarantee, so the rate window is not an
+event-retention policy.
+
+The new migration adds required private `best_score` metadata; earlier migrations
+are unchanged. Before Task 4 there was no supported submission writer. If events
+were manually seeded beforehand, migration fails rather than inventing historical
+results or deleting data. Resolve such data explicitly before upgrading.
+
+Only `authenticated` and the trusted owner may execute the function. Its empty
+`search_path`, qualified references, identity checks and explicit JSON construction
+preserve existing RLS and column grants. PostgreSQL's default `READ COMMITTED`
+is required (`READ UNCOMMITTED` has the same PostgreSQL semantics).
+`REPEATABLE READ` and `SERIALIZABLE` fail closed with SQLSTATE `0A000`,
+`READ_COMMITTED_REQUIRED`, preventing stale snapshots from bypassing event checks.
+See [PostgreSQL transaction isolation](https://www.postgresql.org/docs/17/transaction-iso.html).
+
+SQL errors use `UNAUTHORIZED` (`28000`), `INVALID_REQUEST` / `INVALID_SCORE`
+(`22023`), `LEADERBOARD_NOT_FOUND` (`P0002`, including disabled boards),
+`DUPLICATE_KEY_CONFLICT` (`23505`), and `RATE_LIMITED` (`P0001`). Authentication
+and basic argument validation precede replay. HTTP error mapping and JWT signature
+verification belong to the later HTTP task. Per-identity throttling does not stop
+anonymous account farming or prove that a submitted score represents real gameplay.
+
+`pnpm test:db:concurrency` uses separate local PostgreSQL sessions to test profile
+creation, competing better/worse/equal submissions, duplicate/conflicting keys,
+the last quota slot, retries at quota, processing timestamps, isolation rejection,
+and independent player/board pairs. Contention tests inspect actual lock waits
+before releasing the first transaction; synthetic committed data is cleaned up.
 
 ## Repository layout
 
@@ -205,8 +255,9 @@ user. These requirements are combined, not alternatives.
   `{ code: string, message: string }` object; statuses and stable codes are
   documented in OpenAPI. Internal SQL details and credentials must never appear.
 - Names are nullable until set; updates trim whitespace and validate 3–24
-  printable characters. Request bodies are limited to 4 KiB. The planned
-  submission limit is 10 per authenticated identity per board per rolling minute.
+  printable characters. Request bodies are limited to 4 KiB. The
+  submission limit is enforced in SQL at 10 per authenticated identity per board
+  per rolling minute.
 
 Edit OpenAPI first when changing a public shape, then run:
 
@@ -239,7 +290,7 @@ can submit plausible fabricated scores and create additional anonymous accounts.
 See the [design](docs/superpowers/specs/2026-11-08-supabase-game-services-design.md)
 and [implementation plan](docs/superpowers/plans/2026-11-08-supabase-game-services-v01.md).
 The supplied design retains its original draft wording; the plan records its
-approval on 2026-11-08. Only Tasks 1–3 are implemented here. Multiplayer, achievements,
+approval on 2026-11-08. Only Tasks 1–4 are implemented here. Multiplayer, achievements,
 cloud saves, friends, seasons, real-time broadcasts, native engine SDKs, and
 multi-game tenancy remain outside v0.1.
 

@@ -1,46 +1,9 @@
 // Real sessions in the dedicated local fixture; no connection strings or credentials.
 import assert from 'node:assert/strict';
-import { execFileSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { setTimeout } from 'node:timers/promises';
 import { test } from 'node:test';
+import { query, session, waitUntil } from './local-sessions.ts';
 import type { PlayerProfile } from '../../packages/contracts/src/types.js';
-
-const psqlArgs = [
-  'exec', '-i', 'supabase_db_supagame-schema-tests',
-  'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', 'postgres',
-];
-
-function query(sql: string): string {
-  return execFileSync('docker', [...psqlArgs, '-c', sql], { encoding: 'utf8', timeout: 15_000 }).trim();
-}
-
-function session(sql: string) {
-  const child = spawn('docker', psqlArgs, { stdio: ['pipe', 'pipe', 'pipe'] });
-  const state = { stdout: '', stderr: '', exited: false };
-  child.stdout.on('data', (chunk: Buffer) => { state.stdout += chunk.toString(); });
-  child.stderr.on('data', (chunk: Buffer) => { state.stderr += chunk.toString(); });
-  const finished = new Promise<string>((resolve, reject) => {
-    child.on('error', reject);
-    child.on('close', (code) => {
-      state.exited = true;
-      if (code === 0) resolve(state.stdout);
-      else reject(new Error(`Local psql exited ${code}: ${state.stderr}`));
-    });
-  });
-  // Completion is awaited after lock inspection; do not emit an early unhandled rejection.
-  void finished.catch(() => undefined);
-  child.stdin.write(sql);
-  return { child, state, finished };
-}
-
-async function waitUntil(condition: () => boolean, description: string) {
-  const deadline = Date.now() + 5_000;
-  while (!condition()) {
-    assert.ok(Date.now() < deadline, description);
-    await setTimeout(20);
-  }
-}
 
 const cases = [
   { name: 'get/get', first: 'public.sg_get_my_profile()', second: 'public.sg_get_my_profile()', expected: null },

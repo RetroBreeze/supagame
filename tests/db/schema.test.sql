@@ -14,7 +14,7 @@ from (values
 select columns_are('public', 'game_players', array['user_id', 'display_name', 'hidden', 'created_at']);
 select columns_are('public', 'game_leaderboards', array['id', 'kind', 'sort_direction', 'min_value', 'max_value', 'enabled']);
 select columns_are('public', 'game_best_scores', array['leaderboard_id', 'user_id', 'score', 'achieved_at', 'submission_key']);
-select columns_are('sg_private', 'game_submission_events', array['user_id', 'leaderboard_id', 'submission_key', 'submitted_score', 'outcome', 'created_at']);
+select columns_are('sg_private', 'game_submission_events', array['user_id', 'leaderboard_id', 'submission_key', 'submitted_score', 'outcome', 'created_at', 'best_score']);
 
 select col_type_is(s, t, c, typ, t || '.' || c || ' has the intended type')
 from (values
@@ -118,8 +118,8 @@ insert into public.game_best_scores (leaderboard_id, user_id, score, submission_
   ('time', '10000000-0000-4000-8000-000000000002', 42, '20000000-0000-4000-8000-000000000002'),
   ('time', '10000000-0000-4000-8000-000000000003', 1, '20000000-0000-4000-8000-000000000003'),
   ('disabled', '10000000-0000-4000-8000-000000000001', 99, '20000000-0000-4000-8000-000000000004');
-insert into sg_private.game_submission_events (user_id, leaderboard_id, submission_key, submitted_score, outcome) values
-  ('10000000-0000-4000-8000-000000000001', 'time', '20000000-0000-4000-8000-000000000001', 42, 'best');
+insert into sg_private.game_submission_events (user_id, leaderboard_id, submission_key, submitted_score, outcome, best_score) values
+  ('10000000-0000-4000-8000-000000000001', 'time', '20000000-0000-4000-8000-000000000001', 42, 'best', 42);
 
 select is((select hidden from public.game_players where display_name = 'Visible One'), false, 'players default to visible');
 select is((select created_at from public.game_players where display_name = 'Visible One'), now(), 'profile time defaults to server transaction time');
@@ -139,9 +139,9 @@ select throws_ok($$insert into public.game_best_scores (leaderboard_id, user_id,
   '23505', null, 'a second personal best for the same player and board is rejected');
 select throws_ok($$insert into sg_private.game_submission_events select * from sg_private.game_submission_events$$,
   '23505', null, 'duplicate player/board/submission key rejected');
-select lives_ok($$insert into sg_private.game_submission_events (user_id, leaderboard_id, submission_key, submitted_score, outcome) values
-  ('10000000-0000-4000-8000-000000000002', 'time', '20000000-0000-4000-8000-000000000001', 100, 'not_best'),
-  ('10000000-0000-4000-8000-000000000001', 'points', '20000000-0000-4000-8000-000000000001', 100, 'best')$$,
+select lives_ok($$insert into sg_private.game_submission_events (user_id, leaderboard_id, submission_key, submitted_score, outcome, best_score) values
+  ('10000000-0000-4000-8000-000000000002', 'time', '20000000-0000-4000-8000-000000000001', 100, 'not_best', 42),
+  ('10000000-0000-4000-8000-000000000001', 'points', '20000000-0000-4000-8000-000000000001', 100, 'best', 100)$$,
   'the same key is valid for a different player or board');
 
 select throws_ok(format('update %s set %I = %L where user_id = %L and leaderboard_id = %L', t, c, v, '10000000-0000-4000-8000-000000000001', 'time'), '23503', null, t || '.' || c || ' enforces its foreign key')
@@ -215,7 +215,7 @@ begin
     ('insert into public.game_best_scores (leaderboard_id, user_id, score, submission_key) values (''points'', ''10000000-0000-4000-8000-000000000003'', 1, ''20000000-0000-4000-8000-000000000099'')', 'insert a score'),
     ('update public.game_best_scores set score = 1', 'update a score'),
     ('delete from public.game_best_scores', 'delete a score'),
-    ('insert into sg_private.game_submission_events (user_id, leaderboard_id, submission_key, submitted_score, outcome) values (''10000000-0000-4000-8000-000000000003'', ''time'', ''20000000-0000-4000-8000-000000000099'', 1, ''best'')', 'insert an event'),
+    ('insert into sg_private.game_submission_events (user_id, leaderboard_id, submission_key, submitted_score, outcome, best_score) values (''10000000-0000-4000-8000-000000000003'', ''time'', ''20000000-0000-4000-8000-000000000099'', 1, ''best'', 1)', 'insert an event'),
     ('update sg_private.game_submission_events set submitted_score = 1', 'update an event'),
     ('delete from sg_private.game_submission_events', 'delete an event')
   ) as attempts(statement, label);
