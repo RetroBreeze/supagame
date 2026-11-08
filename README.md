@@ -5,10 +5,10 @@ Supabase project. The planned v0.1 provides anonymous player identities and
 leaderboards through a versioned HTTP API, a provisioning CLI, and a thin
 TypeScript SDK. There is no central service operated by this project.
 
-**Status: Tasks 1–2 implemented.** CLI help, the HTTP contract, shared DTOs,
-workspace tooling and the initial database schema are implemented. Provisioning
-commands return `not yet implemented` with exit code 1. Player-management and
-score-submission functions, HTTP handlers and the runtime SDK are future tasks.
+**Status: Tasks 1–3 implemented.** CLI help, the HTTP contract, shared DTOs,
+workspace tooling, database schema and authenticated profile operations are
+implemented. Provisioning commands return `not yet implemented` with exit code 1.
+Score submission, HTTP handlers and the runtime SDK are future tasks.
 Nothing is deployed to a hosted project or published.
 `@supagame/*` and the `supagame` executable are provisional names; all packages
 are private until publication is separately approved.
@@ -71,16 +71,25 @@ pnpm db:stop    # stops this fixture and preserves its local database volume
 ```
 
 `pnpm test:db` runs `supabase test db` against the fixture with its dedicated
-network and `tests/db/schema.test.sql` as the test file.
-The pgTAP suite creates synthetic Auth users and rolls back all fixtures and
-temporary grants. It checks columns, types, keys, constraints, index ordering,
-RLS, and actual allowed/denied queries as `anon` and as `authenticated` with
-both anonymous and permanent user claims. This tests database authorization;
+network and both `tests/db/schema.test.sql` and `tests/db/players.test.sql`.
+These pgTAP suites create synthetic Auth users and roll back their fixtures and
+temporary grants. They check schema constraints, RLS, grants, profile operations,
+name validation and actual allowed/denied queries as `anon` and as `authenticated`
+with both anonymous and permanent user claims. This tests database authorization;
 JWT verification and HTTP behavior belong to later tasks.
 
-`pnpm db:stage` copies the two module migrations into the fixture's ignored
-migrations directory with stable, globally unique versions, core before
-leaderboards. Existing identical copies are left alone; differing copies fail
+After pgTAP, `pnpm test:db` also runs `pnpm test:db:concurrency`. This uses Docker
+to open two real `psql` sessions in the fixed local fixture container. Each case
+holds the first profile insert uncommitted and verifies the second request is
+waiting on a database lock before releasing it. All four get/update combinations
+must return one consistent profile. Synthetic users for these cases are committed
+so both sessions can see them, then deleted in `finally` cleanup. Server timeouts
+bound failed tests. The harness does not accept a hosted database connection.
+
+`pnpm db:stage` copies module migrations into the fixture's ignored migrations
+directory with stable, globally unique versions. Core tables come before
+leaderboards, followed by the new profile functions. Existing identical copies
+are left alone; differing copies fail
 instead of overwriting them. The migration ledger makes repeated installation
 a no-op. Raw SQL files are intentionally **apply-once**: an existing object with
 the same name causes failure rather than silently accepting an incompatible
@@ -107,8 +116,39 @@ changing privileges on unrelated application objects.
 Scores and bounds use `BIGINT` constrained to JSON-safe integers. Trusted deletion
 of an Auth user or board cascades to dependent toolkit records, preventing
 orphans. There are no client delete permissions. Board-specific submission
-validation, profile updates, atomic best-score updates, idempotent replay and
-rate limiting remain the responsibility of subsequent tasks.
+validation, atomic best-score updates, idempotent replay and rate limiting remain
+the responsibility of subsequent tasks.
+
+## Player profile SQL operations
+
+The database now exposes `public.sg_get_my_profile()` and
+`public.sg_update_my_profile(p_display_name text)`, both returning the
+`PlayerProfile` JSON shape: `playerId`, nullable `displayName`, and `createdAt`.
+They support anonymous and permanent Supabase Auth users equally. The first
+valid read or update creates the profile; repeated reads preserve its contents.
+Neither operation accepts a target user ID.
+
+The two `SECURITY DEFINER` functions pin an empty `search_path`, use qualified
+database references, and derive identity from `auth.uid()`. Only `authenticated`
+and the trusted function owner may execute them; `PUBLIC`, `anon` and
+`service_role` receive no execute grant. Missing/malformed subjects and
+nonexistent/deleted Auth users fail with SQLSTATE `28000`, message `UNAUTHORIZED`.
+The gateway must still verify JWT signatures and expiration before setting claims.
+
+Updates trim surrounding ASCII/Unicode whitespace, then require 3–24 Unicode
+characters (code points, not UTF-8 bytes). Embedded C0/C1 controls are rejected,
+matching the existing contract. Invalid names fail with SQLSTATE `22023`, message
+`INVALID_DISPLAY_NAME`, without creating or changing a profile. Validation and
+renaming do not constitute content moderation.
+
+Profile creation uses the existing primary key and conflict handling. The getter
+reads in a separate statement after a conflicting insert completes, using the
+normal PostgreSQL `READ COMMITTED` isolation level. The updater performs an atomic
+insert/update of `display_name` only. Higher transaction isolation levels may
+require the caller to retry serialization failures, as with other PostgreSQL writes.
+No table grants or RLS policies were broadened. Hidden owners may read and rename
+their own profile, but cannot unhide it; it remains absent from public listings.
+Moderation flags are never included in either JSON response.
 
 ## Repository layout
 
@@ -117,7 +157,7 @@ rate limiting remain the responsibility of subsequent tasks.
 | `packages/contracts/` | Authoritative OpenAPI 3.1 contract and derived TypeScript DTOs |
 | `packages/cli/` | CLI entrypoint; future provisioning and maintenance commands |
 | `packages/sdk-ts/` | Reserved for the Task 10 client SDK |
-| `modules/core/migrations/` | Player profile schema, read policy and grants |
+| `modules/core/migrations/` | Player profile schema, protected profile functions, RLS and grants |
 | `modules/leaderboards/` | Leaderboard/score/event schema and indexes; future Edge Function |
 | `tests/cli/`, `tests/api/` | CLI process tests and contract/schema tests |
 | `tests/db/`, `tests/fixtures/local/` | pgTAP schema/security suite and isolated local fixture |
@@ -199,7 +239,7 @@ can submit plausible fabricated scores and create additional anonymous accounts.
 See the [design](docs/superpowers/specs/2026-11-08-supabase-game-services-design.md)
 and [implementation plan](docs/superpowers/plans/2026-11-08-supabase-game-services-v01.md).
 The supplied design retains its original draft wording; the plan records its
-approval on 2026-11-08. Only Tasks 1–2 are implemented here. Multiplayer, achievements,
+approval on 2026-11-08. Only Tasks 1–3 are implemented here. Multiplayer, achievements,
 cloud saves, friends, seasons, real-time broadcasts, native engine SDKs, and
 multi-game tenancy remain outside v0.1.
 
