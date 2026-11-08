@@ -5,10 +5,11 @@ Supabase project. The planned v0.1 provides anonymous player identities and
 leaderboards through a versioned HTTP API, a provisioning CLI, and a thin
 TypeScript SDK. There is no central service operated by this project.
 
-**Status: Tasks 1–4 implemented.** CLI help, the HTTP contract, shared DTOs,
-workspace tooling, database schema, profile operations and atomic score submission are
-implemented. Provisioning commands return `not yet implemented` with exit code 1.
-Ranking functions, HTTP handlers and the runtime SDK are future tasks.
+**Status: Tasks 1–5 implemented.** CLI help, the HTTP contract, shared DTOs,
+workspace tooling, database schema, profile operations, atomic score submission
+and ranked reads are implemented. Provisioning commands return `not yet implemented`
+with exit code 1.
+HTTP handlers and the runtime SDK are future tasks.
 Nothing is deployed to a hosted project or published.
 `@supagame/*` and the `supagame` executable are provisional names; all packages
 are private until publication is separately approved.
@@ -71,8 +72,9 @@ pnpm db:stop    # stops this fixture and preserves its local database volume
 ```
 
 `pnpm test:db` runs `supabase test db` against the fixture with its dedicated
-network and `tests/db/schema.test.sql`, `tests/db/players.test.sql`, and
-`tests/db/submission.test.sql`.
+network and `tests/db/schema.test.sql`, `tests/db/players.test.sql`,
+`tests/db/submission.test.sql`, `tests/db/rankings.test.sql`, and
+`tests/db/rankings-plans.test.sql`.
 These pgTAP suites create synthetic Auth users and roll back their fixtures and
 temporary grants. They check schema constraints, RLS, grants, profile operations,
 name validation and actual allowed/denied queries as `anon` and as `authenticated`
@@ -89,9 +91,9 @@ bound failed tests. The harness does not accept a hosted database connection.
 
 `pnpm db:stage` copies module migrations into the fixture's ignored migrations
 directory with stable, globally unique versions. Core tables come before
-leaderboards, followed by profile functions and score submission. Existing identical copies
-are left alone; differing copies fail
-instead of overwriting them. The migration ledger makes repeated installation
+leaderboards, followed by profile functions, score submission and ranking reads.
+Existing identical copies are left alone; differing copies fail instead of
+overwriting them. The migration ledger makes repeated installation
 a no-op. Raw SQL files are intentionally **apply-once**: an existing object with
 the same name causes failure rather than silently accepting an incompatible
 schema. Future changes must be new, additive migrations. The staging helper is
@@ -200,6 +202,66 @@ the last quota slot, retries at quota, processing timestamps, isolation rejectio
 and independent player/board pairs. Contention tests inspect actual lock waits
 before releasing the first transaction; synthetic committed data is cleaned up.
 
+## Ranking and pagination SQL operations
+
+- `public.sg_list_leaderboards()` returns enabled `LeaderboardSummary` objects,
+  ordered by ID, or `[]`. It lists all developer-managed board definitions.
+- `public.sg_get_entries(p_board_id text, p_limit integer DEFAULT 50,
+  p_cursor jsonb DEFAULT NULL)` returns `{ entries, nextCursor }`. Limits must be
+  1–100; an explicitly null limit is invalid. Empty pages return `[]` and a null cursor.
+- `public.sg_get_my_score(p_board_id text)` uses `auth.uid()` and returns the same
+  entry DTO, or JSON `null` for no visible score (including a hidden owner).
+  This read never creates a profile or accepts a target player ID.
+
+Entries contain only `playerId`, nullable `displayName`, `score`, `rank`, and
+`achievedAt`. Competition rank uses score alone: ties share a rank and subsequent
+places are skipped (`1, 1, 3`). Display order uses score in the board's direction,
+then ascending achievement timestamp and UUID. Hidden players are excluded before
+calculating ranks. Personal standings count strictly better visible scores and
+therefore agree with entry pages.
+
+The cursor describes the last returned tuple as
+`{ boardId, score, achievedAt, playerId }`. `nextCursor` is its JSON serialization
+as a **string**, matching the existing HTTP contract. Clients should treat that
+string as opaque. The future HTTP adapter must parse it into the RPC's JSONB input;
+SQL callers can pass `(previous_page ->> 'nextCursor')::jsonb`. No HTTP encoding or
+route handler is implemented here. Scores must be safe integers, timestamps must
+include a timezone and preserve up to six fractional digits, and UUIDs must use
+the canonical hyphenated form. Invalid types, missing/extra fields, another board's
+cursor, or decoded cursors exceeding 4 KiB raise `22023 / INVALID_CURSOR`.
+Cursors are positions in public data, not signed authorization tokens; they need
+not refer to a row that still exists.
+
+Ranking precedes cursor filtering, so pages beginning midway through a tie keep
+their global rank. A `limit + 1` lookahead determines whether a continuation exists.
+The functions are `STABLE`, giving each call a consistent query snapshot
+([PostgreSQL volatility documentation](https://www.postgresql.org/docs/17/xfunc-volatility.html)).
+Separate pages are not a shared snapshot: concurrent score, visibility or board
+changes can change ranks and page membership. Ordering is deterministic for unchanged data.
+
+All three functions use `SECURITY INVOKER`, an empty `search_path`, qualified
+references and explicit output fields. Existing table grants and RLS remain in
+force, including additional caller policies. `anon` and `authenticated` can list
+boards and entries; only `authenticated` can request a personal standing. Neither
+`PUBLIC` nor `service_role` receives execution grants. Missing/disabled boards
+raise `P0002 / LEADERBOARD_NOT_FOUND`; invalid limits raise `22023 / INVALID_REQUEST`;
+missing/malformed personal subjects raise `28000 / UNAUTHORIZED`.
+
+The plan suite uses 10,000 players on each sort direction, with real API-role RLS
+and `EXPLAIN (ANALYZE, BUFFERS)`. It records default-plan index/sort choices and
+checks bounded page output and primary-key access for personal lookup. A separate
+diagnostic discourages sequential scans, other join strategies and ordinary sorts
+to verify an ordered ranking-index path is available; application settings are
+unchanged. It explains the underlying ranked-page query because a plain
+PL/pgSQL-call explain hides nested plans, and also exercises the real RPCs on the
+same dataset with normal settings. Depending on statistics and costs, PostgreSQL
+may choose a sequential scan and full-board sort, or either ranking index with
+a backward scan and incremental tie sorting. Exact global ranks require scanning
+preceding visible scores on deep pages; existing RLS may also scan profiles to
+build a visibility lookup. Results
+and JSON aggregation are bounded, but database work is not constant-time. Large tie
+groups can add sorting work. These checks are a sanity test, not a scale guarantee.
+
 ## Repository layout
 
 | Path | Responsibility |
@@ -290,7 +352,7 @@ can submit plausible fabricated scores and create additional anonymous accounts.
 See the [design](docs/superpowers/specs/2026-11-08-supabase-game-services-design.md)
 and [implementation plan](docs/superpowers/plans/2026-11-08-supabase-game-services-v01.md).
 The supplied design retains its original draft wording; the plan records its
-approval on 2026-11-08. Only Tasks 1–4 are implemented here. Multiplayer, achievements,
+approval on 2026-11-08. Only Tasks 1–5 are implemented here. Multiplayer, achievements,
 cloud saves, friends, seasons, real-time broadcasts, native engine SDKs, and
 multi-game tenancy remain outside v0.1.
 
