@@ -5,11 +5,11 @@ Supabase project. The planned v0.1 provides anonymous player identities and
 leaderboards through a versioned HTTP API, a provisioning CLI, and a thin
 TypeScript SDK. There is no central service operated by this project.
 
-**Status: Tasks 1–5 implemented.** CLI help, the HTTP contract, shared DTOs,
-workspace tooling, database schema, profile operations, atomic score submission
-and ranked reads are implemented. Provisioning commands return `not yet implemented`
-with exit code 1.
-HTTP handlers and the runtime SDK are future tasks.
+**Status: Tasks 1–6 implemented.** CLI help, the HTTP contract, shared DTOs,
+workspace tooling, database schema, profile operations, atomic score submission,
+ranked reads and the versioned Edge HTTP API are implemented. Provisioning
+commands return `not yet implemented` with exit code 1.
+The runtime SDK and provisioning commands remain future tasks.
 Nothing is deployed to a hosted project or published.
 `@supagame/*` and the `supagame` executable are provisional names; all packages
 are private until publication is separately approved.
@@ -36,8 +36,8 @@ node packages/cli/dist/cli.js --help
 packages individually. `pnpm --filter @supagame/cli test` and
 `pnpm --filter @supagame/contracts test` select their respective suites.
 The TypeScript tests need no Supabase credentials or Docker stack. Database
-tests use the local fixture below. Edge Function and end-to-end suites arrive
-with their owning tasks; they are not represented by passing placeholder scripts.
+tests use the local fixture below. Deno HTTP tests and local Edge integration
+are described below; the broader end-to-end suite remains a later task.
 
 TypeScript 5.9.3 is pinned because it is compatible with both the OpenAPI type
 generator and TypeScript ESLint. Dependencies are exact versions and the pnpm
@@ -49,7 +49,7 @@ contracts contain no runtime dependencies. Generated output is ignored.
 Docker must be running. Supabase CLI **3.0.0** is an exact development dependency;
 use the repository's scripts so a different global CLI version is not selected.
 The fixture in `tests/fixtures/local/supabase/` has project ID
-`supagame-schema-tests`, PostgreSQL 17, and database port **55432**. It starts
+`supagame-schema-tests`, PostgreSQL 17, and database port **55432**. `pnpm db:start` starts
 only the local database, including Supabase's Auth schema and roles. No hosted
 credentials or project link are needed. Initial startup downloads Docker images.
 
@@ -79,7 +79,7 @@ These pgTAP suites create synthetic Auth users and roll back their fixtures and
 temporary grants. They check schema constraints, RLS, grants, profile operations,
 name validation and actual allowed/denied queries as `anon` and as `authenticated`
 with both anonymous and permanent user claims. This tests database authorization;
-JWT verification and HTTP behavior belong to later tasks.
+JWT verification and HTTP behavior have separate Edge tests below.
 
 After pgTAP, `pnpm test:db` also runs `pnpm test:db:concurrency`. This uses Docker
 to open real `psql` sessions in the fixed local fixture container. Profile cases
@@ -192,8 +192,8 @@ See [PostgreSQL transaction isolation](https://www.postgresql.org/docs/17/transa
 SQL errors use `UNAUTHORIZED` (`28000`), `INVALID_REQUEST` / `INVALID_SCORE`
 (`22023`), `LEADERBOARD_NOT_FOUND` (`P0002`, including disabled boards),
 `DUPLICATE_KEY_CONFLICT` (`23505`), and `RATE_LIMITED` (`P0001`). Authentication
-and basic argument validation precede replay. HTTP error mapping and JWT signature
-verification belong to the later HTTP task. Per-identity throttling does not stop
+and basic argument validation precede replay. The Edge adapter maps these errors
+and verifies JWT signatures before calling SQL. Per-identity throttling does not stop
 anonymous account farming or prove that a submitted score represents real gameplay.
 
 `pnpm test:db:concurrency` uses separate local PostgreSQL sessions to test profile
@@ -223,9 +223,10 @@ therefore agree with entry pages.
 The cursor describes the last returned tuple as
 `{ boardId, score, achievedAt, playerId }`. `nextCursor` is its JSON serialization
 as a **string**, matching the existing HTTP contract. Clients should treat that
-string as opaque. The future HTTP adapter must parse it into the RPC's JSONB input;
-SQL callers can pass `(previous_page ->> 'nextCursor')::jsonb`. No HTTP encoding or
-route handler is implemented here. Scores must be safe integers, timestamps must
+string as opaque. The HTTP adapter parses it into the RPC's JSONB input;
+SQL callers can pass `(previous_page ->> 'nextCursor')::jsonb`. HTTP callers
+URL-encode the opaque string as the `cursor` query parameter. Scores must be safe
+integers, timestamps must
 include a timezone and preserve up to six fractional digits, and UUIDs must use
 the canonical hyphenated form. Invalid types, missing/extra fields, another board's
 cursor, or decoded cursors exceeding 4 KiB raise `22023 / INVALID_CURSOR`.
@@ -270,8 +271,8 @@ groups can add sorting work. These checks are a sanity test, not a scale guarant
 | `packages/cli/` | CLI entrypoint; future provisioning and maintenance commands |
 | `packages/sdk-ts/` | Reserved for the Task 10 client SDK |
 | `modules/core/migrations/` | Player profile schema, protected profile functions, RLS and grants |
-| `modules/leaderboards/` | Leaderboard/score/event schema and indexes; future Edge Function |
-| `tests/cli/`, `tests/api/` | CLI process tests and contract/schema tests |
+| `modules/leaderboards/` | Leaderboard/score/event schema, indexes and Edge Function |
+| `tests/cli/`, `tests/api/` | CLI process, contract, Deno HTTP and local Edge integration tests |
 | `tests/db/`, `tests/fixtures/local/` | pgTAP schema/security suite and isolated local fixture |
 | `tests/sdk/`, `tests/e2e/` | Reserved for later local test suites |
 | `examples/capacitor-demo/` | Reserved for the standalone Task 11 example |
@@ -283,7 +284,7 @@ games will call HTTP endpoints or the SDK directly.
 
 ## HTTP contract
 
-The [OpenAPI document](packages/contracts/openapi.yaml) defines the future base
+The [OpenAPI document](packages/contracts/openapi.yaml) defines the base
 path `/functions/v1/supagame/v1` on the developer's Supabase project URL.
 Every operation requires the project's **publishable** key in the `apikey`
 header. Authenticated operations additionally require
@@ -336,6 +337,83 @@ Consumers use the named exports from `packages/contracts/src/types.ts` (or
 types preserve nullability and enum values; TypeScript's `number` type cannot
 enforce safe-integer bounds, so runtime validation is still required.
 
+## Edge HTTP API development
+
+The six routes above are implemented in `modules/leaderboards/functions/supagame/`.
+Routing, authentication, transport validation and error formatting are separate;
+each request delegates its business operation to an existing PostgreSQL function.
+RPC types refer to the generated contract DTOs. No database migrations, grants,
+RLS policies or score-submission behavior changed for Task 6.
+
+`pnpm install` provisions Deno **2.9.6** through pnpm's pinned runtime support.
+Deno dependencies are pinned in `deno.lock`; the auth adapter uses
+`@supabase/server` **1.9.2**. The scripts use explicit Deno permissions and frozen
+resolution. First use needs network access to download the locked dependencies.
+
+```sh
+pnpm test:edge             # Real JWT cryptography; mocked RPC transport, no stack
+pnpm check:edge            # Also included in pnpm typecheck
+pnpm lint:edge             # Also included in pnpm lint
+pnpm api:start             # Dedicated local Auth, gateway, REST, DB and Edge stack
+pnpm db:migrate
+pnpm test:edge:integration # Raw HTTP against http://127.0.0.1:55431 only
+pnpm test:db
+pnpm db:stop
+```
+
+`api:start` copies the fixture's public `.env.example` into its ignored `.env`
+only when absent, and suppresses CLI startup output because it contains privileged
+local keys. If a DB-only fixture is already running, stop it before `api:start`.
+The integration suite creates anonymous and permanent Auth users, checks all six
+routes plus direct REST permissions, and deletes its synthetic users and boards.
+It reads local status in memory, uses only the publishable key and user JWTs for
+HTTP, and uses the fixed local Docker DB solely for fixture setup/cleanup. It
+refuses a non-fixture API URL and never accepts a hosted target.
+
+The local function configuration has `verify_jwt = false`: public and protected
+routes share one function. Application authentication uses the supported
+[`@supabase/server` core primitives](https://supabase.com/docs/guides/functions/auth)
+to verify the publishable key on every non-preflight request to a supported route,
+then separately verify a user JWT on protected routes. Those are **both** required,
+not an auth-mode alternative. JWT verification checks the signature, issuer,
+audience, expiry, authenticated role and UUID subject. The caller-scoped client
+forwards the verified user token; public reads always use the anonymous role.
+No service-role/admin client is created. This adapter requires modern publishable
+keys and JWKS-backed user JWTs supported by the server auth library; legacy anon
+keys and legacy shared-secret JWT verification are not supported.
+
+Supabase supplies its URL, publishable keys and JWKS environment. Configure:
+
+- `SG_ALLOWED_ORIGINS`: JSON array of exact browser origins, for example
+  `["https://game.example"]`. Default `[]` permits no browser origins; native
+  clients without an Origin header still work. Wildcards and `null` origins are
+  rejected. Valid OPTIONS preflights require neither API key nor user session.
+- `SG_AUTH_ISSUER`: exact Auth JWT issuer if it differs from
+  `SUPABASE_PUBLIC_URL` (or `SUPABASE_URL`) plus `/auth/v1`. The local fixture needs
+  this because its external Auth URL differs from Docker's internal gateway URL.
+  Never derive the trusted issuer from request headers or unverified token claims.
+
+Writes require uncompressed UTF-8 `application/json`; actual streamed bytes are
+limited to 4096 even without Content-Length. Unknown fields, identity overrides,
+duplicate/unknown query parameters and malformed cursors fail closed. JSON numeric
+source text is checked so fractional scores cannot become accepted integers through
+floating-point rounding. SQL still owns name normalization, bounds, ranking,
+idempotency and throttling. Cursors preserve timestamp microseconds.
+
+Application errors use the OpenAPI `{ code, message }` envelope and no-store
+responses. Only known SQLSTATE/message pairs become domain errors; unexpected
+errors return a generic 500 without logging credentials or SQL diagnostics.
+The contract now also documents 403 CORS/permission failures, 405 with `Allow`,
+415 media-type failures, credential-free OPTIONS, and unknown-route 404s.
+Supabase's gateway can reject project keys before invoking the function; those
+platform-owned error bodies cannot be normalized by this handler. The local Kong
+gateway also answers OPTIONS with 200 and wildcard CORS headers before Edge runs;
+the handler itself returns 204 with configured origins when preflight reaches it.
+Actual requests still enforce the origin allowlist and reject disallowed origins
+before authentication or SQL. JWT signature
+verification does not immediately revoke an otherwise valid access token after
+sign-out; Supabase token expiration and existing database authorization still apply.
+
 ## Security and scope
 
 Future installations belong entirely to the developer's Supabase project.
@@ -352,7 +430,7 @@ can submit plausible fabricated scores and create additional anonymous accounts.
 See the [design](docs/superpowers/specs/2026-11-08-supabase-game-services-design.md)
 and [implementation plan](docs/superpowers/plans/2026-11-08-supabase-game-services-v01.md).
 The supplied design retains its original draft wording; the plan records its
-approval on 2026-11-08. Only Tasks 1–5 are implemented here. Multiplayer, achievements,
+approval on 2026-11-08. Only Tasks 1–6 are implemented here. Multiplayer, achievements,
 cloud saves, friends, seasons, real-time broadcasts, native engine SDKs, and
 multi-game tenancy remain outside v0.1.
 

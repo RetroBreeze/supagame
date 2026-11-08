@@ -1,4 +1,4 @@
-# Isolated, local-only Task 2 database fixture. Never link this to a hosted project.
+# Isolated local database/API fixture. Never link this to a hosted project.
 project_id = "supagame-schema-tests"
 
 [api]
@@ -34,4 +34,18 @@ enabled = false
 enabled = false
 
 [edge_runtime]
-enabled = false
+enabled = true
+inspector_port = 55433
+
+[auth]
+enabled = true
+site_url = "http://localhost:55431"
+enable_anonymous_sign_ins = true
+
+[auth.email]
+enable_confirmations = false
+
+[functions.supagame]
+enabled = true
+verify_jwt = false
+entrypoint = "../../../../modules/leaderboards/functions/supagame/index.ts"

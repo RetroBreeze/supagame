@@ -7,8 +7,15 @@ info:
     identifier: MIT
   description: |
     Contract for a single game installed in the developer's own Supabase project.
-    Task 1 defines this contract; runtime endpoints are not yet implemented.
-    Every request includes the project's publishable key in the apikey header.
+    Every application request includes the project's publishable key in the apikey header.
+    OPTIONS preflight requests require no credentials. The handler returns 204 for configured
+    origins; Supabase's gateway may answer preflight itself with 200 and broader CORS headers.
+    Actual application requests still enforce the configured origin allowlist.
+    Disallowed origins or database permissions return 403 FORBIDDEN. Unknown routes return
+    404 NOT_FOUND; unsupported methods return 405 METHOD_NOT_ALLOWED with an Allow header.
+    Write requests require uncompressed application/json with UTF-8 encoding; unsupported
+    media types or encodings return 415 UNSUPPORTED_MEDIA_TYPE. Unknown or repeated query
+    parameters return 400 INVALID_REQUEST (repeated cursors return INVALID_CURSOR).
     Player routes also require a verified Supabase Auth JWT (anonymous or permanent).
     No request accepts a caller-supplied player identity for writes.
     Scores are PostgreSQL BIGINT values restricted in JSON to Number.isSafeInteger(score).
@@ -31,8 +38,14 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/LeaderboardSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
         '500':
           $ref: '#/components/responses/InternalError'
   /leaderboards/{id}/entries:
@@ -76,6 +89,10 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
@@ -98,8 +115,14 @@ paths:
                 anyOf:
                   - $ref: '#/components/schemas/MyScore'
                   - type: 'null'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
@@ -138,12 +161,18 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '429':
           $ref: '#/components/responses/RateLimited'
         '500':
@@ -162,8 +191,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlayerProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
         '500':
           $ref: '#/components/responses/InternalError'
     patch:
@@ -191,8 +226,14 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
         '500':
           $ref: '#/components/responses/InternalError'
 components:
@@ -385,6 +426,24 @@ components:
             $ref: '#/components/schemas/ApiError'
     InternalError:
       description: INTERNAL_ERROR — generic failure with no internal implementation details.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    Forbidden:
+      description: FORBIDDEN — origin or database operation is not permitted.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    MethodNotAllowed:
+      description: METHOD_NOT_ALLOWED — unsupported method; includes an Allow header.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    UnsupportedMediaType:
+      description: UNSUPPORTED_MEDIA_TYPE — use uncompressed application/json with UTF-8 encoding.
       content:
         application/json:
           schema:

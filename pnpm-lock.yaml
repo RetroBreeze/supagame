@@ -181,6 +181,9 @@ importers:
       ajv-formats:
         specifier: 3.0.1
         version: 3.0.1(ajv@8.20.0)
+      deno:
+        specifier: runtime:2.9.6
+        version: runtime:2.9.6
       eslint:
         specifier: 10.14.0
         version: 10.14.0(supports-color@10.2.2)
@@ -693,6 +696,69 @@ packages:
 
   deep-is@0.1.4:
     resolution: {integrity: sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ==}
+
+  deno@runtime:2.9.6:
+    resolution:
+      type: variations
+      variants:
+        - resolution:
+            archive: zip
+            bin: deno
+            integrity: sha256-ITovME8E08nLUiBmmvrROPYKWqsf6Aliq96481gHpHI=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.9.6/deno-aarch64-apple-darwin.zip
+          targets:
+            - cpu: arm64
+              os: darwin
+        - resolution:
+            archive: zip
+            bin: deno.exe
+            integrity: sha256-rLAUr+IpmEd2TiMrSZPhYuOUbN7sNmA+PxoLVIzR6lU=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.9.6/deno-aarch64-pc-windows-msvc.zip
+          targets:
+            - cpu: arm64
+              os: win32
+        - resolution:
+            archive: zip
+            bin: deno
+            integrity: sha256-mkavxsOSx80v9xoxVYk1VFtGQI0Oh/eoaQjHEnIcBG4=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.9.6/deno-aarch64-unknown-linux-gnu.zip
+          targets:
+            - cpu: arm64
+              os: linux
+        - resolution:
+            archive: zip
+            bin: deno
+            integrity: sha256-fUUkuCvMVX/gIKGltWlW7UK5kq5bKAJuitXRcylTP18=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.9.6/deno-x86_64-apple-darwin.zip
+          targets:
+            - cpu: x64
+              os: darwin
+        - resolution:
+            archive: zip
+            bin: deno.exe
+            integrity: sha256-FeUwCwujw2ladiHZAWCnRuyecQIozuY5r6nVgPbjzRE=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.9.6/deno-x86_64-pc-windows-msvc.zip
+          targets:
+            - cpu: x64
+              os: win32
+            - cpu: arm64
+              os: win32
+        - resolution:
+            archive: zip
+            bin: deno
+            integrity: sha256-OU8H9Nor6+bObx584PoWQpspsIw14/rD/iWXJnbf9LI=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.9.6/deno-x86_64-unknown-linux-gnu.zip
+          targets:
+            - cpu: x64
+              os: linux
+    version: 2.9.6
+    hasBin: true
 
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
@@ -1655,6 +1721,8 @@ snapshots:
       supports-color: 10.2.2
 
   deep-is@0.1.4: {}
+
+  deno@runtime:2.9.6: {}
 
   detect-libc@2.1.2: {}
 

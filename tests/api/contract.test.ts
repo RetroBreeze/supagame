@@ -45,6 +45,15 @@ beforeAll(async () => {
 });
 
 describe('v1 HTTP contract', () => {
+  it('documents cross-cutting HTTP errors and unsupported write media types', () => {
+    for (const [path, method] of routes) {
+      expect(operation(path, method).responses?.['403']).toEqual({ $ref: '#/components/responses/Forbidden' });
+      expect(operation(path, method).responses?.['405']).toEqual({ $ref: '#/components/responses/MethodNotAllowed' });
+      if (method !== 'get') expect(operation(path, method).responses?.['415']).toEqual({ $ref: '#/components/responses/UnsupportedMediaType' });
+    }
+    expect(document.info.description).toContain('OPTIONS');
+    expect(document.info.description).toContain('NOT_FOUND');
+  });
   it('is a valid OpenAPI 3.1 document with the versioned function base path', async () => {
     await expect(SwaggerParser.validate(contractPath)).resolves.toBeDefined();
     expect(document.openapi).toMatch(/^3\.1\./);

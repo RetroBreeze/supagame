@@ -1,0 +1,13 @@
+{
+  "nodeModulesDir": "none",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "fmt": { "singleQuote": true, "lineWidth": 100 },
+  "lint": { "rules": { "exclude": ["no-import-prefix"] } }
+}

@@ -5,7 +5,9 @@
   "type": "module",
   "license": "MIT",
   "packageManager": "pnpm@12.18.0",
-  "engines": { "node": ">=24.0.0 <25" },
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
   "scripts": {
     "test": "vitest run",
     "db:start": "supabase db start --workdir tests/fixtures/local --network-id supagame-schema-tests-local",
@@ -14,11 +16,16 @@
     "test:db": "supabase test db --workdir tests/fixtures/local --network-id supagame-schema-tests-local tests/db/schema.test.sql tests/db/players.test.sql tests/db/submission.test.sql tests/db/rankings.test.sql tests/db/rankings-plans.test.sql && pnpm test:db:concurrency",
     "test:db:concurrency": "node --test tests/db/players-concurrency.test.ts tests/db/submission-concurrency.test.ts",
     "db:stop": "supabase stop --workdir tests/fixtures/local --network-id supagame-schema-tests-local",
-    "typecheck": "tsc --noEmit && pnpm -r typecheck",
-    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit && pnpm -r typecheck && pnpm check:edge",
+    "lint": "eslint . --max-warnings=0 && pnpm lint:edge",
     "build": "pnpm -r build",
     "contracts:generate": "openapi-typescript packages/contracts/openapi.yaml -o packages/contracts/src/generated.ts",
-    "contracts:check": "openapi-typescript packages/contracts/openapi.yaml -o packages/contracts/src/generated.ts --check"
+    "contracts:check": "openapi-typescript packages/contracts/openapi.yaml -o packages/contracts/src/generated.ts --check",
+    "api:start": "node tests/api/start-local.ts",
+    "test:edge": "deno test --frozen --allow-env --allow-read=packages/contracts/openapi.yaml tests/api/http.test.ts",
+    "test:edge:integration": "deno test --frozen --allow-env --allow-read=packages/contracts/openapi.yaml --allow-net=127.0.0.1:55431 --allow-run=./node_modules/.bin/supabase,docker tests/api/http.integration.test.ts",
+    "check:edge": "deno check --frozen modules/leaderboards/functions/supagame/index.ts tests/api/http.test.ts tests/api/http.integration.test.ts",
+    "lint:edge": "deno lint modules/leaderboards/functions/supagame tests/api/http*.ts && deno fmt --check deno.json modules/leaderboards/functions/supagame tests/api/http*.ts"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "13.1.0",
@@ -34,5 +41,12 @@
     "typescript-eslint": "8.72.1",
     "vitest": "5.1.0",
     "yaml": "2.9.1"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "deno",
+      "version": "2.9.6",
+      "onFail": "download"
+    }
   }
 }
