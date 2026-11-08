@@ -5,10 +5,11 @@ Supabase project. The planned v0.1 provides anonymous player identities and
 leaderboards through a versioned HTTP API, a provisioning CLI, and a thin
 TypeScript SDK. There is no central service operated by this project.
 
-**Status: Task 1 bootstrap only.** CLI help, the HTTP contract, shared DTOs,
-workspace tooling and initial tests are implemented. Provisioning commands
-return `not yet implemented` with exit code 1. Database migrations, HTTP
-handlers and the runtime SDK are future tasks. Nothing is deployed or published.
+**Status: Tasks 1–2 implemented.** CLI help, the HTTP contract, shared DTOs,
+workspace tooling and the initial database schema are implemented. Provisioning
+commands return `not yet implemented` with exit code 1. Player-management and
+score-submission functions, HTTP handlers and the runtime SDK are future tasks.
+Nothing is deployed to a hosted project or published.
 `@supagame/*` and the `supagame` executable are provisional names; all packages
 are private until publication is separately approved.
 
@@ -33,14 +34,81 @@ node packages/cli/dist/cli.js --help
 `pnpm -r typecheck`, `pnpm -r lint` and `pnpm -r build` check the workspace
 packages individually. `pnpm --filter @supagame/cli test` and
 `pnpm --filter @supagame/contracts test` select their respective suites.
-No Supabase credentials, Docker stack or hosted project is needed for Task 1.
-Database, Edge Function and end-to-end suites arrive with their owning tasks;
-they are not represented by passing placeholder scripts.
+The TypeScript tests need no Supabase credentials or Docker stack. Database
+tests use the local fixture below. Edge Function and end-to-end suites arrive
+with their owning tasks; they are not represented by passing placeholder scripts.
 
 TypeScript 5.9.3 is pinned because it is compatible with both the OpenAPI type
 generator and TypeScript ESLint. Dependencies are exact versions and the pnpm
 lockfile is committed. Packages use ESM, strict typing, and NodeNext resolution;
 contracts contain no runtime dependencies. Generated output is ignored.
+
+## Local database tests
+
+Docker must be running. Supabase CLI **3.0.0** is an exact development dependency;
+use the repository's scripts so a different global CLI version is not selected.
+The fixture in `tests/fixtures/local/supabase/` has project ID
+`supagame-schema-tests`, PostgreSQL 17, and database port **55432**. It starts
+only the local database, including Supabase's Auth schema and roles. No hosted
+credentials or project link are needed. Initial startup downloads Docker images.
+
+Create this Docker network once to bind the database port to loopback only
+(the [Supabase local-development guidance](https://supabase.com/docs/guides/local-development)
+describes this setting):
+
+```sh
+docker network create --driver bridge --opt com.docker.network.bridge.host_binding_ipv4=127.0.0.1 supagame-schema-tests-local
+```
+
+Then start and test the fixture:
+
+```sh
+pnpm db:start
+pnpm db:migrate
+pnpm test:db
+pnpm db:migrate # repeated installation: no pending migrations
+pnpm db:stop    # stops this fixture and preserves its local database volume
+```
+
+`pnpm test:db` runs `supabase test db` against the fixture with its dedicated
+network and `tests/db/schema.test.sql` as the test file.
+The pgTAP suite creates synthetic Auth users and rolls back all fixtures and
+temporary grants. It checks columns, types, keys, constraints, index ordering,
+RLS, and actual allowed/denied queries as `anon` and as `authenticated` with
+both anonymous and permanent user claims. This tests database authorization;
+JWT verification and HTTP behavior belong to later tasks.
+
+`pnpm db:stage` copies the two module migrations into the fixture's ignored
+migrations directory with stable, globally unique versions, core before
+leaderboards. Existing identical copies are left alone; differing copies fail
+instead of overwriting them. The migration ledger makes repeated installation
+a no-op. Raw SQL files are intentionally **apply-once**: an existing object with
+the same name causes failure rather than silently accepting an incompatible
+schema. Future changes must be new, additive migrations. The staging helper is
+test infrastructure; it does not implement the future provisioning CLI.
+
+The database foundation provides:
+
+- `game_players`, linked to `auth.users`, with nullable display names and a hidden flag.
+- `game_leaderboards`, with time/points kinds, asc/desc ordering and optional bounds.
+- `game_best_scores`, with one row per board/player and two ranking indexes that
+  preserve ascending achievement-time/player-ID tie order for both score directions.
+- `sg_private.game_submission_events`, keyed by player/board/submission UUID,
+  with an index for the future rate-limit window. No submission logic runs yet.
+
+RLS permits reads of enabled boards, visible profiles and their scores. Explicit
+column grants keep moderation flags and submission keys out of public reads.
+Neither API role can insert, update, delete, truncate, or create foreign keys or
+triggers against these tables. The private schema has no API-role access, is excluded
+from the fixture's exposed schemas, and its event table also has default-deny RLS.
+Migrations revoke Supabase's automatic client grants on these tables without
+changing privileges on unrelated application objects.
+
+Scores and bounds use `BIGINT` constrained to JSON-safe integers. Trusted deletion
+of an Auth user or board cascades to dependent toolkit records, preventing
+orphans. There are no client delete permissions. Board-specific submission
+validation, profile updates, atomic best-score updates, idempotent replay and
+rate limiting remain the responsibility of subsequent tasks.
 
 ## Repository layout
 
@@ -49,10 +117,11 @@ contracts contain no runtime dependencies. Generated output is ignored.
 | `packages/contracts/` | Authoritative OpenAPI 3.1 contract and derived TypeScript DTOs |
 | `packages/cli/` | CLI entrypoint; future provisioning and maintenance commands |
 | `packages/sdk-ts/` | Reserved for the Task 10 client SDK |
-| `modules/core/migrations/` | Reserved for player profiles and security migrations |
-| `modules/leaderboards/` | Reserved for leaderboard migrations and the Edge Function |
+| `modules/core/migrations/` | Player profile schema, read policy and grants |
+| `modules/leaderboards/` | Leaderboard/score/event schema and indexes; future Edge Function |
 | `tests/cli/`, `tests/api/` | CLI process tests and contract/schema tests |
-| `tests/db/`, `tests/sdk/`, `tests/e2e/` | Reserved for later local test suites |
+| `tests/db/`, `tests/fixtures/local/` | pgTAP schema/security suite and isolated local fixture |
+| `tests/sdk/`, `tests/e2e/` | Reserved for later local test suites |
 | `examples/capacitor-demo/` | Reserved for the standalone Task 11 example |
 | `docs/superpowers/` | Product design and numbered implementation plan |
 
@@ -120,7 +189,7 @@ Future installations belong entirely to the developer's Supabase project.
 Clients receive only a publishable key and their own session. Never place
 privileged credentials in games, fixtures or committed files. Hosted deployment
 must preview the exact destination and pending migrations and require explicit
-approval; Task 1 performs no hosted operations.
+approval. The current implementation performs no hosted operations.
 
 Existing authenticated sessions must be reused. Losing an unlinked anonymous
 session may make its identity unrecoverable. Range checks and per-identity rate
@@ -130,7 +199,7 @@ can submit plausible fabricated scores and create additional anonymous accounts.
 See the [design](docs/superpowers/specs/2026-11-08-supabase-game-services-design.md)
 and [implementation plan](docs/superpowers/plans/2026-11-08-supabase-game-services-v01.md).
 The supplied design retains its original draft wording; the plan records its
-approval on 2026-11-08. Only Task 1 is implemented here. Multiplayer, achievements,
+approval on 2026-11-08. Only Tasks 1–2 are implemented here. Multiplayer, achievements,
 cloud saves, friends, seasons, real-time broadcasts, native engine SDKs, and
 multi-game tenancy remain outside v0.1.
 
