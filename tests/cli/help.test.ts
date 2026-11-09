@@ -26,13 +26,6 @@ describe('supagame CLI bootstrap', () => {
     expect(result.stdout).toContain('Usage: supagame');
   });
 
-  it.each(['doctor', 'upgrade'])('%s fails clearly until its owning task implements it', (command) => {
-    const result = runCli(command);
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain(`${command}: not yet implemented`);
-    expect(result.stdout).toBe('');
-  });
-
   it.each(commands)('%s --help succeeds without running the command', (command) => {
     const result = runCli(command, '--help');
     expect(result.status, result.stderr).toBe(0);

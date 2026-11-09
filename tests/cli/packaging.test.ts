@@ -49,6 +49,14 @@ it(
     result = run('deploy', '--project-ref', ref);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('--allow-remote');
+    const maintained = snapshot(join(root, 'supabase'));
+    result = run('doctor');
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('HEALTHY');
+    result = run('upgrade', '--dry-run');
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('no upgrade available');
+    expect(snapshot(join(root, 'supabase'))).toEqual(maintained);
     const functionRoot = join(root, 'supabase/functions/supagame');
     expect(readFileSync(join(functionRoot, 'deno.lock'), 'utf8')).not.toContain(
       '"workspace"',

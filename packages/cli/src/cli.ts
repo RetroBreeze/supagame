@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { doctor, doctorExitCode } from './commands/doctor.ts';
+import type { DoctorOptions } from './commands/doctor.ts';
+import { upgrade } from './commands/upgrade.ts';
 import { Command } from 'commander';
 import { init } from './commands/init.ts';
 import { deploy } from './commands/deploy.ts';
@@ -63,15 +66,17 @@ local(
     'Explicitly authorize hosted changes without a prompt (CI opt-in)',
   )
   .action((options: DeployOptions) => deploy(options));
-for (
-  const [name, description] of [
-    ['doctor', 'Diagnose the installation and configuration'],
-    ['upgrade', 'Stage additive module upgrades'],
-  ]
-) {
-  program.command(name!).description(`${description} (not yet implemented)`)
-    .action(() => program.error(`${name}: not yet implemented`, { exitCode: 1 }));
-}
+program.command('doctor').description('Read-only installation, schema and security diagnostics')
+  .option('--workdir <directory>', 'Explicit project root')
+  .option('--local', 'Inspect the running local database')
+  .option('--remote', 'Inspect the explicitly selected hosted project read-only')
+  .option('--project-ref <ref>', 'Exact matching hosted project reference')
+  .action(async (options: DoctorOptions) => {
+    const findings = await doctor(options);
+    process.exitCode = doctorExitCode(findings, Boolean(options.local || options.remote));
+  });
+local(program.command('upgrade').description('Stage known forward-only module upgrades locally'))
+  .action((options: LocalOptions) => upgrade(options));
 if (process.argv.length === 2) program.help();
 try {
   await program.parseAsync();

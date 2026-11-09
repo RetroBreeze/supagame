@@ -5,10 +5,11 @@ Supabase project. The planned v0.1 provides anonymous player identities and
 leaderboards through a versioned HTTP API, a provisioning CLI, and a thin
 TypeScript SDK. There is no central service operated by this project.
 
-**Status: Tasks 1–8 implemented.** CLI help, the HTTP contract, shared DTOs,
+**Status: Tasks 1–9 implemented.** CLI help, the HTTP contract, shared DTOs,
 workspace tooling, database schema, profile operations, atomic score submission,
 ranked reads, the versioned Edge HTTP API, local CLI setup/staging, leaderboard
-creation and explicitly confirmed deployment are implemented. Maintenance commands and the runtime SDK remain future tasks.
+creation, explicitly confirmed deployment, diagnostics and forward-only upgrade staging
+are implemented. The runtime SDK and final example/release work remain future tasks.
 Nothing is deployed to a hosted project or published.
 `@supagame/*` and the `supagame` executable are provisional names; all packages
 are private until publication is separately approved.
@@ -278,8 +279,8 @@ groups can add sorting work. These checks are a sanity test, not a scale guarant
 | `docs/superpowers/` | Product design and numbered implementation plan |
 
 The CLI prepares project files, creates leaderboard definitions and deploys only
-after explicit authorization. `doctor` and `upgrade` remain placeholders that exit
-unsuccessfully. Games call the HTTP API directly.
+after explicit authorization. `doctor` inspects without remediation; `upgrade` stages
+known forward-only releases locally. Games call the HTTP API directly.
 
 ## Local CLI setup and module staging
 
@@ -487,6 +488,106 @@ including zero mutation calls on unapproved attempts. `pnpm test:cli:db` runs ge
 SQL, escaping and real CLI dry-run checks in the fixed local PostgreSQL fixture.
 No automated test performs a hosted deployment.
 
+## Diagnostics and forward-only upgrades
+
+Run from the selected Supabase project root (all commands accept `--workdir`):
+
+```sh
+supagame doctor                                  # Files only; no CLI/network calls
+supagame doctor --local                          # Also inspect the running local DB
+supagame doctor --remote --project-ref <ref>      # Explicit hosted read-only inspection
+supagame upgrade --dry-run                       # Preview local staging
+supagame upgrade                                 # Stage only; never deploy
+```
+
+Doctor never repairs files, changes settings, applies migrations, modifies records
+or deploys functions. Default diagnostics work offline without hosted credentials.
+Live inspection requires the pinned **Supabase CLI 3.0.0** on `PATH`. Remote mode
+requires a reference matching the manifest and available local link metadata;
+`--local` and `--remote` cannot be combined. Environment variables never choose a
+hosted destination. Read failures and unknown response formats are reported as
+unverified, not successful.
+
+Every finding includes its provenance (`local`, `database`, or `remote`) and status:
+
+| Status | Meaning |
+| --- | --- |
+| `HEALTHY` | The stated check passed against observed evidence. |
+| `WARNING` | Configuration needs attention, a newer release/pending migration exists, or known drift needs review. |
+| `ERROR` | A required component, supported version, target agreement or security expectation failed. |
+| `CANNOT VERIFY` | The evidence was unavailable or the check was not requested. |
+
+Exit code **1** means an error was found; **2** means requested live evidence is
+incomplete; **0** means neither condition occurred (warnings can still be present).
+Default offline mode does not fail solely because live checks were not requested.
+The informational HTTP/CORS limitation does not affect the exit code; doctor does
+not acquire player sessions or make runtime API requests.
+
+Local checks cover TOML and manifest validity, selected project references, module
+dependencies, exact migration/asset bytes, generated board definitions, anonymous
+sign-in and Edge Function configuration. Config.json, dotenv files and target
+configuration overrides are flagged rather than evaluated or copied. Doctor does
+not read dotenv contents or print configuration values. Deployment locks and incomplete journals are reported without
+removing or repairing them.
+
+Live database inspection compares the migration ledger with the authoritative release
+inventory and local files, distinguishing the known applied schema version from the
+locally recorded version. It reports pending and missing-history migrations,
+including unrelated application migrations. Catalog checks inspect RLS, exact policy
+names/roles/predicates, prohibited table and column writes, API-role ownership/bypass,
+public column allowlists, private-schema access and RPC signatures, security modes,
+empty search paths and narrow EXECUTE grants. Missing or malformed query evidence
+never produces a security success.
+
+Remote mode also reads hosted anonymous-auth settings and Edge Function status/JWT
+configuration. A matching completed deployment receipt, local asset hash and remote
+version/hash support a code-match finding; drift is warned about and missing evidence
+is explicitly unverified. These are configuration/catalog checks, **not an audit of
+SQL function bodies or a substitute for runtime security tests**. Migration history
+identifies applied versions, not the bytes originally applied. Arbitrary PostgreSQL
+extensions, external grants and application-specific security remain outside this
+module's diagnostic baseline.
+
+Supabase's read commands can write local link caches. Doctor therefore invokes them
+in disposable scratch space with minimal configuration and no dotenv files, leaving
+the selected project's files, modification times, configuration and cache untouched. All SQL
+is fixed catalog inspection, executed with `db query --read-only`; no runtime RPCs
+or player records are read. Hosted commands always carry `--remote=<ref>` and never
+`--yes`. See the official [read-only query documentation](https://supabase.com/docs/reference/cli/supabase-issue-bug)
+for the database-enforced transaction mode. Management API reads and CLI cache files
+are handled in memory/scratch; raw errors that might contain credentials are withheld.
+
+The production inventory in `packages/cli/src/lib/versions.ts` currently contains
+**core 0.1.0 and leaderboards 0.1.0 only**. An intact installation reports
+“Up to date; no upgrade available” and preserves file bytes and mtimes. Unknown,
+newer-than-supported or incompatible versions fail rather than guessing a migration
+path or downgrading. Missing/modified installed files require manual restoration;
+upgrade is not a repair command.
+
+A future approved release must provide a known predecessor, a complete cumulative
+migration history, a complete asset snapshot and compatible module dependencies.
+Inventory validation rejects migration rewrites/removals, version collisions,
+backward paths and asset deletion. New SQL must be reviewed as additive by release
+authors; the CLI does not pretend to prove SQL semantics with a keyword filter.
+Only bundled, reviewed release definitions are used—there is no arbitrary inventory
+file, URL or SQL input option. Future-version tests use fixtures, not fabricated
+production releases.
+
+Upgrade stages missing **new** migration files and replaces an asset only when its
+bytes match the known installed release. Identical partially staged future files can
+be reused. User modifications and conflicting filenames fail before changes. It uses
+the existing path validation, staging lock, optimistic concurrency checks, rollback
+and manifest-last publication. Existing migration files are never replaced, even if
+not yet applied. Configuration and unrelated files remain unchanged. Review and
+commit staged changes, then use the separate explicitly confirmed deployment workflow
+when ready. No reset, deletion, downgrade, automatic remediation or deployment runs
+from a maintenance command.
+
+Maintenance coverage is included in `pnpm --filter @supagame/cli test`.
+`pnpm test:cli:db` additionally checks the actual local CLI protocol and catalog
+security diagnostics against synthetic, rolled-back drift in the fixed Supabase
+fixture. Remote inspection tests use mocked process execution only.
+
 ## HTTP contract
 
 The [OpenAPI document](packages/contracts/openapi.yaml) defines the base
@@ -635,7 +736,7 @@ can submit plausible fabricated scores and create additional anonymous accounts.
 See the [design](docs/superpowers/specs/2026-11-08-supabase-game-services-design.md)
 and [implementation plan](docs/superpowers/plans/2026-11-08-supabase-game-services-v01.md).
 The supplied design retains its original draft wording; the plan records its
-approval on 2026-11-08. Only Tasks 1–8 are implemented here. Multiplayer, achievements,
+approval on 2026-11-08. Only Tasks 1–9 are implemented here. Multiplayer, achievements,
 cloud saves, friends, seasons, real-time broadcasts, native engine SDKs, and
 multi-game tenancy remain outside v0.1.
 

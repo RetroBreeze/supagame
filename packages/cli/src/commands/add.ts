@@ -17,7 +17,7 @@ export function add(module: string, options: LocalOptions): void {
   for (const [name, version] of Object.entries(existing.value.modules)) {
     if (version !== MODULE_VERSION) {
       throw new Error(
-        `Installed ${name} version ${version} differs from CLI templates ${MODULE_VERSION}. Use a matching CLI version; automatic upgrades are not implemented.`,
+        `Installed ${name} version ${version} differs from CLI templates ${MODULE_VERSION}. Use a matching CLI version, or inspect known forward-only paths with supagame upgrade --dry-run.`,
       );
     }
   }
