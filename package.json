@@ -14,6 +14,7 @@
     "db:stage": "node tests/db/stage-migrations.ts",
     "db:migrate": "pnpm db:stage && supabase migration up --workdir tests/fixtures/local",
     "test:db": "supabase test db --workdir tests/fixtures/local --network-id supagame-schema-tests-local tests/db/schema.test.sql tests/db/players.test.sql tests/db/submission.test.sql tests/db/rankings.test.sql tests/db/rankings-plans.test.sql && pnpm test:db:concurrency",
+    "test:cli:db": "node --test tests/db/leaderboard-migrations.test.ts",
     "test:db:concurrency": "node --test tests/db/players-concurrency.test.ts tests/db/submission-concurrency.test.ts",
     "db:stop": "supabase stop --workdir tests/fixtures/local --network-id supagame-schema-tests-local",
     "typecheck": "tsc --noEmit && pnpm -r typecheck && pnpm check:edge",

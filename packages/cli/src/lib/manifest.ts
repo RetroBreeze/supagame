@@ -25,7 +25,7 @@ function keys(value: Record<string, unknown>, expected: string[]): boolean {
   return Object.keys(value).length === expected.length &&
     expected.every((key) => Object.hasOwn(value, key));
 }
-function board(value: unknown): value is LeaderboardDefinition {
+export function isLeaderboard(value: unknown): value is LeaderboardDefinition {
   if (
     !object(value) ||
     !keys(value, [
@@ -66,7 +66,7 @@ export function validateManifest(value: unknown): Manifest {
   }
   if (value.modules.leaderboards && !value.modules.core) throw invalid();
   if (
-    !value.leaderboards.every(board) ||
+    !value.leaderboards.every(isLeaderboard) ||
     new Set(value.leaderboards.map((item) => item.id)).size !==
       value.leaderboards.length
   ) throw invalid();

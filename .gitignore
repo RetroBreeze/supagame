@@ -8,3 +8,4 @@ coverage/
 .superpowers/
 .worktrees/
 *.tgz
+.supagame-deploy-lock/

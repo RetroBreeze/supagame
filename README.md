@@ -5,11 +5,10 @@ Supabase project. The planned v0.1 provides anonymous player identities and
 leaderboards through a versioned HTTP API, a provisioning CLI, and a thin
 TypeScript SDK. There is no central service operated by this project.
 
-**Status: Tasks 1–7 implemented.** CLI help, the HTTP contract, shared DTOs,
+**Status: Tasks 1–8 implemented.** CLI help, the HTTP contract, shared DTOs,
 workspace tooling, database schema, profile operations, atomic score submission,
-ranked reads, the versioned Edge HTTP API, and local CLI setup/staging are
-implemented. Leaderboard creation, deployment, maintenance commands and the
-runtime SDK remain future tasks.
+ranked reads, the versioned Edge HTTP API, local CLI setup/staging, leaderboard
+creation and explicitly confirmed deployment are implemented. Maintenance commands and the runtime SDK remain future tasks.
 Nothing is deployed to a hosted project or published.
 `@supagame/*` and the `supagame` executable are provisional names; all packages
 are private until publication is separately approved.
@@ -97,7 +96,7 @@ overwriting them. The migration ledger makes repeated installation
 a no-op. Raw SQL files are intentionally **apply-once**: an existing object with
 the same name causes failure rather than silently accepting an incompatible
 schema. Future changes must be new, additive migrations. The staging helper is
-test infrastructure; it does not implement the future provisioning CLI.
+test infrastructure; production staging is handled by the provisioning CLI.
 
 The database foundation provides:
 
@@ -268,7 +267,7 @@ groups can add sorting work. These checks are a sanity test, not a scale guarant
 | Path | Responsibility |
 | --- | --- |
 | `packages/contracts/` | Authoritative OpenAPI 3.1 contract and derived TypeScript DTOs |
-| `packages/cli/` | Local CLI initialization/module staging; future deployment and maintenance |
+| `packages/cli/` | CLI setup, module staging, leaderboard creation and confirmed deployment |
 | `packages/sdk-ts/` | Reserved for the Task 10 client SDK |
 | `modules/core/migrations/` | Player profile schema, protected profile functions, RLS and grants |
 | `modules/leaderboards/` | Leaderboard/score/event schema, indexes and Edge Function |
@@ -278,9 +277,9 @@ groups can add sorting work. These checks are a sanity test, not a scale guarant
 | `examples/capacitor-demo/` | Reserved for the standalone Task 11 example |
 | `docs/superpowers/` | Product design and numbered implementation plan |
 
-The CLI's `init` and `add leaderboards` commands prepare local files.
-`leaderboard`, `deploy`, `doctor` and `upgrade` remain explicit placeholders
-that exit unsuccessfully. Games call the HTTP API directly.
+The CLI prepares project files, creates leaderboard definitions and deploys only
+after explicit authorization. `doctor` and `upgrade` remain placeholders that exit
+unsuccessfully. Games call the HTTP API directly.
 
 ## Local CLI setup and module staging
 
@@ -296,8 +295,8 @@ node /path/to/supagame/packages/cli/dist/cli.js add leaderboards
 
 Both commands accept `--workdir <project-root>`; otherwise only the current
 directory is inspected. There is no ancestor-directory search. An empty directory
-gets an instruction to run the official `supabase init` first. The toolkit does
-not create or link a hosted project, inspect accounts, or run Supabase commands.
+gets an instruction to run the official `supabase init` first. These local setup
+commands do not create or link a hosted project, inspect accounts, or run Supabase commands.
 
 `init` records a supplied project reference or reads project-local
 `supabase/.temp/project-ref` / `supabase/.temp/linked-project.json` metadata.
@@ -321,17 +320,17 @@ A fresh `supagame.config.json` is:
 The reference above is a placeholder. Manifest validation rejects unknown fields,
 unsupported formats, invalid module/version records and invalid or duplicate board
 definitions. Module records map `core` and `leaderboards` to release versions;
-installation sets both to `0.1.0`. `leaderboards` is reserved for Task 8's board
-creation command. Its validated definition shape is
+installation sets both to `0.1.0`. The `leaderboard create` command records entries
+in `leaderboards`. Its validated definition shape is
 `{ id, kind, sortDirection, keepBest: true, minValue, maxValue }`, with safe-integer
-or null bounds; Task 7 does not create definitions or board SQL.
+or null bounds.
 
 `add leaderboards` stages all five prerequisite SQL migrations in dependency order
 under `supabase/migrations/`, retaining stable versions `20261108000100` through
 `20261108000500`. Existing migration version collisions fail even when the suffix
 is different. SQL is copied byte for byte and never applied or rewritten. Projects
-with newer applied migration versions must review ordering when deployment is
-implemented; staging makes no assumption about the remote migration ledger.
+with newer applied migration versions must review ordering in the deployment
+preview; staging makes no assumption about the remote migration ledger.
 
 The Edge files go under `supabase/functions/supagame/`. The build bundles only an explicit allowlist of its own
 module assets, excluding local/hidden files such as `.env`; installation does not
@@ -376,6 +375,117 @@ there is no deployment or database operation to undo.
 Run `pnpm --filter @supagame/cli test` for CLI, filesystem and built-asset tests.
 The CLI tests use temporary directories; the copied Edge typecheck requires the
 locked Deno dependencies to be cached or available for download.
+
+## Leaderboard creation and confirmed deployment
+
+After `init` and `add leaderboards`, use the built executable (shown as
+`supagame` below):
+
+```sh
+supagame leaderboard create level-1 --type time --order asc --keep-best --min 0 --max 3600000
+supagame leaderboard create high-score --type points --order desc --keep-best --dry-run
+```
+
+IDs use 1–64 lowercase letters/digits/hyphens, starting with a letter or digit.
+Type and ordering are independent: `asc` means smaller is better; `desc` means
+larger is better. `--keep-best` is required. Optional bounds are decimal safe
+integers; minimum cannot exceed maximum. Commands record the definition and stage
+SQL together, using the existing rollback/manifest-last installer. Identical
+commands preserve bytes and mtimes; conflicting definitions or edited migrations
+fail. A completed SQL write with a missing manifest entry can be adopted by
+repeating the identical command. A missing migration for a recorded board must be
+restored from Git, because it may already have been applied.
+
+Generated migration versions are one UTC second after the greatest local migration
+version, independent of the wall clock. SQL inserts the definition without changing
+an existing board, then locks and checks the full definition. An incompatible or
+disabled existing board raises `SUPAGAME_LEADERBOARD_CONFLICT`. All text is escaped
+and all interpolated values are validated. Commit the manifest and SQL together;
+never edit an applied migration. Both creation and deployment require unique
+14-digit UTC-style `timestamp_name.sql` migration names; ambiguous or unsupported
+filenames fail instead of being silently omitted.
+
+Deployment uses **Supabase CLI 3.0.0** on `PATH`, the version whose flags and JSON
+protocol this adapter verifies. Other versions fail closed until their compatibility
+is tested. Supabase handles the developer's own authentication; this repository's
+tests require no hosted credentials. The deployment command always requires an
+explicit reference matching the manifest and any local link metadata:
+
+```sh
+supagame deploy --project-ref <project-ref> --dry-run
+supagame deploy --project-ref <project-ref>
+# Deliberate authorization for CI; this permits hosted mutations:
+supagame deploy --project-ref <project-ref> --allow-remote
+```
+
+All commands accept `--workdir <project-root>`. Deployment dry-run performs remote
+inspection but no hosted mutation. An interactive deployment prints the destination,
+every pending migration with its SHA-256 and SDK/unrelated label, and the function
+change. The operator must type **`deploy <project-ref>`** exactly. Noninteractive
+execution fails without `--allow-remote`; `CI`, `SUPABASE_YES`, manifest fields and
+other environment settings never supply consent. Dry-run and authorization flags
+cannot be combined.
+
+The CLI cross-checks `migration list` against `db push --dry-run` and rejects missing
+remote history, incomplete previews, ambiguous destinations or unsupported output.
+It previews **all** pending project SQL, including unrelated migrations. Review the
+SQL contents: migration code can itself perform arbitrary database changes.
+`--include-all` ensures older staged SDK versions are included in both preview and
+application. This ordering needs particular review in an existing application.
+After consent it rechecks local files and remote history/function metadata, then uses:
+
+```text
+supabase db push --remote=<ref> --include-all --skip-vault --yes
+supabase functions deploy supagame --remote=<ref> --yes
+```
+
+Additional `--workdir` and structured-output flags select a private temporary copy
+of exactly the reviewed migrations and versioned function assets. Minimal temporary
+configuration disables seeds and preserves the function's required
+`verify_jwt = false`; its route-specific authentication remains unchanged. Original
+configuration, `.env` files, secrets, config.json overrides, custom role files and
+unrelated functions are not copied. `--skip-vault` prevents the CLI's default Vault
+synchronization. The wrapper never invokes reset, prune, function deletion, config
+push or secrets deployment. It suppresses raw child output, which can contain SQL
+or credentials. The flags and structured protocol follow the
+[Supabase CLI 3.0.0 database implementation](https://github.com/supabase/cli/blob/v3.0.0/apps/cli/src/command-internal/db-push-core.ts)
+and [named-function deployment implementation](https://github.com/supabase/cli/blob/v3.0.0/apps/cli/src/shared/functions/deploy.ts).
+
+This release deploys the installed SDK's exact function assets. Modified SDK files
+must be restored or handled separately; arbitrary custom import graphs are not
+packaged by this command. Configure hosted anonymous Auth and `SG_ALLOWED_ORIGINS`
+separately. Local config/Auth settings and function secrets are not pushed.
+
+A project lock prevents overlapping deployments from the same checkout. Before each
+hosted phase, an atomic journal at `supabase/.temp/supagame-deploy.json` records the
+attempt and migration hashes. Database progress is verified before function
+deployment. A successful receipt plus matching local assets and remote function
+version/hash/settings permits a repeat to skip unchanged work. Without a verifiable
+receipt/content hash, the preview explicitly proposes redeployment.
+
+Deployment cannot be atomic across PostgreSQL and Edge hosting:
+
+- Database failure stops before functions and attempts read-only reconciliation,
+  reporting applied and remaining migrations. There is no automatic retry. If an
+  attempted migration remains unapplied, it may have partial effects; subsequent
+  invocations refuse to replay it. Inspect its SQL, the remote schema and ledger,
+  reconcile manually, and retain the journal until the outcome is established.
+  Clearing an uncertain journal without that inspection is unsafe.
+- Function failure preserves successful database progress. A subsequent invocation
+  inspects both services and requires fresh consent for any remaining work.
+- Process termination can leave `.supagame-deploy-lock`. Establish that no deployment
+  process is still running and inspect remote progress before removing that lock.
+  Preserve the journal for the next invocation. Do not commit the lock or journal;
+  Supabase normally ignores `.temp/`.
+- The local lock does not coordinate separate checkouts or remote administrators.
+  Serialize deployments externally; pre/post checks cannot eliminate every remote
+  race. Migration history establishes applied versions, not the contents of an
+  already-applied file, so preserve migration immutability in Git.
+
+`pnpm --filter @supagame/cli test` covers deployment with mocked process execution,
+including zero mutation calls on unapproved attempts. `pnpm test:cli:db` runs generated
+SQL, escaping and real CLI dry-run checks in the fixed local PostgreSQL fixture.
+No automated test performs a hosted deployment.
 
 ## HTTP contract
 
@@ -515,7 +625,7 @@ Future installations belong entirely to the developer's Supabase project.
 Clients receive only a publishable key and their own session. Never place
 privileged credentials in games, fixtures or committed files. Hosted deployment
 must preview the exact destination and pending migrations and require explicit
-approval. The current implementation performs no hosted operations.
+approval. Implementation tests never perform hosted operations.
 
 Existing authenticated sessions must be reused. Losing an unlinked anonymous
 session may make its identity unrecoverable. Range checks and per-identity rate
@@ -525,7 +635,7 @@ can submit plausible fabricated scores and create additional anonymous accounts.
 See the [design](docs/superpowers/specs/2026-11-08-supabase-game-services-design.md)
 and [implementation plan](docs/superpowers/plans/2026-11-08-supabase-game-services-v01.md).
 The supplied design retains its original draft wording; the plan records its
-approval on 2026-11-08. Only Tasks 1–7 are implemented here. Multiplayer, achievements,
+approval on 2026-11-08. Only Tasks 1–8 are implemented here. Multiplayer, achievements,
 cloud saves, friends, seasons, real-time broadcasts, native engine SDKs, and
 multi-game tenancy remain outside v0.1.
 

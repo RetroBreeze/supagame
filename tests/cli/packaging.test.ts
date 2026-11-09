@@ -41,6 +41,14 @@ it(
     result = run('add', 'leaderboards');
     expect(result.status, result.stderr).toBe(0);
     expect(snapshot(join(root, 'supabase'))).toEqual(before);
+    result = run('leaderboard', 'create', 'level-1', '--type', 'time', '--order', 'asc', '--keep-best');
+    expect(result.status, result.stderr).toBe(0);
+    const configured = snapshot(join(root, 'supabase'));
+    expect(run('leaderboard', 'create', 'level-1', '--type', 'time', '--order', 'asc', '--keep-best').status).toBe(0);
+    expect(snapshot(join(root, 'supabase'))).toEqual(configured);
+    result = run('deploy', '--project-ref', ref);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('--allow-remote');
     const functionRoot = join(root, 'supabase/functions/supagame');
     expect(readFileSync(join(functionRoot, 'deno.lock'), 'utf8')).not.toContain(
       '"workspace"',
