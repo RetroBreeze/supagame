@@ -9,7 +9,8 @@ TypeScript SDK. There is no central service operated by this project.
 workspace tooling, database schema, profile operations, atomic score submission,
 ranked reads, the versioned Edge HTTP API, local CLI setup/staging, leaderboard
 creation, explicitly confirmed deployment, diagnostics and forward-only upgrade staging
-are implemented. The runtime SDK and final example/release work remain future tasks.
+are implemented, along with the [TypeScript SDK](packages/sdk-ts/README.md).
+The final example/release work remains a future task.
 Nothing is deployed to a hosted project or published.
 `@supagame/*` and the `supagame` executable are provisional names; all packages
 are private until publication is separately approved.
@@ -35,7 +36,9 @@ node packages/cli/dist/cli.js --help
 `pnpm -r typecheck`, `pnpm -r lint` and `pnpm -r build` check the workspace
 packages individually. `pnpm --filter @supagame/cli test` and
 `pnpm --filter @supagame/contracts test` select their respective suites.
-The TypeScript tests need no Supabase credentials or Docker stack. Database
+`pnpm --filter @supagame/sdk-ts test` runs SDK unit/browser tests;
+`pnpm test:sdk:integration` uses the local stack started with `pnpm api:start`.
+The default TypeScript unit tests need no Supabase credentials or Docker stack. Database
 tests use the local fixture below. Deno HTTP tests and local Edge integration
 are described below; the broader end-to-end suite remains a later task.
 
@@ -269,12 +272,13 @@ groups can add sorting work. These checks are a sanity test, not a scale guarant
 | --- | --- |
 | `packages/contracts/` | Authoritative OpenAPI 3.1 contract and derived TypeScript DTOs |
 | `packages/cli/` | CLI setup, module staging, leaderboard creation and confirmed deployment |
-| `packages/sdk-ts/` | Reserved for the Task 10 client SDK |
+| `packages/sdk-ts/` | Browser-compatible TypeScript SDK and caller-owned Auth lifecycle |
 | `modules/core/migrations/` | Player profile schema, protected profile functions, RLS and grants |
 | `modules/leaderboards/` | Leaderboard/score/event schema, indexes and Edge Function |
 | `tests/cli/`, `tests/api/` | CLI process, contract, Deno HTTP and local Edge integration tests |
 | `tests/db/`, `tests/fixtures/local/` | pgTAP schema/security suite and isolated local fixture |
-| `tests/sdk/`, `tests/e2e/` | Reserved for later local test suites |
+| `tests/sdk/` | SDK unit, browser-bundle and local Supabase integration tests |
+| `tests/e2e/` | Reserved for Task 11 |
 | `examples/capacitor-demo/` | Reserved for the standalone Task 11 example |
 | `docs/superpowers/` | Product design and numbered implementation plan |
 

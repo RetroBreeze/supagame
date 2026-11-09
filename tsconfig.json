@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.base.json",
-  "compilerOptions": { "noEmit": true, "allowImportingTsExtensions": true, "types": ["node"] },
-  "include": ["tests/**/*.ts", "packages/cli/scripts/**/*.ts", "vitest.config.ts"],
+  "compilerOptions": { "noEmit": true, "allowImportingTsExtensions": true, "types": ["node"], "lib": ["ES2023", "DOM"] },
+  "include": ["tests/**/*.ts", "packages/cli/scripts/**/*.ts", "packages/sdk-ts/scripts/**/*.ts", "vitest.config.ts"],
   "exclude": ["tests/api/http*.ts"]
 }

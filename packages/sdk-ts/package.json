@@ -2,7 +2,33 @@
   "name": "@supagame/sdk-ts",
   "version": "0.1.0",
   "private": true,
-  "description": "Reserved for the Supabase Game Services TypeScript SDK (Task 10)",
+  "description": "Browser-compatible TypeScript client for the Supagame HTTP API",
   "type": "module",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "test": "vitest run --root ../.. tests/sdk",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src scripts --max-warnings=0",
+    "validators:generate": "node scripts/generate-validators.ts",
+    "validators:check": "node scripts/generate-validators.ts --check"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "sideEffects": false,
+  "dependencies": {
+    "@supagame/contracts": "workspace:*"
+  },
+  "peerDependencies": {
+    "@supabase/supabase-js": "^2.119.0"
+  }
 }
