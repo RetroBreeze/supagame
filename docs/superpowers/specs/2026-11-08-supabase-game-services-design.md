@@ -1,6 +1,9 @@
 A self-hosted, MIT-licensed, open-source toolkit for adding game leaderboards to a developer's existing Supabase project. The developer uses a command-line tool to provision services, while games use a stable HTTP API or a thin language SDK at runtime.
 
-**Status:** Draft for review, 8 November 2026. **First implementation:** anonymous players and leaderboards, tested in Toy Tanks (Android/Capacitor). "Supagame" is a provisional working name, not a confirmed package name.
+**Status:** Draft for review, 8 November 2026. **First implementation:** anonymous players and leaderboards, verified with a standalone browser consumer. "Supagame" is a provisional working name, not a confirmed package name.
+
+The first-PR scope correction replaces the provisional native-game consumer with
+a generic browser demo. No native platform or device test is a v0.1 release gate.
 
 # Goals and boundaries
 
@@ -156,7 +159,7 @@ PostgreSQL is the source of truth. Leaderboard definitions are version-controlle
 
 A local Supabase integration environment verifies: fresh installation, repeated installation, safe upgrade, anonymous sign-in, permanent-account reuse, score submission, non-improving score, concurrency, deterministic ranking/ties, pagination, idempotency, invalid values, auth failures, RLS isolation, and no client-side admin access.
 
-An example Capacitor/TypeScript game demonstrates a complete first-launch-to-leaderboard flow. Documentation includes a five-minute quickstart, endpoint schemas, configuration reference, security model, troubleshooting guide, limitations, and copyable SDK examples.
+An example TypeScript browser application demonstrates a complete first-launch-to-leaderboard flow. Documentation includes a five-minute quickstart, endpoint schemas, configuration reference, security model, troubleshooting guide, limitations, and copyable SDK examples.
 
 **V0.1 is complete when:** a new developer can install the leaderboard module into their own Supabase project, create two differently ordered boards, authenticate a new anonymous player, submit/read scores from both TypeScript and raw HTTP, and verify security and upgrades with passing automated tests.
 
@@ -166,7 +169,7 @@ An example Capacitor/TypeScript game demonstrates a complete first-launch-to-lea
 
 2. Secure submission function and ranked-read API; test auth, RLS, concurrency and errors.
 
-3. TypeScript SDK with anonymous-session helper; use Toy Tanks as the reference consumer.
+3. TypeScript SDK with anonymous-session helper; use the standalone browser demo as the reference consumer.
 
 4. Add maintenance commands, upgrade checks, release packaging, and complete docs.
 

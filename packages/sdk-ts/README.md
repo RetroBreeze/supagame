@@ -32,7 +32,7 @@ if (page.nextCursor !== null) {
 
 Supabase owns storage, persistence, token refresh and account linking. The SDK
 adds no storage, timers or auth-state subscriptions. Configure your caller-owned
-client's storage for the browser or Capacitor environment as usual. The tested
+client's storage for your application's environment as usual. The tested
 peer dependency is `@supabase/supabase-js` 2.119.0; the peer range is `^2.119.0`.
 
 `ensureAnonymousSession()` reuses both anonymous and permanent sessions, checks
@@ -140,7 +140,8 @@ After an approved OpenAPI change, run
 validators require no Ajv, dynamic code generation or Node modules at runtime.
 `pnpm contracts:check` checks their freshness along with generated DTOs. The
 browser test bundles the SDK for a browser and executes it without Node globals
-or eval. Real-device Capacitor testing is not part of Task 10.
+or eval. The standalone browser consumer is exercised in Chromium; native platforms
+are optional and are not a v0.1 release requirement.
 
 The runtime is ESM and uses standard Web APIs (Fetch, URL, Web Crypto). WebViews
 without `crypto.randomUUID` use `crypto.getRandomValues`; if secure randomness is

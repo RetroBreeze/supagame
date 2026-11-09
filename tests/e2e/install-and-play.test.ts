@@ -8,7 +8,7 @@ import { files, packedConsumer, repo, run } from './packages.ts';
 import { localProject } from './local-project.ts';
 
 test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → browser', { timeout: 600_000 }, async (t) => {
-  assert.ok(existsSync(join(repo, 'examples/capacitor-demo/src/main.ts')), 'The runnable consumer example must exist');
+  assert.ok(existsSync(join(repo, 'examples/browser-demo/src/main.ts')), 'The runnable consumer example must exist');
   const consumer = await packedConsumer();
   t.after(() => consumer.remove());
   const project = await localProject();
@@ -121,10 +121,10 @@ test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → b
     assert.equal((await game.leaderboards.getMine('arcade'))?.score, 60);
   });
   await t.test('real Chromium consumer uses installed SDK, persists identity and ships no privileged credentials', async () => {
-    const demo = join(consumer.root, 'demo'); cpSync(join(repo, 'examples/capacitor-demo'), demo, { recursive: true, filter: (source) => !/(?:^|\/)(?:node_modules|dist)(?:\/|$)/.test(source) && !/\/\.env(?:\.|$)/.test(source) });
+    const demo = join(consumer.root, 'demo'); cpSync(join(repo, 'examples/browser-demo'), demo, { recursive: true, filter: (source) => !/(?:^|\/)(?:node_modules|dist)(?:\/|$)/.test(source) && !/\/\.env(?:\.|$)/.test(source) });
     // Resolve the SDK from the clean consumer's node_modules, not workspace links.
     const env = { ...process.env, VITE_SUPABASE_URL: project.url, VITE_SUPABASE_PUBLISHABLE_KEY: key, SUPABASE_SERVICE_ROLE_KEY: 'server-only-canary-do-not-ship', VITE_UNUSED_SECRET: 'unused-env-canary-do-not-ship' };
-    run(process.execPath, [join(repo, 'examples/capacitor-demo/node_modules/vite/bin/vite.js'), 'build', demo], consumer.root, env);
+    run(process.execPath, [join(repo, 'examples/browser-demo/node_modules/vite/bin/vite.js'), 'build', demo], consumer.root, env);
     const bundle = files(join(demo, 'dist')).map((path) => readFileSync(path, 'utf8')).join('\n');
     for (const secret of ['server-only-canary-do-not-ship', 'unused-env-canary-do-not-ship', ...Object.entries(status).filter(([name]) => /SECRET|SERVICE_ROLE|JWT_SECRET|DB_URL/.test(name)).map(([, value]) => value)]) {
       if (secret) assert.ok(!bundle.includes(secret), 'Client bundle must not contain privileged configuration');

@@ -6,7 +6,73 @@ on 9 November 2026 with Node 24.22.2, pnpm 12.18.0, Supabase CLI 3.0.0, Deno 2.9
 PostgreSQL 17 and Playwright 1.65.0/Chromium. No hosted credentials, deployment,
 npm publication or public release were used.
 
-## Verification command record
+## First-PR preparation review
+
+Review branch: `prepare-v0.1-pr`, based on Task 11 commit
+`c79f309dad0f0aaaebc2ec6192ac304443152098`. The review covered the Tasks 1–11
+contract, SQL authorization/concurrency/ranking, Edge authentication/validation,
+CLI staging/deployment/maintenance, SDK session/transport, consumer, package
+contents and CI. It found no new runtime correction needed for the first PR.
+This is a source review with local regressions, not an independent security audit.
+
+The consumer is now `examples/browser-demo` / `@supagame/browser-demo`.
+Its TypeScript, HTML, CSS, environment template and TypeScript configuration are
+byte-identical to the previous demo. The native configuration was removed; test
+imports, workspace lockfile, canonical design/plan, public guides and CI labels
+use the generic browser name. No native platform, device test or mobile toolchain
+is required for v0.1. No CLI, SQL, Edge, SDK runtime or OpenAPI behavior changed.
+
+The renamed config test was run first and failed on the missing new import, then
+passed all 8 tests after moving the demo. All tracked local Markdown links were
+checked and resolve; tracked files contain no remaining old demo-name references.
+The older Task 11 record below uses the current example name for commands.
+
+### Fresh verification for this review
+
+| Command | Outcome |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | PASS; renamed workspace importer, no dependency resolution changes |
+| `pnpm exec vitest run tests/demo/config.test.ts` | Expected missing-path failure before rename; then PASS, 8 tests |
+| `pnpm test` | PASS; 270 tests |
+| `pnpm -r test` | PASS; CLI 132, contract 36, SDK 94, browser demo 8 |
+| `pnpm typecheck` | PASS; root, packages, browser demo and frozen Deno checks |
+| `pnpm lint` | PASS; ESLint and Deno lint/format |
+| `pnpm -r build` | PASS; CLI/assets, contracts, SDK/declarations and browser demo |
+| `pnpm contracts:check` | PASS; OpenAPI DTOs and SDK response validators unchanged/current |
+| `pnpm test:edge` | PASS; 80 tests |
+| `pnpm test:packages` | PASS; clean tarball consumer, metadata/assets/declarations and browser bundle |
+| `pnpm api:start` / `pnpm db:migrate` | PASS; local regression fixture, existing migration ledger current |
+| `pnpm test:db` | PASS; 691 pgTAP assertions and 18 concurrency tests |
+| `pnpm test:cli:db` | PASS; 16 tests |
+| `pnpm test:edge:integration` | PASS; 1 suite, 12 steps |
+| `pnpm test:sdk:integration` | PASS; 7 tests |
+| `pnpm db:stop` | PASS; only the regression fixture stopped |
+| `pnpm test:e2e` | PASS; 9 tests, fresh tarball installation/local backend/raw HTTP and renamed demo in real Chromium |
+| `actionlint .github/workflows/ci.yml` | PASS; actionlint 1.7.7 |
+| `pnpm audit --prod --json` | PASS; no reported advisories in production npm graph |
+| `pnpm audit --json` | Exit 1; one moderate development-only minimatch advisory, reviewed below |
+| `git diff --check` | PASS |
+
+### Findings and disposition
+
+- **No known code/test blocker to opening the first PR.** Runtime boundaries and
+  package contents passed the checks above. Packages retain their MIT licenses,
+  private publication guards, standalone CLI assets and generated contract DTOs.
+- **Nonblocking dependency finding:** the full audit reports development-only
+  `minimatch` 10.2.6, GHSA-g3hv-75wg-m249, through lint tooling. Production audit
+  is clear. See the [dependency review](security.md#first-pr-dependency-review-9-november-2026)
+  for exposure, the upstream fix and why no transitive major override was forced.
+- **Public-release gates remain:** target-repository CI execution, separately
+  authorized hosted staging verification, final namespace/metadata decisions, and
+  operational capacity/abuse/retention policy. Local tests do not establish those.
+  Native-platform verification is not one of these gates.
+- Ranking cost, unbounded event retention, anonymous identity farming and
+  client-fabricated plausible scores remain documented limitations; no new
+  mitigation or unrelated feature was introduced in this review.
+- No hosted deployment, publication, push or merge was performed. Pre-existing
+  untracked local documents were preserved and excluded from the correction.
+
+## Task 11 verification command record
 
 Commands were run from the repository root using the pinned toolchain on PATH.
 These are the verification/setup commands executed, including their outcomes;
@@ -21,7 +87,7 @@ filesystem/source inspection and Git review commands are not test claims.
 | `pnpm typecheck` | PASS; root tests/tooling, every package/example and frozen Deno Edge checks |
 | `pnpm lint` | PASS; ESLint plus Deno lint/format checks |
 | `pnpm -r build` | PASS; CLI/assets, contract DTOs, SDK/declarations and Vite browser assets |
-| `pnpm --filter @supagame/capacitor-demo build` | PASS; used to isolate the clean-consumer config failure |
+| `pnpm --filter @supagame/browser-demo build` | PASS; used to isolate the clean-consumer config failure |
 | `pnpm contracts:check` | PASS; generated OpenAPI DTOs and standalone SDK validators current |
 | `pnpm test:edge` | PASS; 80 Edge HTTP/auth/validation tests |
 | `pnpm test:packages` | PASS; clean tarball installation, executable CLI, SDK exports, declarations and browser bundling |
@@ -91,8 +157,8 @@ All failures above were addressed; none are hidden as skipped tests.
 
 - No Task 1–10 runtime code, database migration or public API contract was changed.
   Existing security, concurrency, CLI and HTTP suites pass unchanged.
-- The browser example is a small vanilla TypeScript/Vite form, not a game. Capacitor
-  configuration points at built web assets; there are no generated native projects.
+- The browser example is a small vanilla TypeScript/Vite form, not a game.
+  No native framework, configuration or generated native project is required.
 - E2E uses tarballs for CLI/contracts/SDK and installs outside the repository.
   Development tools run from the pinned workspace; runtime SDK imports resolve
   from the isolated consumer's installed package.
@@ -111,7 +177,8 @@ All failures above were addressed; none are hidden as skipped tests.
 
 ## Remaining release gates
 
-There are no known failing local checks. Before a separately approved public release:
+All functional local checks pass; the development dependency audit finding above
+remains open. Before a separately approved public release:
 
 1. Confirm the provisional `@supagame/*` names/ownership and final repository,
    support and package metadata. Review versioning and deliberately remove private
@@ -120,9 +187,7 @@ There are no known failing local checks. Before a separately approved public rel
 3. Perform an explicitly authorized staging-project deployment verification,
    including project targeting, hosted Auth/issuer/origin configuration and failure
    recovery. Mocked hosted CLI tests and local protocol tests are not live proof.
-4. If claiming native support, verify physical Capacitor builds, device networking,
-   persistence and provider deep-link flows. Chromium does not establish these.
-5. Choose operational capacity, anonymous-account abuse and event-retention policies;
+4. Choose operational capacity, anonymous-account abuse and event-retention policies;
    load-test expected leaderboard sizes. Client-authored plausible scores remain
    forgeable; this release is not complete anti-cheat.
 

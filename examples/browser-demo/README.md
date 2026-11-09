@@ -1,6 +1,6 @@
-# Minimal Supagame consumer
+# Minimal Supagame browser demo
 
-A small browser application, compatible with a Capacitor WebView build. It uses
+A small standalone browser application. It uses
 `@supagame/sdk-ts` for profile, score and leaderboard operations and the caller-owned
 Supabase client for authentication. It is not a game and does not touch Vaccoin,
 Toy Tanks or any other project.
@@ -15,9 +15,9 @@ From the repository root:
 ```sh
 pnpm install --frozen-lockfile
 pnpm -r build
-cp examples/capacitor-demo/.env.example examples/capacitor-demo/.env.local
+cp examples/browser-demo/.env.example examples/browser-demo/.env.local
 # Set the local URL and modern publishable key; no privileged credentials.
-pnpm --filter @supagame/capacitor-demo dev --port 5173 --strictPort
+pnpm --filter @supagame/browser-demo dev --port 5173 --strictPort
 ```
 
 Allow `http://127.0.0.1:5173` in `SG_ALLOWED_ORIGINS`. Open that address, choose a
@@ -36,20 +36,16 @@ SDK installed from a tarball, then drives real Chromium against a fresh local
 Supabase backend. It verifies browser sign-in, profile, both boards and reload
 persistence, and scans the bundle for privileged local credentials/build canaries.
 
-## Capacitor
+## Browser build
 
-`capacitor.config.json` declares `webDir: "dist"`. `pnpm --filter
-@supagame/capacitor-demo build` produces web assets suitable for an existing
-Capacitor project. Add/sync native platforms using your application's chosen,
-pinned Capacitor toolchain; no generated Android/iOS project or native dependency
-is included here. See the [official installation guide](https://capacitorjs.com/docs/getting-started).
+`pnpm --filter @supagame/browser-demo build` produces static assets in `dist`.
+Use `pnpm --filter @supagame/browser-demo preview --port 5173 --strictPort` to
+preview the build locally with the same allowed origin. Production hosting must
+serve HTTPS and configure the backend's exact origin allowlist.
 
-Configure the exact origins used by your WebView (for example
-`capacitor://localhost` or `http://localhost`) in the backend allowlist. Physical
-devices cannot reach your workstation through their own `127.0.0.1`; use an
-appropriately secured reachable backend. Hosted HTTPS, native deep links, native
-storage adapters and physical-device builds have **not** been verified here.
-The automated consumer is Chromium, not an Android/iOS emulator.
+The example uses standard browser APIs and requires no native platform or mobile
+toolchain. Chromium is the automated consumer; other browsers and hosted HTTPS
+configuration have not been independently verified here.
 
 OAuth/email linking belongs to the application's Auth flow. See
 [identity and linking](../../docs/security.md#anonymous-identity-and-linking).

@@ -49,7 +49,7 @@
 | `packages/sdk-ts/src/*.ts` | Runtime TypeScript API and anonymous-session adapter |
 | `tests/db/*.sql`, `tests/api/*.test.ts`, `tests/cli/*.test.ts` | pgTAP, HTTP, and CLI behavior tests |
 | `tests/e2e/*.test.ts` | Installation and lifecycle tests against a local Supabase stack |
-| `examples/capacitor-demo/`, `docs/` | Integration example, quickstart, API and security docs |
+| `examples/browser-demo/`, `docs/` | Integration example, quickstart, API and security docs |
 
 ## Task 1: Bootstrap the CLI entrypoint and lock the API contract
 
@@ -173,13 +173,13 @@
 
 ## Task 11: End-to-end consumer, security regression and public docs
 
-**Files:** Create `tests/e2e/install-and-play.test.ts`, `examples/capacitor-demo/*`, `docs/quickstart.md`, `docs/api.md`, `docs/security.md`, `docs/troubleshooting.md`, `docs/upgrades.md`, release configuration and examples in root README.
+**Files:** Create `tests/e2e/install-and-play.test.ts`, `examples/browser-demo/*`, `docs/quickstart.md`, `docs/api.md`, `docs/security.md`, `docs/troubleshooting.md`, `docs/upgrades.md`, release configuration and examples in root README.
 
 **Interfaces:** A developer can install two boards (`level-1`, time/asc; `arcade`, points/desc), obtain an anonymous user, submit and read scores using both the TS SDK and raw HTTP, and later upgrade that anonymous identity using configured Supabase Auth identity linking.
 
 - [ ] **Step 1 — failing E2E:** Start from a fresh local Supabase stack and empty fixture project; assert CLI setup, a repeat setup, two board definitions, anonymous user, accepted/rejected score cases, top/personal ranks and raw HTTP access. Assert forbidden direct score-table write and no server key in the built example.
 - [ ] **Step 2 — red:** Run `pnpm test:e2e`; expect missing fixture/example or failing workflow.
-- [ ] **Step 3 — implement:** Complete the minimal Capacitor-compatible demo, packaging, API/quickstart/security/troubleshooting/upgrade docs, account-linking example, and CI jobs for database/API/CLI/SDK/E2E suites. Test the CLI's published package contents in a clean fixture rather than only source imports.
+- [ ] **Step 3 — implement:** Complete the minimal browser demo, packaging, API/quickstart/security/troubleshooting/upgrade docs, account-linking example, and CI jobs for database/API/CLI/SDK/E2E suites. Test the CLI's published package contents in a clean fixture rather than only source imports.
 - [ ] **Step 4 — green:** Run `pnpm -r test`, `pnpm -r typecheck`, `pnpm test:e2e`, and `pnpm -r build`; review a clean install from a packed CLI tarball.
 - [ ] **Step 5 — commit:** Commit docs, example and release readiness work. Do not publish npm or mutate a production Supabase project without explicit separate authorization.
 

@@ -17,12 +17,12 @@ Nothing is deployed to a hosted project or published.
 Start with the [quickstart](docs/quickstart.md). Public guides:
 [API/SDK](docs/api.md) · [security and limitations](docs/security.md) ·
 [troubleshooting](docs/troubleshooting.md) · [doctor/upgrades](docs/upgrades.md) ·
-[consumer example](examples/capacitor-demo/README.md) · [verification record](docs/verification.md).
+[consumer example](examples/browser-demo/README.md) · [verification record](docs/verification.md).
 
 The packages are currently private: install local tarballs, not unpublished npm
 names. The example is a small score-entry UI, not a game; no other game project is
-modified. Chromium/local Supabase are tested; hosted deployment, provider OAuth
-and physical Capacitor devices require separate verification.
+modified. Chromium/local Supabase are tested; hosted deployment and provider OAuth
+require separate verification. No native platform or mobile toolchain is required.
 `@supagame/*` and the `supagame` executable are provisional names; all packages
 are private until publication is separately approved.
 
@@ -290,7 +290,7 @@ groups can add sorting work. These checks are a sanity test, not a scale guarant
 | `tests/db/`, `tests/fixtures/local/` | pgTAP schema/security suite and isolated local fixture |
 | `tests/sdk/` | SDK unit, browser-bundle and local Supabase integration tests |
 | `tests/e2e/` | Clean tarball consumer, fresh local installation, security and Chromium lifecycle |
-| `examples/capacitor-demo/` | Minimal standalone TypeScript/browser consumer with Capacitor web assets |
+| `examples/browser-demo/` | Minimal standalone TypeScript/browser consumer |
 | `docs/superpowers/` | Product design and numbered implementation plan |
 
 The CLI prepares project files, creates leaderboard definitions and deploys only

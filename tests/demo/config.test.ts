@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { demoConfig } from '../../examples/capacitor-demo/src/config.js';
+import { demoConfig } from '../../examples/browser-demo/src/config.js';
 
 it('accepts a local URL and a publishable key only', () => {
   expect(demoConfig('http://127.0.0.1:54321/', 'sb_publishable_example')).toEqual({ url: 'http://127.0.0.1:54321', key: 'sb_publishable_example' });

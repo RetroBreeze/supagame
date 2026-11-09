@@ -116,3 +116,24 @@ as in the local Docker fixture. Hosted configuration normally uses the project's
 public URL; custom domains/issuers need explicit review. Supagame deploy does not
 push Auth settings or secrets. Never commit `.env`, privileged keys, database
 passwords, personal access tokens or user JWTs. CI requires no hosted credentials.
+
+## First-PR dependency review (9 November 2026)
+
+`pnpm audit --prod --json` reported no known advisories in the production npm
+workspace dependency graph. The full `pnpm audit --json` reported one moderate,
+development-only finding: `minimatch` 10.2.6 through ESLint/typescript-eslint,
+[GHSA-g3hv-75wg-m249](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249).
+The upstream advisory describes resource amplification from attacker-controlled
+glob patterns with `optimizationLevel >= 2`; the patched version is 11.0.1.
+
+This dependency is absent from the CLI/SDK runtime dependency graphs and the
+browser bundle. The reviewed lint call sites do not enable that optimization
+level, and game/API input does not reach the lint toolchain. It is recorded as a
+nonblocking development-tooling finding, not an API vulnerability. Keep lint
+configuration trusted and update through a compatible upstream tooling release;
+this review does not force a transitive major-version override or suppress the
+advisory. Reassess if linting untrusted glob configuration is introduced.
+
+The npm audit does not cover the separately locked Deno graph, container images,
+or hosted infrastructure. Existing local security regressions and source review
+are complementary checks, not a guarantee that no vulnerabilities exist.

@@ -173,14 +173,14 @@ old identity or scores. See [identity linking](security.md#anonymous-identity-an
 Back in the checkout:
 
 ```sh
-cp examples/capacitor-demo/.env.example examples/capacitor-demo/.env.local
+cp examples/browser-demo/.env.example examples/browser-demo/.env.local
 # Edit only the URL and publishable key to match the local backend above.
-pnpm --filter @supagame/capacitor-demo dev
+pnpm --filter @supagame/browser-demo dev
 ```
 
 Open `http://127.0.0.1:5173`. Set your display name, select a board, submit an
 integer, and inspect your best and the rankings. See the
-[example README](../examples/capacitor-demo/README.md) for Capacitor constraints.
+[example README](../examples/browser-demo/README.md) for browser setup and build instructions.
 
 ## Hosted deployment: a separate, explicit operation
 
