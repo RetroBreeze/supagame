@@ -1,9 +1,28 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AuthApiError } from '@supabase/supabase-js';
-import { createGameServices, AuthenticationError } from '../../packages/sdk-ts/src/index.js';
+import { createGameServices, AuthenticationError, InvalidParameterError, type UpdatePlayerRequest } from '../../packages/sdk-ts/src/index.js';
 import { fixture, key, profile, session, userId } from './fixtures.js';
 
 afterEach(() => vi.restoreAllMocks());
+it.each([
+  { label: 'null', input: null },
+  { label: 'undefined', input: undefined },
+  { label: 'string', input: 'Player' },
+  { label: 'number', input: 42 },
+  { label: 'boolean', input: false },
+  { label: 'bigint', input: 42n },
+  { label: 'symbol', input: Symbol('Player') },
+  { label: 'array', input: [] },
+  { label: 'function with a display name', input: Object.assign(() => undefined, { displayName: 'Player' }) },
+  { label: 'array with a display name', input: Object.assign([], { displayName: 'Player' }) },
+])('rejects $label profile input with a typed error before auth or HTTP', async ({ input }) => {
+  const f = fixture();
+  const game = createGameServices({ supabase: f.supabase });
+  await expect(game.players.updateMe(input as unknown as UpdatePlayerRequest)).rejects.toBeInstanceOf(InvalidParameterError);
+  expect(f.getSession).not.toHaveBeenCalled();
+  expect(f.fetcher).not.toHaveBeenCalled();
+});
+
 describe('caller-owned player authentication', () => {
   it('signs in anonymously on first use and coalesces simultaneous calls across wrappers', async () => {
     const f = fixture(null);

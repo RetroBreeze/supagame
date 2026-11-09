@@ -15,6 +15,9 @@ export function createPlayers(client: SupabaseConnection, transport: Transport):
       return transport.request('/players/me', 'GET', 'PlayerProfile', { session: await requireSession(client) });
     },
     async updateMe(input) {
+      if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+        throw new InvalidParameterError('displayName', 'Display names must contain 3–24 printable characters after trimming.');
+      }
       // Normalize only the documented name field; never forward caller-supplied identity fields.
       const body = { displayName: typeof input?.displayName === 'string' ? input.displayName.trim() : input?.displayName };
       if (!matches('UpdatePlayerRequest', body) || Object.keys(input).some((key) => key !== 'displayName')) {
