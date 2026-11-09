@@ -1,0 +1,61 @@
+name: v0.1 verification
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: verification-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  unit-and-packages:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 12.18.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - name: CLI, SDK, demo and API contract unit regressions
+        run: pnpm test
+      - run: pnpm test:edge
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm contracts:check
+      - name: Install and verify actual npm tarballs (no publication)
+        run: pnpm test:packages
+  local-integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 12.18.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Create loopback-only regression network
+        run: docker network create --driver bridge --opt com.docker.network.bridge.host_binding_ipv4=127.0.0.1 supagame-schema-tests-local
+      - id: local
+        run: pnpm api:start
+      - run: pnpm db:migrate
+      - run: pnpm test:db
+      - run: pnpm test:cli:db
+      - run: pnpm test:edge:integration
+      - run: pnpm test:sdk:integration
+      - name: Stop only the regression fixture
+        if: always() && steps.local.outcome != 'skipped'
+        run: pnpm db:stop
+      - name: Fresh tarball installation, local backend, raw HTTP and Chromium consumer
+        run: pnpm test:e2e

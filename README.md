@@ -10,8 +10,19 @@ workspace tooling, database schema, profile operations, atomic score submission,
 ranked reads, the versioned Edge HTTP API, local CLI setup/staging, leaderboard
 creation, explicitly confirmed deployment, diagnostics and forward-only upgrade staging
 are implemented, along with the [TypeScript SDK](packages/sdk-ts/README.md).
-The final example/release work remains a future task.
+The v0.1 consumer example, tarball verification, isolated E2E suite and CI workflow
+are implemented. Publication and hosted verification remain separately approved steps.
 Nothing is deployed to a hosted project or published.
+
+Start with the [quickstart](docs/quickstart.md). Public guides:
+[API/SDK](docs/api.md) · [security and limitations](docs/security.md) ·
+[troubleshooting](docs/troubleshooting.md) · [doctor/upgrades](docs/upgrades.md) ·
+[consumer example](examples/capacitor-demo/README.md) · [verification record](docs/verification.md).
+
+The packages are currently private: install local tarballs, not unpublished npm
+names. The example is a small score-entry UI, not a game; no other game project is
+modified. Chromium/local Supabase are tested; hosted deployment, provider OAuth
+and physical Capacitor devices require separate verification.
 `@supagame/*` and the `supagame` executable are provisional names; all packages
 are private until publication is separately approved.
 
@@ -40,7 +51,7 @@ packages individually. `pnpm --filter @supagame/cli test` and
 `pnpm test:sdk:integration` uses the local stack started with `pnpm api:start`.
 The default TypeScript unit tests need no Supabase credentials or Docker stack. Database
 tests use the local fixture below. Deno HTTP tests and local Edge integration
-are described below; the broader end-to-end suite remains a later task.
+are described below; `pnpm test:e2e` creates and cleans its own isolated local stack.
 
 TypeScript 5.9.3 is pinned because it is compatible with both the OpenAPI type
 generator and TypeScript ESLint. Dependencies are exact versions and the pnpm
@@ -278,8 +289,8 @@ groups can add sorting work. These checks are a sanity test, not a scale guarant
 | `tests/cli/`, `tests/api/` | CLI process, contract, Deno HTTP and local Edge integration tests |
 | `tests/db/`, `tests/fixtures/local/` | pgTAP schema/security suite and isolated local fixture |
 | `tests/sdk/` | SDK unit, browser-bundle and local Supabase integration tests |
-| `tests/e2e/` | Reserved for Task 11 |
-| `examples/capacitor-demo/` | Reserved for the standalone Task 11 example |
+| `tests/e2e/` | Clean tarball consumer, fresh local installation, security and Chromium lifecycle |
+| `examples/capacitor-demo/` | Minimal standalone TypeScript/browser consumer with Capacitor web assets |
 | `docs/superpowers/` | Product design and numbered implementation plan |
 
 The CLI prepares project files, creates leaderboard definitions and deploys only
@@ -747,3 +758,42 @@ multi-game tenancy remain outside v0.1.
 ## Licence
 
 [MIT](LICENSE), copyright 2026 Supabase Game Services contributors.
+
+
+## v0.1 full verification
+
+Use the pinned Node/pnpm versions above. Commands require no hosted credentials:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm -r build
+pnpm test
+pnpm -r test
+pnpm typecheck
+pnpm lint
+pnpm contracts:check
+pnpm test:edge
+pnpm test:packages
+pnpm exec playwright install --with-deps chromium
+# Create the dedicated regression network once (see local database setup above).
+pnpm api:start
+pnpm db:migrate
+pnpm test:db
+pnpm test:cli:db
+pnpm test:edge:integration
+pnpm test:sdk:integration
+pnpm db:stop
+pnpm test:e2e
+```
+
+E2E packs CLI/contracts/SDK, installs them into a temporary consumer, initializes
+another fresh Supabase project, stages both boards, runs real SQL/Auth/HTTP and
+drives the copied demo with Chromium. Its project ID, ports and Docker network
+are isolated from the stable regression fixture and other projects. Only those
+test-owned temporary resources are removed. A separate `pnpm test:packages` checks
+tarballs/declarations/browser bundling without requiring Docker.
+
+[GitHub Actions](.github/workflows/ci.yml) runs unit/package and local-integration
+jobs with pinned tool/action versions. It has no publish/deploy job or hosted
+secrets. See [verification and release gates](docs/verification.md) for measured
+results and explicit limits of local evidence.

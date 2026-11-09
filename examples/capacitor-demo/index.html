@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Supagame demo</title></head>
+<body>
+<main>
+  <h1>Supagame demo</h1>
+  <p>Two leaderboards, one player. This example submits scores you enter; it does not verify gameplay.</p>
+  <p id="status" role="status">Connecting…</p>
+  <p id="identity"></p>
+  <fieldset id="controls" disabled>
+    <form id="profile-form">
+      <label>Display name <input id="display-name" required minlength="3" maxlength="24" autocomplete="nickname"></label>
+      <button>Save name</button>
+    </form>
+    <label>Leaderboard <select id="board"><option value="level-1">Level 1 · time · smaller is better</option><option value="arcade">Arcade · points · larger is better</option></select></label>
+    <form id="score-form">
+      <label>Score <input id="score" type="number" step="1" min="0" max="1000000" required value="42500"></label>
+      <button>Submit score</button>
+    </form>
+    <button id="refresh" type="button">Refresh rankings</button>
+    <p id="personal-best">No score yet.</p>
+    <table><caption>Top players</caption><thead><tr><th>Rank</th><th>Player</th><th>Score</th></tr></thead><tbody id="entries"></tbody></table>
+  </fieldset>
+  <p>Your anonymous identity stays in this browser's storage. Clearing it can lose access to your scores.</p>
+</main>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
