@@ -5,11 +5,11 @@ Supabase project. The planned v0.1 provides anonymous player identities and
 leaderboards through a versioned HTTP API, a provisioning CLI, and a thin
 TypeScript SDK. There is no central service operated by this project.
 
-**Status: Tasks 1–6 implemented.** CLI help, the HTTP contract, shared DTOs,
+**Status: Tasks 1–7 implemented.** CLI help, the HTTP contract, shared DTOs,
 workspace tooling, database schema, profile operations, atomic score submission,
-ranked reads and the versioned Edge HTTP API are implemented. Provisioning
-commands return `not yet implemented` with exit code 1.
-The runtime SDK and provisioning commands remain future tasks.
+ranked reads, the versioned Edge HTTP API, and local CLI setup/staging are
+implemented. Leaderboard creation, deployment, maintenance commands and the
+runtime SDK remain future tasks.
 Nothing is deployed to a hosted project or published.
 `@supagame/*` and the `supagame` executable are provisional names; all packages
 are private until publication is separately approved.
@@ -268,7 +268,7 @@ groups can add sorting work. These checks are a sanity test, not a scale guarant
 | Path | Responsibility |
 | --- | --- |
 | `packages/contracts/` | Authoritative OpenAPI 3.1 contract and derived TypeScript DTOs |
-| `packages/cli/` | CLI entrypoint; future provisioning and maintenance commands |
+| `packages/cli/` | Local CLI initialization/module staging; future deployment and maintenance |
 | `packages/sdk-ts/` | Reserved for the Task 10 client SDK |
 | `modules/core/migrations/` | Player profile schema, protected profile functions, RLS and grants |
 | `modules/leaderboards/` | Leaderboard/score/event schema, indexes and Edge Function |
@@ -278,9 +278,104 @@ groups can add sorting work. These checks are a sanity test, not a scale guarant
 | `examples/capacitor-demo/` | Reserved for the standalone Task 11 example |
 | `docs/superpowers/` | Product design and numbered implementation plan |
 
-The CLI's `init`, `add`, `leaderboard`, `deploy`, `doctor`, and `upgrade`
-commands currently expose help only. The CLI is for developer provisioning;
-games will call HTTP endpoints or the SDK directly.
+The CLI's `init` and `add leaderboards` commands prepare local files.
+`leaderboard`, `deploy`, `doctor` and `upgrade` remain explicit placeholders
+that exit unsuccessfully. Games call the HTTP API directly.
+
+## Local CLI setup and module staging
+
+Build with `pnpm --filter @supagame/cli build`. From a developer's existing
+Supabase project root, use the resulting executable (or its absolute Node path):
+
+```sh
+node /path/to/supagame/packages/cli/dist/cli.js init --project-ref <project-ref> --dry-run
+node /path/to/supagame/packages/cli/dist/cli.js init --project-ref <project-ref>
+node /path/to/supagame/packages/cli/dist/cli.js add leaderboards --dry-run
+node /path/to/supagame/packages/cli/dist/cli.js add leaderboards
+```
+
+Both commands accept `--workdir <project-root>`; otherwise only the current
+directory is inspected. There is no ancestor-directory search. An empty directory
+gets an instruction to run the official `supabase init` first. The toolkit does
+not create or link a hosted project, inspect accounts, or run Supabase commands.
+
+`init` records a supplied project reference or reads project-local
+`supabase/.temp/project-ref` / `supabase/.temp/linked-project.json` metadata.
+These files follow [Supabase's local link conventions](https://supabase.com/docs/guides/local-development/local-and-hosted-projects).
+All available references, including an existing manifest, must agree. Missing or
+conflicting references fail with corrective instructions. Environment variables
+and the local TOML `project_id` never select a remote project. Recording a reference
+does not verify that it exists or that the developer has hosted access.
+
+A fresh `supagame.config.json` is:
+
+```json
+{
+  "formatVersion": 1,
+  "projectRef": "abcdefghijklmnopqrst",
+  "modules": {},
+  "leaderboards": []
+}
+```
+
+The reference above is a placeholder. Manifest validation rejects unknown fields,
+unsupported formats, invalid module/version records and invalid or duplicate board
+definitions. Module records map `core` and `leaderboards` to release versions;
+installation sets both to `0.1.0`. `leaderboards` is reserved for Task 8's board
+creation command. Its validated definition shape is
+`{ id, kind, sortDirection, keepBest: true, minValue, maxValue }`, with safe-integer
+or null bounds; Task 7 does not create definitions or board SQL.
+
+`add leaderboards` stages all five prerequisite SQL migrations in dependency order
+under `supabase/migrations/`, retaining stable versions `20261108000100` through
+`20261108000500`. Existing migration version collisions fail even when the suffix
+is different. SQL is copied byte for byte and never applied or rewritten. Projects
+with newer applied migration versions must review ordering when deployment is
+implemented; staging makes no assumption about the remote migration ledger.
+
+The Edge files go under `supabase/functions/supagame/`. The build bundles only an explicit allowlist of its own
+module assets, excluding local/hidden files such as `.env`; installation does not
+depend on the source checkout. Runtime source
+is unchanged. Packaging relocates the type-only DTO import into a copied
+`contracts.generated.ts`, and includes a standalone Deno configuration and the
+locked dependencies. A built CLI test checks this complete copied graph using
+`deno check --frozen` outside the repository.
+
+The CLI parses TOML to validate it, then appends only a missing
+`[functions.supagame]` section with `enabled = true`, `verify_jwt = false`, and the
+local entrypoint/import-map paths. Existing bytes, comments and line endings are
+preserved. An existing compatible section is unchanged; incompatible settings
+require manual review. Existing anonymous-auth settings are preserved, with an
+instruction if anonymous sign-in is not enabled. Browser clients still need
+`SG_ALLOWED_ORIGINS`; the staged `.env.example` contains placeholders only.
+
+Dry runs list `create`, `update`, `unchanged` and `conflict` paths, including active
+installer locks, without writing files. Every destination is checked before any
+installation writes. Existing identical files are reused, missing files can be
+restaged, and modified files or incompatible module versions cause failure.
+Repeated successful commands preserve file bytes, modes and modification times;
+existing manifests are not rewritten solely to normalize formatting.
+
+Writes use exclusive temporary files, a project-local `.supagame-stage` lock,
+atomic file publication and a manifest written last. Caught write failures restore
+original files (including their original inode metadata) and remove new files and
+empty directories. Concurrent user edits are preserved instead of overwritten
+by rollback. Paths reject traversal, symlinks, hard-linked destinations and special
+files. Use a canonical project path on a local filesystem supporting hard links
+and atomic rename; do not move the project or edit installation files concurrently.
+These checks are not a sandbox against a hostile process with the same OS access.
+
+After a process interruption, rerun the same command: stale locks owned by a dead
+process on this machine can be cleaned, and identical completed files allow forward
+recovery. No untrusted journal is replayed. If ownership cannot be verified, a PID
+has been reused, or interruption left a temporary hard link, stop other installers,
+inspect `.supagame-stage`, remove only that temporary staging directory, then rerun.
+Never commit staging backups. Multiple files are not a power-loss-atomic transaction;
+there is no deployment or database operation to undo.
+
+Run `pnpm --filter @supagame/cli test` for CLI, filesystem and built-asset tests.
+The CLI tests use temporary directories; the copied Edge typecheck requires the
+locked Deno dependencies to be cached or available for download.
 
 ## HTTP contract
 
@@ -430,7 +525,7 @@ can submit plausible fabricated scores and create additional anonymous accounts.
 See the [design](docs/superpowers/specs/2026-11-08-supabase-game-services-design.md)
 and [implementation plan](docs/superpowers/plans/2026-11-08-supabase-game-services-v01.md).
 The supplied design retains its original draft wording; the plan records its
-approval on 2026-11-08. Only Tasks 1–6 are implemented here. Multiplayer, achievements,
+approval on 2026-11-08. Only Tasks 1–7 are implemented here. Multiplayer, achievements,
 cloud saves, friends, seasons, real-time broadcasts, native engine SDKs, and
 multi-game tenancy remain outside v0.1.
 

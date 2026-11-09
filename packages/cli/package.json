@@ -10,10 +10,13 @@
   "files": ["dist"],
   "scripts": {
     "dev": "node src/cli.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src --max-warnings=0",
     "test": "vitest run --root ../.. tests/cli"
   },
-  "dependencies": { "commander": "15.1.0" }
+  "dependencies": {
+    "commander": "15.1.0",
+    "smol-toml": "1.9.1"
+  }
 }
