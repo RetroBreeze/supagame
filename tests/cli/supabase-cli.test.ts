@@ -1,7 +1,7 @@
 import { chmodSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
-import { processEnvironment, runSupabase } from '../../packages/cli/src/lib/supabase-cli.ts';
+import { processEnvironment, runSupabase, SupabaseCli } from '../../packages/cli/src/lib/supabase-cli.ts';
 import { project, put } from './project-fixture.ts';
 const roots: string[] = [];
 afterEach(() => {
@@ -54,4 +54,47 @@ it('reports unavailable executables without hanging or throwing credential-beari
   roots.push(root);
   vi.stubEnv('PATH', root);
   expect((await runSupabase(['--version'], root)).code).toBeNull();
+});
+it('preserves Linux credential-store discovery while stripping deployment overrides', async () => {
+  const root = project();
+  roots.push(root);
+  put(root, 'bin/supabase', `#!${process.execPath}\nconsole.log(JSON.stringify({bus: process.env.DBUS_SESSION_BUS_ADDRESS, runtime: process.env.XDG_RUNTIME_DIR, consent: process.env.SUPABASE_YES, override: process.env.SUPABASE_CLI_BINARY_OVERRIDE ?? null}));\n`);
+  chmodSync(join(root, 'bin/supabase'), 0o700);
+  vi.stubEnv('PATH', join(root, 'bin'));
+  vi.stubEnv('DBUS_SESSION_BUS_ADDRESS', 'unix:path=/run/user/1234/bus');
+  vi.stubEnv('XDG_RUNTIME_DIR', '/run/user/1234');
+  vi.stubEnv('SUPABASE_CLI_BINARY_OVERRIDE', '/untrusted/binary');
+  const result = await runSupabase(['--version'], root);
+  expect(result.code).toBe(0);
+  expect(JSON.parse(result.stdout)).toEqual({
+    bus: 'unix:path=/run/user/1234/bus',
+    runtime: '/run/user/1234',
+    consent: 'false',
+    override: null,
+  });
+});
+
+it.each([
+  { operation: 'version check', action: (cli: SupabaseCli) => cli.checkVersion() },
+  { operation: 'migration inspection', action: (cli: SupabaseCli) => cli.inspect([]) },
+  { operation: 'database preview', action: (cli: SupabaseCli) => cli.inspect([]) },
+  { operation: 'function inspection', action: (cli: SupabaseCli) => cli.functionInfo() },
+  { operation: 'database deployment', action: (cli: SupabaseCli) => cli.push() },
+  { operation: 'function deployment', action: (cli: SupabaseCli) => cli.deployFunction() },
+])('identifies $operation failures without exposing subprocess data', async ({ operation, action }) => {
+  const ref = 'abcdefghijklmnopqrst';
+  for (const throws of [false, true]) {
+    const cli = new SupabaseCli(async (args) => {
+      if (operation === 'database preview' && args[0] === 'migration') {
+        return { code: 0, stdout: JSON.stringify({ target: { kind: 'linked', project_ref: ref }, migrations: [] }), stderr: '' };
+      }
+      if (throws) throw new Error('SECRET credential in spawn error');
+      return { code: 1, stdout: 'SECRET token', stderr: 'SECRET password' };
+    }, '/isolated', ref);
+    let message = '';
+    try { await action(cli); } catch (error) { message = (error as Error).message; }
+    expect(message).toContain(operation);
+    expect(message).toContain('raw output is withheld');
+    expect(message).not.toContain('SECRET');
+  }
 });

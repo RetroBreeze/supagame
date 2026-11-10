@@ -49,15 +49,26 @@ For the stable regression fixture use `pnpm db:stop`.
 
 ## Hosted deployment failures
 
-Hosted execution was not independently tested in this repository. Deployment unit
-tests mock remote process execution; real CLI protocol/database tests use local
-fixtures. Before production use, perform a separately authorized staging-project
-verification with your own credentials and backup/recovery process.
+Hosted mutation paths have not been independently tested in this repository.
+Deployment unit tests mock remote process execution; real CLI protocol/database
+tests use local fixtures. Hosted read-only dry runs have been verified with
+Supabase CLI 3.0.0. Before production deployment, perform a separately authorized
+staging-project verification with your own credentials and backup/recovery process.
 
 `supagame deploy --project-ref <ref> --dry-run` contacts the selected project for
 read-only inspection. A missing/ambiguous inventory fails closed. Every pending
 migration, including unrelated SQL, is displayed. Review actual SQL contents;
 filename/hash previews cannot guarantee its effects.
+
+If direct Supabase CLI commands work but Supagame inspection fails on Linux,
+check that the launching session can access its saved login through Secret Service.
+Supagame preserves `DBUS_SESSION_BUS_ADDRESS` and `XDG_RUNTIME_DIR` for credential
+store discovery; older CLI tarballs stripped both and could fail migration
+inspection with a misleading IPv6 error. Rebuild, repack and reinstall the CLI
+following the [quickstart](quickstart.md) when using an older local tarball.
+Use the reported operation (version check, migration inspection, database preview
+or function inspection) to narrow failures. Raw subprocess output remains withheld
+because it may contain credentials; do not paste tokens or private CLI output.
 
 Interactive consent is the exact phrase `deploy <ref>`. Noninteractive use requires
 `--allow-remote`; `CI`, Supabase environment flags or a previous approval are not
