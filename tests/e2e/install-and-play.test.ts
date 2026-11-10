@@ -19,7 +19,8 @@ test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → b
   const cli = (...args: string[]) => run(consumer.cli, [...args, '--workdir', project.root], consumer.root);
   const snapshot = () => Object.fromEntries(files(project.root).map((path) => [path.slice(project.root.length), readFileSync(path, 'utf8')]));
   await t.test('installs twice without changing files and creates both board directions', () => {
-    cli('init', '--project-ref', 'abcdefghijklmnopqrst');
+    cli('init', '--project-ref', 'abcdefghijklmnopqrst', '--origin', `http://127.0.0.1:${project.browserPort}`);
+    assert.match(readFileSync(join(project.root, 'supabase/functions/.env'), 'utf8'), /SG_ALLOWED_ORIGINS/);
     cli('add', 'leaderboards');
     const before = snapshot(); cli('init'); cli('add', 'leaderboards'); assert.deepEqual(snapshot(), before);
     cli('leaderboard', 'create', 'level-1', '--type', 'time', '--order', 'asc', '--keep-best', '--min', '0', '--max', '1000000');
@@ -30,6 +31,10 @@ test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → b
     assert.ok(!readFileSync(join(project.root, 'supabase/functions/supagame/types.ts'), 'utf8').includes('../../../../'));
   });
   project.start();
+  // Realtime service initialization owns its schema; stage the optional migration afterwards.
+  cli('add', 'live-leaderboards');
+  project.supabase(['migration', 'up']);
+  const liveFiles = snapshot(); cli('add', 'live-leaderboards'); assert.deepEqual(snapshot(), liveFiles);
   // Never print the status object: it also contains privileged local fixture keys.
   const status = JSON.parse(project.supabase(['status', '--output', 'json'])) as Record<string, string>;
   assert.equal(status.API_URL, project.url);
@@ -171,4 +176,23 @@ test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → b
       await page.getByRole('status').filter({ hasText: 'New personal best.' }).waitFor();
     } finally { await browser?.close(); await new Promise<void>((resolve) => server.close(() => resolve())); }
   });
+  await t.test('installed Live Leaderboards receives a private database broadcast after a synthetic local best', async () => {
+    const client = makeClient(); const sdk = consumer.sdk.createGameServices({ supabase: client });
+    const player = await sdk.players.ensureAnonymousSession();
+    let connected = false, initial = false, updated = false;
+    const subscription = sdk.leaderboards.subscribe('arcade', {
+      onStatus: status => { if (status === 'connected') connected = true; },
+      onUpdate: page => { initial = true; updated = page.entries.some(e => e.playerId === player.userId && e.score === 999999); },
+    });
+    const wait = async (condition: () => boolean) => {
+      const deadline = Date.now() + 15000;
+      while (!condition()) { assert.ok(Date.now() < deadline, 'Local private Broadcast did not converge'); await new Promise(r => setTimeout(r, 50)); }
+    };
+    try {
+      await wait(() => connected && initial);
+      await sdk.leaderboards.submit('arcade', 999999);
+      await wait(() => updated);
+    } finally { subscription.unsubscribe(); await client.removeAllChannels(); }
+  });
+
 });

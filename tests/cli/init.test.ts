@@ -40,13 +40,14 @@ describe('init', () => {
     }
     expect(result.stdout).toContain(ref);
   });
-  it('requires Supabase initialization in empty directories; never searches parents', () => {
+  it('bootstraps empty directories without searching parents', () => {
     const root = fixture(false);
     const before = snapshot(root);
     const result = cli(root, 'init', '--project-ref', ref);
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain('supabase init');
-    expect(snapshot(root)).toEqual(before);
+    expect(result.status, result.stderr).toBe(0);
+    expect(before).toEqual({});
+    expect(manifest(root).projectRef).toBe(ref);
+    expect(readFileSync(join(root, 'supabase/config.toml'), 'utf8')).toContain('enable_anonymous_sign_ins = true');
   });
   it('uses local link metadata but never environment variables or local project_id as a remote ref', () => {
     const root = fixture();
@@ -176,4 +177,20 @@ it('rejects non-string leaderboard enums', () => {
   };
   put(root, 'supagame.config.json', JSON.stringify(value));
   expect(cli(root, 'init').status).toBe(1);
+});
+it('preserves a JSON-only Supabase configuration rather than creating an ignored TOML configuration', () => {
+  const root = fixture(false);
+  put(root, 'supabase/config.json', '{"project_id":"existing-json-project","custom":"keep"}');
+  const before = snapshot(root);
+  const result = cli(root, 'init', '--project-ref', ref);
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain('config.json');
+  expect(snapshot(root)).toEqual(before);
+});
+it('keeps generated local credentials and deployment caches out of a fresh project Git tree', () => {
+  const root = fixture(false);
+  expect(cli(root, 'init', '--project-ref', ref).status).toBe(0);
+  const ignore = readFileSync(join(root, '.gitignore'), 'utf8');
+  expect(ignore).toContain('/supabase/.temp/');
+  expect(ignore).toContain('/supabase/functions/.env');
 });

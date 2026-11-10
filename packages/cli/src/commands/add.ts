@@ -56,10 +56,10 @@ export function add(module: string, options: LocalOptions): void {
     project.config.auth.enable_anonymous_sign_ins !== true
   ) {
     console.log(
-      'Anonymous sign-in is not enabled in local config. Enable auth.enable_anonymous_sign_ins for anonymous players; hosted Auth settings must be checked separately. Existing settings were preserved.',
+      'Anonymous sign-in is not enabled in local config. Enable auth.enable_anonymous_sign_ins for anonymous players; deploy previews and enables the hosted prerequisite after authorization. Existing settings were preserved.',
     );
   }
   console.log(
-    'Configure SG_ALLOWED_ORIGINS for browser clients. No database migrations or function deployments were executed.',
+    value.origins ? 'Browser origins are configured; deploy will inspect hosted configuration. No hosted changes were made.' : 'For browser games, run supagame config origins add <origin>. No database migrations or function deployments were executed.',
   );
 }

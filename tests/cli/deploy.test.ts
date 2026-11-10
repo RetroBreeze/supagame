@@ -1,6 +1,8 @@
-import { readdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
+import { realtimePrerequisites } from '../../packages/cli/src/lib/realtime-prerequisites.ts';
+import { digest } from '../../packages/cli/src/lib/deployment-files.ts';
 import { deploy } from '../../packages/cli/src/commands/deploy.ts';
 import type { DeployDependencies } from '../../packages/cli/src/commands/deploy.ts';
 import type { ProcessRunner } from '../../packages/cli/src/lib/supabase-cli.ts';
@@ -22,6 +24,8 @@ function fixture() {
   const applied = new Set<string>();
   let remoteFunction: Record<string, unknown> | null = null;
   let omitHash = false;
+  let realtimeReady = true;
+  let anonymous = true, secret: string | null = null, configFailure = false;
   let failure: 'db' | 'partial' | 'function' | 'interrupt' | undefined;
   let badPreview = false,
     badTarget = false,
@@ -38,13 +42,25 @@ function fixture() {
       kind: 'linked',
       project_ref: badTarget ? 'zzzzzzzzzzzzzzzzzzzz' : ref,
     };
-    const names = readdirSync(join(cwd, 'supabase/migrations')).sort();
+    const names = existsSync(join(cwd, 'supabase/migrations')) ? readdirSync(join(cwd, 'supabase/migrations')).sort() : [];
     const pending = names.filter((name) => !applied.has(name.slice(0, 14)));
     const json = (data: object) => ({
       code: 0,
       stdout: JSON.stringify({ ...data, target }),
       stderr: '',
     });
+    if (args[0] === 'config') {
+      if (args[1] === 'push') { if (configFailure) return { code: 1, stdout: '', stderr: 'SECRET credential' }; anonymous = true; return json({}); }
+      return json({ schema_version: 1, scope: { present: ['auth', 'realtime'] }, changes: anonymous ? [] : [{ path: ['auth', 'enable_anonymous_sign_ins'], class: 'update', declared: true, local: true, remote: false }], masked: [], unmanaged: [] });
+    }
+    if (args[0] === 'secrets') {
+      if (args[1] === 'set') {
+        if (configFailure) return { code: 1, stdout: '', stderr: 'SECRET credential' };
+        const value = readFileSync(args[args.indexOf('--env-file') + 1]!, 'utf8').trim().slice("SG_ALLOWED_ORIGINS='".length, -1);
+        secret = digest(value);
+      }
+      return json({ secrets: secret ? [{ name: 'SG_ALLOWED_ORIGINS', value: secret }] : [] });
+    }
     if (args[0] === 'migration') {
       return json({
         migrations: [
@@ -56,6 +72,7 @@ function fixture() {
         })),
       });
     }
+    if (args[0] === 'db' && args[1] === 'query') return { code: 0, stdout: JSON.stringify(realtimePrerequisites().map(c => ({ check: c.id, ok: realtimeReady }))), stderr: '' };
     if (args[0] === 'db') {
       expect(args).toContain('--skip-vault');
       expect(args).toContain('--include-all');
@@ -106,11 +123,16 @@ function fixture() {
   const options = { workdir: root, projectRef: ref };
   const mutations = () =>
     calls.filter(({ args }) =>
-      (args[0] === 'db' && !args.includes('--dry-run')) ||
-      (args[0] === 'functions' && args[1] === 'deploy')
+      (args[0] === 'db' && args[1] === 'push' && !args.includes('--dry-run')) ||
+      (args[0] === 'functions' && args[1] === 'deploy') ||
+      (args[0] === 'config' && args[1] === 'push') ||
+      (args[0] === 'secrets' && args[1] === 'set')
     );
   return {
     root,
+    realtimeUnavailable: () => { realtimeReady = false; },
+    hosted: (a: boolean, s: string | null) => { anonymous = a; secret = s; },
+    configFail: (v: boolean) => { configFailure = v; },
     calls,
     applied,
     logs,
@@ -354,4 +376,81 @@ it('interrupted confirmation and a pre-existing deployment lock make zero hosted
   const count = f.calls.length;
   await expect(deploy(f.options, f.deps)).rejects.toThrow(/lock/i);
   expect(f.calls).toHaveLength(count);
+});
+
+it('previews and confirms hosted prerequisites with the same deployment', async () => {
+  const f = fixture();
+  expect(cli(f.root, 'config', 'origins', 'add', 'http://localhost:5173').status).toBe(0);
+  f.hosted(false, null);
+  f.confirm.mockImplementation(async () => {
+    expect(f.mutations()).toHaveLength(0);
+    expect(f.logs.join('\n')).toMatch(/Anonymous authentication: enable/);
+    expect(f.logs.join('\n')).toMatch(/Browser origins: create/);
+    return `deploy ${ref}`;
+  });
+  await deploy(f.options, f.deps);
+  expect(f.mutations().map(c => c.args.slice(0, 2))).toEqual([['config', 'push'], ['secrets', 'set'], ['db', 'push'], ['functions', 'deploy']]);
+  const count = f.mutations().length;
+  await deploy(f.options, f.deps);
+  expect(f.mutations()).toHaveLength(count);
+  expect(f.confirm).toHaveBeenCalledOnce();
+});
+it('previews an unknown existing origin value but blocks replacement unless explicitly requested', async () => {
+  const f = fixture(); cli(f.root, 'config', 'origins', 'add', 'http://localhost:5173');
+  f.hosted(true, 'b'.repeat(64));
+  const before = snapshot(f.root);
+  await deploy({ ...f.options, dryRun: true }, f.deps);
+  expect(snapshot(f.root)).toEqual(before);
+  expect(f.logs.join('\n')).toContain('--replace-origins');
+  await expect(deploy(f.options, f.deps)).rejects.toThrow(/replace-origins/);
+  expect(f.mutations()).toHaveLength(0);
+  await deploy({ ...f.options, replaceOrigins: true }, f.deps);
+  expect(f.mutations()[0]!.args.slice(0, 2)).toEqual(['secrets', 'set']);
+});
+it('keeps configuration unchanged when confirmation is declined', async () => {
+  const f = fixture(); f.hosted(false, null);
+  cli(f.root, 'config', 'origins', 'add', 'http://localhost:5173');
+  f.confirm.mockResolvedValue('no');
+  await expect(deploy(f.options, f.deps)).rejects.toThrow(/declined/);
+  expect(f.mutations()).toHaveLength(0);
+});
+it('rechecks remote configuration after consent', async () => {
+  const f = fixture();
+  f.confirm.mockImplementation(async () => { f.hosted(false, null); return `deploy ${ref}`; });
+  await expect(deploy(f.options, f.deps)).rejects.toThrow(/changed/);
+  expect(f.mutations()).toHaveLength(0);
+});
+it('reports partial configuration failure and safely retries before touching the database', async () => {
+  const f = fixture(); f.hosted(true, null); f.configFail(true);
+  cli(f.root, 'config', 'origins', 'add', 'http://localhost:5173');
+  await expect(deploy(f.options, f.deps)).rejects.toThrow(/configuration.*failed|configuration.*uncertain/i);
+  expect(f.mutations().every(c => c.args[0] === 'secrets')).toBe(true);
+  expect(f.logs.join('\n')).not.toContain('SECRET');
+  f.configFail(false);
+  await deploy(f.options, f.deps);
+  expect(f.confirm).toHaveBeenCalledTimes(2);
+});
+it('adds origins after a successful receipt and refuses removing known origins without replacement consent', async () => {
+  const f = fixture(); cli(f.root, 'config', 'origins', 'add', 'http://localhost:5173');
+  await deploy(f.options, f.deps);
+  cli(f.root, 'config', 'origins', 'add', 'https://game.test');
+  await deploy(f.options, f.deps);
+  expect(f.mutations().filter(c => c.args[0] === 'secrets')).toHaveLength(2);
+  const manifest = JSON.parse(readFileSync(join(f.root, 'supagame.config.json'), 'utf8'));
+  manifest.origins = ['https://game.test']; put(f.root, 'supagame.config.json', JSON.stringify(manifest));
+  await expect(deploy(f.options, f.deps)).rejects.toThrow(/replace-origins/);
+});
+
+it('blocks Live Leaderboards deployment when the target lacks database Broadcast prerequisites', async () => {
+  const f = fixture(); cli(f.root, 'add', 'live-leaderboards'); f.realtimeUnavailable();
+  await deploy({ ...f.options, dryRun: true }, f.deps);
+  expect(f.logs.join('\n')).toMatch(/ACTION REQUIRED.*Realtime/);
+  await expect(deploy(f.options, f.deps)).rejects.toThrow(/Realtime prerequisites/);
+  expect(f.mutations()).toHaveLength(0);
+});
+it('explains initialization when an explicit target has no manifest', async () => {
+  const root = project(); roots.push(root);
+  const run = vi.fn();
+  await expect(deploy({ workdir: root, projectRef: ref, dryRun: true }, { run, interactive: false, confirm: vi.fn(), log: vi.fn() })).rejects.toThrow(/init/);
+  expect(run).not.toHaveBeenCalled();
 });

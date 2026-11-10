@@ -8,13 +8,11 @@ import { runSupabase } from '../../packages/cli/src/lib/supabase-cli.ts';
 import { templateFiles } from '../../packages/cli/src/lib/templates.ts';
 import { currentInventory } from '../../packages/cli/src/lib/versions.ts';
 import { cli, initialized, project, put, snapshot } from '../cli/project-fixture.ts';
-import { query } from './local-sessions.ts';
+import { execFileSync } from 'node:child_process';
 const checks = securityChecks(['core', 'leaderboards', 'live-leaderboards']);
 function inspect(setup = ''): { check: string; ok: boolean }[] {
   return JSON.parse(
-    query(
-      `begin; ${setup} select jsonb_agg(result) from (${securityQuery(checks)}) result; rollback;`,
-    ),
+    execFileSync('docker', ['exec', '-i', 'supabase_db_supagame-schema-tests', 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-U', 'supabase_admin', '-d', 'postgres', '-c', `begin; ${setup} select jsonb_agg(result) from (${securityQuery(checks)}) result; rollback;`], { encoding: 'utf8', timeout: 15000 }),
   );
 }
 test('catalog diagnostics accept the actual installed schema, policies, column grants and RPC grants', () => {
@@ -28,6 +26,12 @@ for (
       'writes:authenticated:game_leaderboards',
     ],
     ["alter policy supagame_live_receive on realtime.messages using (true);", 'live:authorization'],
+    ["grant execute on function sg_private.live_invalidate() to anon;", 'live:trigger'],
+    ["drop trigger supagame_live_scores on public.game_best_scores; create trigger supagame_live_scores before insert on public.game_leaderboards for each row execute function sg_private.live_invalidate();", 'live:triggers'],
+    ["create policy unrelated_broad_receive on realtime.messages for select to authenticated using (true);", 'live:other-policies'],
+    ["alter table realtime.messages disable row level security;", 'live:realtime-rls'],
+    ["revoke select on realtime.messages from authenticated;", 'live:receive-grants'],
+
     ["alter table public.game_best_scores disable trigger supagame_live_scores;", 'live:triggers'],
     ['alter table public.game_players disable row level security;', 'rls:public.game_players'],
     [

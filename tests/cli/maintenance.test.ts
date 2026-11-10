@@ -276,9 +276,11 @@ function remoteFixture() {
         masked: [],
         unmanaged: [],
         changes: disabledAuth
-          ? [{ path: 'auth.enable_anonymous_sign_ins', local: true, remote: false }]
+          ? [{ path: ['auth', 'enable_anonymous_sign_ins'], class: 'update', declared: true, local: true, remote: false }]
           : [],
       };
+    } else if (args[0] === 'secrets' && args[1] === 'list') {
+      value = { target, secrets: [] };
     } else if (args[0] === 'functions' && args[1] === 'list') {
       value = {
         target,
@@ -329,6 +331,7 @@ it('remote doctor uses only explicit read-only operations, distinguishes verifie
     ['migration', 'list'],
     ['db', 'query'],
     ['config', 'diff'],
+    ['secrets', 'list'],
     ['functions', 'list'],
   ]);
   expect(snapshot(f.root)).toEqual(before);
@@ -455,3 +458,13 @@ it.each(['missing', 'contradictory'])(
     expect(f.calls).toHaveLength(2);
   },
 );
+
+it('doctor identifies absent/mismatched origin configuration and disabled Auth as action required', async () => {
+  const f = remoteFixture();
+  expect(cli(f.root, 'config', 'origins', 'add', 'http://localhost:5173').status).toBe(0);
+  f.set('auth');
+  const findings = await doctor(f.options, f.deps);
+  expect(findings.find(d => d.scope === 'remote' && d.id === 'origins')?.status).toBe('action required');
+  expect(findings.find(d => d.scope === 'remote' && d.id === 'anonymous-auth')?.status).toBe('action required');
+  expect(doctorExitCode(findings, true)).toBe(1);
+});

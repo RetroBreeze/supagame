@@ -12,7 +12,7 @@ import type { ProcessRunner } from '../lib/supabase-cli.ts';
 import { inspectLive } from '../lib/doctor-live.ts';
 import { readState } from '../lib/deployment-state.ts';
 
-export type DiagnosticStatus = 'healthy' | 'warning' | 'error' | 'cannot verify';
+export type DiagnosticStatus = 'healthy' | 'warning' | 'error' | 'cannot verify' | 'action required';
 export interface Diagnostic {
   scope: 'local' | 'database' | 'remote';
   id: string;
@@ -124,7 +124,8 @@ export async function doctor(
       );
     }
   }
-  if (manifest?.value.modules['live-leaderboards']) local('live-realtime-settings', 'warning', 'Verify Realtime is enabled and private channels are supported in the target project. Public-channel settings and WebSocket delivery require a separate runtime check.');
+  if (manifest) local('origins', manifest.value.origins ? 'healthy' : 'warning', manifest.value.origins ? `${manifest.value.origins.length} browser origins declared locally; hosted values require remote inspection.` : 'Browser origins are unmanaged. Use supagame config origins add <origin>, then preview deployment. Existing hosted configuration is preserved.');
+  if (manifest?.value.modules['live-leaderboards'] && project && object(project.config.realtime) && project.config.realtime.enabled === false) local('live-realtime-settings', 'action required', 'Local Realtime is explicitly disabled. Review [realtime].enabled in supabase/config.toml and restart the local stack; hosted settings are separate.');
   const releases: ModuleRelease[] = [];
   if (
     !attempt('inventory', () => {
@@ -279,6 +280,7 @@ export async function doctor(
     projectId: String(project.config.project_id),
     port: Number(port),
     remote: options.remote ?? false,
+    origins: manifest.value.origins,
     localAnonymous: object(project.config.auth) &&
       project.config.auth.enable_anonymous_sign_ins === true,
     run: dependencies.run,
@@ -287,7 +289,7 @@ export async function doctor(
   return finish();
 }
 export function doctorExitCode(findings: readonly Diagnostic[], live: boolean): number {
-  if (findings.some((f) => f.status === 'error')) return 1;
+  if (findings.some((f) => f.status === 'error' || f.status === 'action required')) return 1;
   return live &&
       findings.some((f) => f.status === 'cannot verify' && f.id !== 'http')
     ? 2

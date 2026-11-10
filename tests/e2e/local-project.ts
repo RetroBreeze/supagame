@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -58,7 +58,7 @@ enabled = false
 [studio]
 enabled = false
 [realtime]
-enabled = false
+enabled = true
 [storage]
 enabled = false
 [local_smtp]
@@ -75,8 +75,6 @@ enable_anonymous_sign_ins = true
 [auth.email]
 enable_confirmations = false
 `);
-    mkdirSync(join(root, 'supabase/functions'), { recursive: true });
-    writeFileSync(join(root, 'supabase/functions/.env'), `SG_AUTH_ISSUER=${url}/auth/v1\nSG_ALLOWED_ORIGINS=["http://127.0.0.1:${browserPort}"]\n`, { mode: 0o600 });
     return {
       root, id, url, browserPort: browserPort!, supabase, remove,
       start() {

@@ -26,6 +26,26 @@ require separate verification. No native platform or mobile toolchain is require
 `@supagame/*` and the `supagame` executable are provisional names; all packages
 are private until publication is separately approved.
 
+## Install in your game
+
+See the [quickstart](docs/quickstart.md) for local tarball installation and CLI login.
+After creating a Supabase project:
+
+```sh
+supagame init --project-ref YOUR_PROJECT_REF --origin http://localhost:5173
+supagame add leaderboards
+supagame add live-leaderboards
+supagame leaderboard create arcade --type points --order desc --keep-best --min 0 --max 1000000
+supagame deploy --project-ref YOUR_PROJECT_REF
+supagame doctor --remote --project-ref YOUR_PROJECT_REF
+```
+
+Deployment previews and asks before hosted changes. It handles anonymous Auth,
+origins, SQL, permissions and the Edge Function, preserving unrelated settings.
+Use `supagame config origins add <origin>` to add another browser address. Existing
+unreadable origin secrets have an explicit migration path; see the
+[installation reference](docs/installation-reference.md).
+
 ## Local development
 
 Use Node.js **24 LTS** (`.node-version` pins 24.22.2) and pnpm **12.18.0**.
@@ -311,7 +331,7 @@ node /path/to/supagame/packages/cli/dist/cli.js add leaderboards
 
 Both commands accept `--workdir <project-root>`; otherwise only the current
 directory is inspected. There is no ancestor-directory search. An empty directory
-gets an instruction to run the official `supabase init` first. These local setup
+gets a minimal local Supabase configuration from `supagame init`. These local setup
 commands do not create or link a hosted project, inspect accounts, or run Supabase commands.
 
 `init` records a supplied project reference or reads project-local
@@ -335,7 +355,9 @@ A fresh `supagame.config.json` is:
 
 The reference above is a placeholder. Manifest validation rejects unknown fields,
 unsupported formats, invalid module/version records and invalid or duplicate board
-definitions. Module records map `core` and `leaderboards` to release versions;
+definitions. Optional `origins` stores a normalized list of public browser origins;
+old manifests remain valid. Module records map `core`, `leaderboards` and optional
+`live-leaderboards` to release versions;
 installation sets both to `0.1.0`. The `leaderboard create` command records entries
 in `leaderboards`. Its validated definition shape is
 `{ id, kind, sortDirection, keepBest: true, minValue, maxValue }`, with safe-integer
@@ -361,8 +383,10 @@ The CLI parses TOML to validate it, then appends only a missing
 local entrypoint/import-map paths. Existing bytes, comments and line endings are
 preserved. An existing compatible section is unchanged; incompatible settings
 require manual review. Existing anonymous-auth settings are preserved, with an
-instruction if anonymous sign-in is not enabled. Browser clients still need
-`SG_ALLOWED_ORIGINS`; the staged `.env.example` contains placeholders only.
+instruction if local anonymous sign-in is not enabled. Use `init --origin <origin>`
+or `config origins add <origin>` to prepare browser configuration. Deployment
+manages hosted anonymous Auth and `SG_ALLOWED_ORIGINS` after explicit consent;
+see the [installation reference](docs/installation-reference.md).
 
 Dry runs list `create`, `update`, `unchanged` and `conflict` paths, including active
 installer locks, without writing files. Every destination is checked before any
@@ -461,16 +485,19 @@ configuration disables seeds and preserves the function's required
 `verify_jwt = false`; its route-specific authentication remains unchanged. Original
 configuration, `.env` files, secrets, config.json overrides, custom role files and
 unrelated functions are not copied. `--skip-vault` prevents the CLI's default Vault
-synchronization. The wrapper never invokes reset, prune, function deletion, config
-push or secrets deployment. It suppresses raw child output, which can contain SQL
+synchronization. The wrapper never invokes reset, prune or function deletion.
+Hosted prerequisites use a separate isolated, one-property Auth configuration
+with an allowlisted diff, and only the `SG_ALLOWED_ORIGINS` secret. It suppresses raw child output, which can contain SQL
 or credentials. The flags and structured protocol follow the
 [Supabase CLI 3.0.0 database implementation](https://github.com/supabase/cli/blob/v3.0.0/apps/cli/src/command-internal/db-push-core.ts)
 and [named-function deployment implementation](https://github.com/supabase/cli/blob/v3.0.0/apps/cli/src/shared/functions/deploy.ts).
 
 This release deploys the installed SDK's exact function assets. Modified SDK files
 must be restored or handled separately; arbitrary custom import graphs are not
-packaged by this command. Configure hosted anonymous Auth and `SG_ALLOWED_ORIGINS`
-separately. Local config/Auth settings and function secrets are not pushed.
+packaged by this command. Hosted anonymous Auth and browser origins are previewed,
+authorized and verified with the deployment. The developer’s full local config and
+environment files are never pushed. Unknown existing origin values require explicit
+`--replace-origins` consent after recording all intended origins.
 
 A project lock prevents overlapping deployments from the same checkout. Before each
 hosted phase, an atomic journal at `supabase/.temp/supagame-deploy.json` records the
@@ -554,8 +581,10 @@ public column allowlists, private-schema access and RPC signatures, security mod
 empty search paths and narrow EXECUTE grants. Missing or malformed query evidence
 never produces a security success.
 
-Remote mode also reads hosted anonymous-auth settings and Edge Function status/JWT
-configuration. A matching completed deployment receipt, local asset hash and remote
+Remote mode also reads hosted anonymous-auth settings, browser origin digests and
+Edge Function status/JWT configuration. Live Leaderboards checks triggers, Realtime
+RLS/helpers/grants and private-channel policies, and distinguishes catalog checks
+from service health and unverified WebSocket delivery. A matching completed deployment receipt, local asset hash and remote
 version/hash support a code-match finding; drift is warned about and missing evidence
 is explicitly unverified. These are configuration/catalog checks, **not an audit of
 SQL function bodies or a substitute for runtime security tests**. Migration history

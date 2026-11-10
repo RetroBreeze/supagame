@@ -113,8 +113,12 @@ API with valid credentials: CORS is a browser control, not authorization.
 
 Set `SG_AUTH_ISSUER` only when the public Auth issuer differs from the runtime URL,
 as in the local Docker fixture. Hosted configuration normally uses the project's
-public URL; custom domains/issuers need explicit review. Supagame deploy does not
-push Auth settings or secrets. Never commit `.env`, privileged keys, database
+public URL; custom domains/issuers need explicit review. Supagame deploy manages
+only the anonymous Auth prerequisite and `SG_ALLOWED_ORIGINS`, with explicit
+authorization, narrowly scoped writes and read-back verification. Unknown origin
+values require explicit replacement consent. The developer’s full configuration
+is never pushed; global Realtime channel settings remain unchanged. See the
+[installation reference](installation-reference.md). Never commit `.env`, privileged keys, database
 passwords, personal access tokens or user JWTs. CI requires no hosted credentials.
 
 ## First-PR dependency review (9 November 2026)

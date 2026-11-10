@@ -3,6 +3,7 @@ import { doctor, doctorExitCode } from './commands/doctor.ts';
 import type { DoctorOptions } from './commands/doctor.ts';
 import { upgrade } from './commands/upgrade.ts';
 import { Command } from 'commander';
+import { addOrigins } from './commands/config-origins.ts';
 import { init } from './commands/init.ts';
 import { deploy } from './commands/deploy.ts';
 import type { DeployOptions } from './commands/deploy.ts';
@@ -33,7 +34,10 @@ local(
     '--project-ref <ref>',
     'Record this Supabase project ref; must agree with local link metadata',
   )
-  .action((options: LocalOptions) => init(options));
+  .option('--origin <origin>', 'Allow a browser origin (repeatable)', (value: string, previous: string[]) => [...(previous ?? []), value], undefined as string[] | undefined)
+  .action((options) => init(options));
+local(program.command('config').description('Manage installation configuration').command('origins').description('Manage allowed browser origins').command('add').argument('<origins...>'))
+  .action((origins: string[], options: LocalOptions) => addOrigins(origins, options));
 local(
   program.command('add').description('Stage a game services module').argument(
     '<module>',
@@ -65,6 +69,7 @@ local(
     '--allow-remote',
     'Explicitly authorize hosted changes without a prompt (CI opt-in)',
   )
+  .option('--replace-origins', 'Explicitly replace unknown/non-additive SG_ALLOWED_ORIGINS with ALL manifest origins; deployment authorization still required')
   .action((options: DeployOptions) => deploy(options));
 program.command('doctor').description('Read-only installation, schema and security diagnostics')
   .option('--workdir <directory>', 'Explicit project root')

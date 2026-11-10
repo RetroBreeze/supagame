@@ -1,20 +1,20 @@
 # Troubleshooting
 
 Start with `supagame doctor` from the selected project root. It is read-only and
-reports **healthy**, **warning**, **error**, or **cannot verify**, with local,
+reports **healthy**, **warning**, **error**, **action required**, or **cannot verify**, with local,
 database and remote provenance. Add `--local` for the running local database.
 Never interpret “cannot verify” as a successful security check.
 
 | Symptom | Check and remedy |
 | --- | --- |
 | `supagame` not found / npm package unavailable | v0.1 is unpublished. Build and install the local tarballs as in [quickstart](quickstart.md); use `npx --no-install supagame` from the consumer project. |
-| No `supabase/config.toml` | Run Supabase CLI `init` in the project first, or pass the correct `--workdir`. Supagame does not search parents. |
+| No `supabase/config.toml` | Run `supagame init --project-ref <ref> --origin <origin>`, or pass the correct `--workdir`. Supagame does not search parents. |
 | Missing/mismatched project ref | Compare explicit ref, `supagame.config.json` and Supabase link metadata. `project_id` is not a hosted ref. Never guess or silently relink another project. |
 | Conflicting file/migration | Restore original SDK files from Git or resolve unrelated filename collisions deliberately. Applied migrations must not be renamed/rewritten. Dry-run before staging. |
 | Unsupported CLI | Install **Supabase CLI 3.0.0**. The adapter fails closed on untested versions/output shapes; upgrading the executable alone is insufficient. |
-| Anonymous sign-in fails | Enable local `auth.enable_anonymous_sign_ins`; hosted Auth settings are separate. Check Auth quotas/CAPTCHA, network and clock. The SDK helper does not collect CAPTCHA tokens. |
+| Anonymous sign-in fails | Run `supagame deploy --project-ref <ref>` to preview and authorize the hosted prerequisite. Existing local disablement requires review of `auth.enable_anonymous_sign_ins`. Check Auth quotas/CAPTCHA, network and clock. The SDK helper does not collect CAPTCHA tokens. |
 | Existing session fails refresh | Recover through the caller-owned Supabase client. Do not force anonymous sign-in to mask an error and replace a permanent identity. |
-| Browser receives 403/CORS errors | Set `SG_ALLOWED_ORIGINS` to exact origins (scheme, host, port; no trailing slash). The demo uses `http://127.0.0.1:5173`, different from `http://localhost:5173`. Restart local Edge runtime after config changes. |
+| Browser receives 403/CORS errors | Run `supagame config origins add <origin>`, then preview/deploy. Unknown hosted values require all intended origins and explicit `--replace-origins`. The demo uses `http://127.0.0.1:5173`, different from `http://localhost:5173`. Restart local Edge runtime after config changes. |
 | Public read receives 401 | Supply a modern `sb_publishable_...` key; preserve `verify_jwt=false` for this mixed-auth Edge Function. Check the key belongs to this project. |
 | Protected request receives 401 | Also send a current Auth user JWT. Check issuer, audience, expiry and role. Local Docker usually needs the external `SG_AUTH_ISSUER` override shown in quickstart. |
 | Generic 500 / function cannot load | Check staged DTO/lock/config files and server-side configuration. Use doctor and local typechecks. Investigate logs privately; never post keys, tokens or status JSON. |
@@ -83,6 +83,24 @@ reinspects remote state and needs fresh authorization. Never delete the journal,
 remove a lock, or rewrite attempted SQL simply to bypass these protections; first
 establish that no deploy process is running and reconcile its outcome.
 
-Supagame deploy does **not** update hosted Auth configuration, origin environment
-settings, seeds, custom roles or Vault secrets. Configure those separately through
-trusted Supabase administration after explicit approval.
+Hosted configuration failures can leave an earlier Auth/origin change applied.
+Database/function work does not start until those changes are verified. Rerun
+`deploy --dry-run`, inspect the result and authorize the remaining work. Origin
+receipts contain public configuration only; a missing receipt never permits an
+unknown secret overwrite. Seeds, custom roles, Vault and unrelated configuration
+remain excluded. See [installation reference](installation-reference.md).
+
+## Live Leaderboards
+
+`doctor --remote --project-ref <ref>` checks actual triggers, authorization, RLS
+and grants. A ledger entry alone is insufficient. Missing database Broadcast
+helpers require the full local Supabase stack or repair of hosted service
+provisioning; do not manually create service-owned Realtime tables. Extra permissive
+receive policies require review because they can broaden access across topics.
+
+A suspended/unhealthy hosted Realtime service requires operator attention. The CLI
+never flips global `private_only`, resumes services or changes quotas. If only
+service-health evidence is unavailable, an optional exported `SUPABASE_ACCESS_TOKEN`
+with appropriate read permissions enables the supported Management API checks.
+The token is not needed for normal CLI-login-based deployment. WebSocket delivery
+still requires a real gameplay check; doctor does not generate artificial scores.

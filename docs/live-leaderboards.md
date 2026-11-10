@@ -62,23 +62,30 @@ in-game events, with no push service or persistent storage.
 
 ## Deployment and troubleshooting
 
-Enable Supabase Realtime before applying the optional migration. For local tests,
-start the full stack with `[realtime] enabled = true` before `pnpm db:migrate`;
-a database-only stack does not initialize `realtime.messages` or `realtime.send`.
-Fresh local projects should start Supabase before staging the optional module.
-The production project must support database Broadcast and private channels.
-Supabase recommends disabling public channel access in Realtime settings; review
-other application channels before changing that setting. This installer never
-changes hosted settings. Private mode is explicitly requested on both sending
-and receiving sides regardless of that global setting.
+`supagame add live-leaderboards` stages everything the module owns. Deployment
+checks database Broadcast/RLS/receive prerequisites, previews the optional migration
+and asks for explicit authorization. It manages anonymous Auth and browser origins
+with the normal installation workflow. No publication setup is required.
 
-Run `supagame doctor --remote --project-ref <ref>` for read-only migration,
-trigger and policy diagnostics. Doctor cannot prove WebSocket delivery or hosted
-Realtime settings; perform a runtime smoke check using real gameplay. Missing
-module/policies or an expired JWT can cause channel errors. HTTP API errors,
-validation failures and network errors are surfaced separately, not all labeled
-offline. A disabled/deleted board produces its existing HTTP not-found error;
-consumers should clear stale content if appropriate.
+For local tests, start the full stack with `[realtime] enabled = true` before
+`pnpm db:migrate`; a database-only stack does not initialize `realtime.messages`
+or `realtime.send`. Fresh local projects should start Supabase before applying the
+optional module. Supagame never creates or alters those service-owned tables.
+
+Both the trigger and SDK explicitly select private mode. The project-wide
+`private_only` setting is preserved so other application channels keep working.
+Run `supagame doctor --remote --project-ref <ref>` to check installed versions,
+actual trigger tables/events, function grants, private-channel policies, Realtime
+RLS and receive permissions. Additional permissive receive policies are flagged
+for review, never removed automatically.
+
+Doctor distinguishes these checks from hosted service health and WebSocket
+delivery. Optional Management API read credentials enable service suspension/health
+inspection; unavailable evidence is reported as **CANNOT VERIFY**. Suspended or
+unhealthy services need operator attention. Perform the final delivery/reconnect
+check during real gameplay. See [installation reference](installation-reference.md)
+for permissions, consent and safe retry details. Missing module/policies or an
+expired JWT can cause channel errors; HTTP failures are reported separately.
 
 Broadcast delivery is best-effort; it is not a durable event log. Every refresh
 uses two HTTP reads, which need not share one database transaction; player rank

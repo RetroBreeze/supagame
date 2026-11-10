@@ -1,3 +1,4 @@
+import { inspectHostedConfiguration } from './doctor-hosted.ts';
 import type { Diagnostic } from '../commands/doctor.ts';
 import type { DeploymentState } from './deployment-state.ts';
 import type { Inventory, ModuleRelease } from './versions.ts';
@@ -16,6 +17,7 @@ export interface LiveInspection {
   ref: string;
   remote: boolean;
   localAnonymous: boolean;
+  origins: string[] | undefined;
   files: MigrationFile[];
   releases: ModuleRelease[];
   inventory: Inventory;
@@ -139,46 +141,7 @@ export async function inspectLive(context: LiveInspection): Promise<void> {
       );
     }
     if (context.remote) {
-      try {
-        const data = await inspector.json(['config', 'diff']);
-        if (
-          !object(data) || data.schema_version !== 1 || !object(data.scope) ||
-          !Array.isArray(data.scope.present) || !data.scope.present.includes('auth') ||
-          !Array.isArray(data.changes) || !Array.isArray(data.masked) ||
-          !Array.isArray(data.unmanaged)
-        ) throw new Error('Unsupported config diff.');
-        const path = 'auth.enable_anonymous_sign_ins';
-        if ([...data.masked, ...data.unmanaged].some((v) => JSON.stringify(v).includes(path))) {
-          throw new Error('Anonymous setting unavailable.');
-        }
-        const change = data.changes.find((c) => object(c) && c.path === path);
-        const enabled = change === undefined ? true : object(change) ? change.remote : undefined;
-        if (typeof enabled !== 'boolean') throw new Error('No remote Auth value.');
-        report(
-          'remote',
-          'anonymous-auth',
-          enabled ? 'healthy' : 'warning',
-          enabled
-            ? 'Hosted anonymous authentication enabled.'
-            : 'Enable anonymous authentication in the selected hosted project; doctor never changes Auth settings.',
-        );
-        const localEnabled = context.localAnonymous;
-        if (localEnabled !== enabled) {
-          report(
-            'remote',
-            'auth-drift',
-            'warning',
-            'Hosted anonymous authentication differs from local TOML. Reconcile the intended settings manually.',
-          );
-        }
-      } catch {
-        report(
-          'remote',
-          'anonymous-auth',
-          'cannot verify',
-          'Hosted Auth inspection unavailable; verify anonymous sign-in in project settings with read access.',
-        );
-      }
+      await inspectHostedConfiguration(context);
       if (releases.some((r) => r.module === 'leaderboards')) {
         try {
           const data = await inspector.json(['functions', 'list']);

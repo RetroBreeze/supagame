@@ -1,3 +1,4 @@
+import { mergeOrigins } from './origins.ts';
 import { readProjectFile } from './file-stage.ts';
 
 export const MANIFEST = 'supagame.config.json';
@@ -14,6 +15,7 @@ export interface Manifest {
   projectRef: string;
   modules: Partial<Record<'core' | 'leaderboards' | 'live-leaderboards', string>>;
   leaderboards: LeaderboardDefinition[];
+  origins?: string[];
 }
 export function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -54,7 +56,7 @@ export function validateManifest(value: unknown): Manifest {
     );
   if (
     !object(value) ||
-    !keys(value, ['formatVersion', 'projectRef', 'modules', 'leaderboards']) ||
+    !keys(value, ['formatVersion', 'projectRef', 'modules', 'leaderboards', ...(Object.hasOwn(value, 'origins') ? ['origins'] : [])]) ||
     value.formatVersion !== 1 || !projectRef(value.projectRef) ||
     !object(value.modules) || !Array.isArray(value.leaderboards)
   ) throw invalid();
@@ -72,6 +74,12 @@ export function validateManifest(value: unknown): Manifest {
       value.leaderboards.length
   ) throw invalid();
   if (value.leaderboards.length && !value.modules.leaderboards) throw invalid();
+  if (value.origins !== undefined) {
+    if (!Array.isArray(value.origins) || !value.origins.every(v => typeof v === 'string')) throw invalid();
+    try {
+      if (JSON.stringify(mergeOrigins([], value.origins)) !== JSON.stringify(value.origins)) throw invalid();
+    } catch { throw invalid(); }
+  }
   return value as unknown as Manifest;
 }
 export function readManifest(
