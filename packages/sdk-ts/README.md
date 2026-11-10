@@ -161,3 +161,12 @@ Achievements are available as `game.achievements`, with the framework-independen
 `createAchievementQueue` export. Optional DOM rendering is a separate
 `@supagame/sdk-ts/browser` entry point. See [Achievements](../../docs/achievements.md)
 for configuration, security, migration and complete examples.
+
+## Accounts and recovery
+
+See [account linking, OAuth callbacks and save conflict resolution](../../docs/accounts.md).
+Configure `accounts.namespace` and a Supabase PKCE client. Use `players.linkProvider`
+to preserve the guest ID; use `players.signInWithProvider` explicitly for account
+recovery. Stage progress with `saves.prepareAccountSwitch`, inspect after authentication,
+and resolve with Keep Cloud, Keep Guest, Cancel or a game-specific merge callback.
+Backups are durable on the preparing device; no scores or achievements are migrated.

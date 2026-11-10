@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { configureAuth } from './commands/auth.ts';
 import { cleanupSaves } from './commands/saves-cleanup.ts';
 import { configureSaves } from './commands/saves-configure.ts';
 import { createAchievement } from './commands/achievement-create.ts';
@@ -88,6 +89,15 @@ program.command('doctor').description('Read-only installation, schema and securi
     const findings = await doctor(options);
     process.exitCode = doctorExitCode(findings, Boolean(options.local || options.remote));
   });
+const authCommand = program.command('auth').description('Configure and diagnose provider authentication (separate from CORS)');
+for (const name of ['configure', 'doctor']) {
+  local(authCommand.command(name)).option('--local', 'Local Auth configuration').option('--remote', 'Explicit hosted Auth configuration')
+    .option('--project-ref <ref>', 'Exact matching hosted project reference')
+    .option('--redirect <url>', 'Exact application callback URL, repeatable', (v: string, prior: string[]) => [...prior, v], [])
+    .option('--site-url <url>', 'Explicit Auth site URL').option('--enable-google', 'Configure Google using GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables')
+    .option('--allow-remote', 'Authorize the previewed narrow Auth patch without a prompt')
+    .action(options => configureAuth({...options, doctor: name === 'doctor'}));
+}
 const savesCommand = program.command('saves').description('Configure and maintain Cloud Saves');
 local(savesCommand.command('cleanup')).option('--local', 'Clean only the local stack').option('--remote', 'Clean an explicitly selected hosted project').option('--project-ref <ref>', 'Exact hosted destination').option('--allow-remote', 'Authorize the displayed hosted cleanup without a prompt').action(cleanupSaves);
 local(savesCommand.command('configure'))

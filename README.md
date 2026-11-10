@@ -849,3 +849,7 @@ quotas, Storage policies and diagnostics. The TypeScript SDK exposes
 IndexedDB queue. See [Cloud Saves quickstart and architecture](docs/cloud-saves.md)
 and [verification](docs/cloud-saves-verification.md). All provisioning remains
 project-owned and explicitly confirmed before hosted changes.
+
+Account linking and recovery: see [Accounts and save conflict resolution](docs/accounts.md)
+for Google setup, PKCE callbacks, durable guest snapshots, backups, custom merges and
+`supagame auth configure` / `supagame auth doctor`.

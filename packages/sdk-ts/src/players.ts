@@ -1,15 +1,17 @@
+import { createAccountPlayers, type AccountPlayers, type AccountContext } from './accounts.js';
 import type { PlayerProfile, UpdatePlayerRequest } from '@supagame/contracts';
 import { ensureSession, requireSession, type SupabaseConnection } from './auth.js';
 import { matches, type Transport } from './client.js';
 import { InvalidParameterError } from './errors.js';
 
-export interface Players {
+export interface Players extends AccountPlayers {
   ensureAnonymousSession(): Promise<{ userId: string }>;
   getMe(): Promise<PlayerProfile>;
   updateMe(input: UpdatePlayerRequest): Promise<PlayerProfile>;
 }
-export function createPlayers(client: SupabaseConnection, transport: Transport): Players {
+export function createPlayers(client: SupabaseConnection, transport: Transport, accounts: AccountContext): Players {
   return {
+    ...createAccountPlayers(client, accounts),
     ensureAnonymousSession: () => ensureSession(client),
     async getMe() {
       return transport.request('/players/me', 'GET', 'PlayerProfile', { session: await requireSession(client) });

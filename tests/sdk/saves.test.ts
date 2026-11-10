@@ -87,3 +87,12 @@ it("pins queued writes to their original player even if Auth changes before disp
   ).rejects.toMatchObject({ kind: "authentication" });
   expect(f.fetcher).not.toHaveBeenCalled();
 });
+it('bounds binary downloads and rejects changed metadata before reading object bytes',async()=>{
+ const f=fixture();f.fetcher.mockImplementation(async()=>Response.json({save:{...record,kind:'binary',objectPath:`${session().user.id}/object`,sizeBytes:1000,revision:3}}));
+ const saves=createGameServices({supabase:f.supabase}).saves;
+ const before=f.requests.length;
+ await expect(saves.loadBinary('profile',{maxBytes:100})).rejects.toMatchObject({kind:'invalid_parameter'});
+ expect(f.requests.slice(before).every(r=>!r.url.includes('/storage/'))).toBe(true);
+ await expect(saves.loadBinary('profile',{maxBytes:2000,expectedRevision:2})).rejects.toMatchObject({code:'SAVE_CONFLICT'});
+ expect(f.requests.every(r=>!r.url.includes('/storage/'))).toBe(true);
+});

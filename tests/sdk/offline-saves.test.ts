@@ -136,3 +136,11 @@ it("stages binary bytes durably and replays deletion through the same revision q
     expect.objectContaining({ expectedRevision: 1, expectedPlayerId: "one" }),
   );
 });
+it('stages pending offline JSON, binary and deletes into an account transition',async()=>{
+ const f=fixture();const offline=f.make();
+ await offline.stage('profile',{coins:11});await offline.stageBinary('blob',new Blob(['pending']));await offline.delete('removed');
+ const prepared=vi.fn(async(input?: {local?: unknown[]})=>{void input;return ({id:'transition',sourcePlayerId:'one'});});f.saves.prepareAccountSwitch=prepared;
+ await offline.prepareAccountSwitch(['profile','blob','removed']);
+ const input=prepared.mock.calls[0]![0] as unknown as {local:{slot:string;kind:string;data?:unknown;binary?:Blob}[]};
+ expect(input.local.find(s=>s.slot==='profile')?.data).toEqual({coins:11});expect(await input.local.find(s=>s.slot==='blob')?.binary?.text()).toBe('pending');expect(input.local.find(s=>s.slot==='removed')?.kind).toBe('delete');
+});

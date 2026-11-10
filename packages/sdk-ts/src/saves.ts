@@ -1,3 +1,4 @@
+import type { AccountSaves as importAccountSaves } from './account-saves.js';
 import type {
   SaveRecord,
   SaveResult,
@@ -13,6 +14,7 @@ import {
   GameServicesError,
   InvalidParameterError,
   StorageError,
+  SaveConflictError,
 } from "./errors.js";
 import { operationId, validateJson, type JsonValue } from "./save-values.js";
 
@@ -24,7 +26,7 @@ export interface SaveOptions {
   metadata?: Record<string, JsonValue>;
 }
 export type Saved<T = unknown> = Omit<SaveRecord, "data"> & { data?: T };
-export interface Saves {
+export interface Saves extends importAccountSaves {
   save<T>(slot: string, data: T, options?: SaveOptions): Promise<Saved<T>>;
   load<T = unknown>(slot: string): Promise<Saved<T>>;
   list(): Promise<SaveRecord[]>;
@@ -40,7 +42,7 @@ export interface Saves {
     data: Blob,
     options?: SaveOptions,
   ): Promise<SaveRecord>;
-  loadBinary(slot: string): Promise<{ save: SaveRecord; data: Blob }>;
+  loadBinary(slot: string, options?: {maxBytes?: number; expectedRevision?: number}): Promise<{ save: SaveRecord; data: Blob }>;
   abortBinary(slot: string, operationId: string): Promise<void>;
   cleanup(): Promise<number>;
 }
@@ -55,7 +57,7 @@ function slotPath(slot: string): string {
 export function createSaves(
   client: SupabaseConnection,
   transport: Transport,
-): Saves {
+): Omit<Saves, keyof importAccountSaves> {
   const revisions = new Map<string, number>();
   const key = (session: Session, slot: string) => `${session.user.id}:${slot}`;
   async function same(session: Session) {
@@ -132,7 +134,7 @@ export function createSaves(
       throw error;
     }
   }
-  const api: Saves = {
+  const api: Omit<Saves, keyof importAccountSaves> = {
     async save(slot, data, options = {}) {
       validateJson(data);
       const session = await requireSession(client);
@@ -264,9 +266,11 @@ export function createSaves(
         throw error;
       }
     },
-    async loadBinary(slot) {
+    async loadBinary(slot, options = {}) {
       const session = await requireSession(client);
       const save = await api.load(slot);
+      if (options.maxBytes !== undefined && (!Number.isSafeInteger(options.maxBytes) || options.maxBytes < 1 || save.sizeBytes > options.maxBytes)) throw new InvalidParameterError('maxBytes', 'Binary save exceeds the bounded download budget. Source data is unchanged.');
+      if (options.expectedRevision !== undefined && save.revision !== options.expectedRevision) throw new SaveConflictError(save, 'Binary save changed before download. Prepare the snapshot again.');
       if (
         save.kind !== "binary" ||
         !save.objectPath ||

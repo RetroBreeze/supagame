@@ -1,10 +1,12 @@
 import type { ApiError as ApiErrorBody } from '@supagame/contracts';
 import type { Session } from '@supabase/supabase-js';
+import { requireSession } from './auth.js';
 import type { SupabaseConnection } from './auth.js';
 import { ApiError, SaveConflictError, AuthenticationError, InvalidParameterError, NetworkError, UnexpectedResponseError } from './errors.js';
 import * as validators from './validation.generated.js';
 
 export interface GameServicesOptions {
+  accounts?: import('./accounts.js').AccountOptions;
   supabase: SupabaseConnection;
   /** Full trusted API base, e.g. https://example.com/functions/v1/supagame/v1. */
   baseUrl?: string;
@@ -85,6 +87,7 @@ export function createTransport(options: GameServicesOptions): Transport {
         if (!result.response || result.response.status !== 200 || !jsonResponse(result.response)) throw new UnexpectedResponseError();
         data = result.data;
       }
+      if (request.session && (await requireSession(options.supabase)).user.id !== request.session.user.id) throw new AuthenticationError('The player changed during the request. Original account data was not returned.');
       if (!(request.nullable && data === null) && !matches(schema, data)) throw new UnexpectedResponseError();
       return data as T;
     },

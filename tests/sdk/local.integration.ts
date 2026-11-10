@@ -142,3 +142,29 @@ it('recovers after upload succeeds but its acknowledgement or metadata commit is
  expect(await(await game.saves.loadBinary(slot)).data.text()).toBe('unfinished');
  await game.saves.delete(slot,{expectedRevision:1});await game.saves.cleanup();await game.saves.cleanup();
 });
+
+it('imports guest JSON and binary into an authenticated permanent account through real RLS/CAS APIs',async()=>{
+ const guest=makeClient(),target=makeClient();
+ const signed=await target.auth.signUp({email:`transition-${crypto.randomUUID()}@example.invalid`,password:`${crypto.randomUUID()}aA1!`});
+ expect(signed.error).toBeNull();users.push(signed.data.user!.id);
+ const rows=new Map<string,unknown>();
+ const store:import('../../packages/sdk-ts/src/offline-saves.js').LocalStore<unknown>={async read(k){return structuredClone(rows.get(k)??null);},async update(k,fn){const n=fn(structuredClone(rows.get(k)??null));rows.set(k,structuredClone(n));return n;}};
+ const services=createGameServices({supabase:guest,accounts:{namespace:'local-transition',store}});
+ const source=await services.players.ensureAnonymousSession();users.push(source.userId);
+ await services.saves.save('state',{coins:11});await services.saves.saveBinary('binary',new Blob(['guest binary']));
+ const transition=await services.saves.prepareAccountSwitch({local:[{slot:'state',kind:'json',data:{coins:12}}]});
+ const targetGame=createGameServices({supabase:target});await targetGame.saves.save('state',{coins:30});await targetGame.saves.saveBinary('binary',new Blob(['cloud binary']));
+ // OAuth itself is mocked in unit/browser tests. This case uses real local sessions
+ // and seeds ONLY its validated callback receipt; every read/write goes through RLS.
+ const flowId=crypto.randomUUID();
+ await store.update(JSON.stringify(['local-transition','flow',flowId]),()=>({version:1,id:flowId,operation:'signIn',sourcePlayerId:source.userId,targetPlayerId:signed.data.user!.id,transitionId:transition.id}));
+ const switched=createGameServices({supabase:target,accounts:{namespace:'local-transition',store}});
+ const review=await switched.saves.inspectAccountSwitch(transition,{flowId});expect(review.slots.find(s=>s.slot==='state')?.cloud?.data).toEqual({coins:30});
+ await switched.saves.resolveAccountSwitch(transition,{strategy:'keepGuest',targetPlayerId:signed.data.user!.id,confirmed:true});
+ await switched.saves.resolveAccountSwitch(transition,{strategy:'keepGuest',targetPlayerId:signed.data.user!.id,confirmed:true});
+ expect((await targetGame.saves.load('state')).data).toEqual({coins:12});expect((await targetGame.saves.load('state')).revision).toBe(2);
+ expect(await(await targetGame.saves.loadBinary('binary')).data.text()).toBe('guest binary');
+ expect((await services.saves.load('state')).data).toEqual({coins:11});
+ const backup=await switched.saves.getAccountSwitchRecovery(transition);expect(await backup.slots.find(s=>s.slot==='binary')?.cloud?.binary?.text()).toBe('cloud binary');
+ for(const api of [services.saves,targetGame.saves]){await api.delete('state',{expectedRevision:api===services.saves?1:2});await api.delete('binary',{expectedRevision:api===services.saves?1:2});await api.cleanup();}
+},30000);

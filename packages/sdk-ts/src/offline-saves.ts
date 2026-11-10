@@ -1,3 +1,5 @@
+import type { TransferSave } from './account-saves.js';
+import { AccountError } from './accounts.js';
 import type { SaveRecord } from "@supagame/contracts";
 import type { Saves, SaveOptions, Saved } from "./saves.js";
 import { AuthenticationError, SaveConflictError } from "./errors.js";
@@ -41,8 +43,29 @@ export function createOfflineSaves(options: {
     if ((await options.playerId()) !== player)
       throw new AuthenticationError("The player changed while synchronizing.");
   }
+  const paused = new Set<string>();
+  function writable(player: string) { if (paused.has(player)) throw new AccountError('TRANSITION_PENDING', 'Account transition prepared. Resume this identity explicitly before changing its offline saves.'); }
   const active = new Map<string, Promise<OfflineEntry | null>>();
   const api = {
+    async prepareAccountSwitch(slots: readonly string[]) {
+      const player = await options.playerId();
+      if (!player) throw new AuthenticationError();
+      paused.add(player);
+      // Drain existing syncs before freezing a recoverable view. Failed pending writes stay staged.
+      await Promise.allSettled([...active.values()]);
+      const local: TransferSave[] = [];
+      for (const slot of new Set(slots)) {
+        const state = await api.local(slot), pending = state?.pending.at(-1);
+        if (!pending) continue;
+        local.push({slot, kind: pending.kind ?? 'json',
+          ...(pending.kind === 'binary' ? {binary: pending.data as Blob} : {data: pending.data}),
+          ...(pending.options.schemaVersion ? {schemaVersion:pending.options.schemaVersion}:{}),
+          ...(pending.options.metadata ? {metadata:pending.options.metadata}:{})});
+      }
+      await same(player);
+      return options.saves.prepareAccountSwitch({local});
+    },
+    async resumeAfterAccountSwitch() { const player = await options.playerId(); if (player) paused.delete(player); },
     async local(slot: string): Promise<OfflineEntry | null> {
       const { key, player } = await scope(slot);
       const value = await options.store.read(key);
@@ -67,6 +90,7 @@ export function createOfflineSaves(options: {
       validateJson(data);
       const snapshot = structuredClone(data);
       const { key, player } = await scope(slot);
+      writable(player);
       await same(player);
       return options.store.update(key, (previous) => {
         const state = previous ?? empty();
@@ -108,6 +132,7 @@ export function createOfflineSaves(options: {
       settings: SaveOptions = {},
     ): Promise<OfflineEntry> {
       const { key, player } = await scope(slot);
+      writable(player);
       await same(player);
       return options.store.update(key, (previous) => {
         const state = previous ?? empty(),
@@ -135,6 +160,7 @@ export function createOfflineSaves(options: {
     },
     async delete(slot: string): Promise<OfflineEntry> {
       const { key, player } = await scope(slot);
+      writable(player);
       await same(player);
       return options.store.update(key, (previous) => {
         const state = previous ?? empty(),
@@ -164,6 +190,7 @@ export function createOfflineSaves(options: {
     ): Promise<OfflineEntry> {
       validateJson(data);
       const { key, player } = await scope(slot);
+      writable(player);
       await same(player);
       return options.store.update(key, (previous) => {
         const state = previous ?? empty();
@@ -185,6 +212,7 @@ export function createOfflineSaves(options: {
     },
     async sync(slot: string): Promise<OfflineEntry | null> {
       const { key, player } = await scope(slot);
+      writable(player);
       const running = active.get(key);
       if (running) return running;
       const work = (async () => {
