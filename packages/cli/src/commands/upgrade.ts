@@ -37,6 +37,7 @@ export function upgrade(
       'Incompatible installed module versions; restore the expected core/leaderboards pair before upgrading.',
     );
   }
+  if (existing.value.modules['live-leaderboards'] && releaseFor(inventory, 'live-leaderboards', existing.value.modules['live-leaderboards']).requiresLeaderboards !== existing.value.modules.leaderboards) throw new Error('Incompatible live-leaderboards dependency.');
   const disk = migrations(project.root);
   const value = { ...existing.value, modules: { ...existing.value.modules } };
   const desired: DesiredFile[] = [];
@@ -95,6 +96,7 @@ export function upgrade(
       );
     }
   }
+  if (value.modules['live-leaderboards'] && releaseFor(inventory, 'live-leaderboards', value.modules['live-leaderboards']).requiresLeaderboards !== value.modules.leaderboards) throw new Error('Incompatible live-leaderboards upgrade dependency.');
   for (const board of value.leaderboards) {
     const matches = disk.filter((f) => f.name.endsWith(`_supagame_board_${board.id}.sql`));
     if (matches.length !== 1 || !matches[0]!.content.equals(leaderboardSql(board))) {

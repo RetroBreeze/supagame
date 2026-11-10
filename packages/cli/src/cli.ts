@@ -37,7 +37,7 @@ local(
 local(
   program.command('add').description('Stage a game services module').argument(
     '<module>',
-    'Module name: leaderboards',
+    'Module name: leaderboards or live-leaderboards',
   ),
 )
   .action((module: string, options: LocalOptions) => add(module, options));

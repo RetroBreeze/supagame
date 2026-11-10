@@ -1,3 +1,4 @@
+import { subscribe, type LiveOptions, type LiveSubscription } from './live.js';
 import type { LeaderboardPage, MyScore, SubmitScoreResult } from '@supagame/contracts';
 import { requireSession, type SupabaseConnection } from './auth.js';
 import { matches, type Transport } from './client.js';
@@ -5,6 +6,7 @@ import { AuthenticationError, GameServicesError, InvalidParameterError, NetworkE
 
 export interface PageOptions { limit?: number; cursor?: string }
 export interface Leaderboards {
+  subscribe(id: string, options: LiveOptions): LiveSubscription;
   getTop(id: string, options?: PageOptions): Promise<LeaderboardPage>;
   getMine(id: string): Promise<MyScore | null>;
   submit(id: string, score: number, submissionKey?: string): Promise<SubmitScoreResult>;
@@ -25,7 +27,8 @@ function submissionUuid(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 export function createLeaderboards(client: SupabaseConnection, transport: Transport): Leaderboards {
-  return {
+  const api: Leaderboards = {
+    subscribe(id, options) { return subscribe(client, api, id, options); },
     async getTop(id, options = {}) {
       const path = boardPath(id);
       const limit = options?.limit === undefined ? 50 : options.limit;
@@ -64,4 +67,5 @@ export function createLeaderboards(client: SupabaseConnection, transport: Transp
       }
     },
   };
+  return api;
 }

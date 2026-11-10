@@ -82,7 +82,7 @@ test('real Supabase CLI local preview reports an unrelated pending migration wit
     mkdirSync(join(root, 'supabase'));
     cpSync(join(fixture, 'config.toml'), join(root, 'supabase/config.toml'));
     cpSync(join(fixture, 'migrations'), join(root, 'supabase/migrations'), { recursive: true });
-    const name = '20261110000100_unrelated_preview.sql';
+    const name = '20261111000100_unrelated_preview.sql';
     writeFileSync(join(root, 'supabase/migrations', name), 'select 1;\n');
     const env = processEnvironment(process.env);
     delete env.SUPABASE_ACCESS_TOKEN;
@@ -117,7 +117,7 @@ test('real Supabase CLI local preview reports an unrelated pending migration wit
     }, { dryRun: true, migrations: [name], seeds: [], roles: [] });
     assert.equal(
       query(
-        "select count(*) from supabase_migrations.schema_migrations where version = '20261110000100';",
+        "select count(*) from supabase_migrations.schema_migrations where version = '20261111000100';",
       ),
       '0',
     );

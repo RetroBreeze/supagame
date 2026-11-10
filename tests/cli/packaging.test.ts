@@ -84,6 +84,7 @@ it('bundles only the versioned allowlist, excluding local or hidden module files
     ...['index.ts', 'routes.ts', 'auth.ts', 'responses.ts', 'types.ts', 'validation.ts'].map(
       (name) => `modules/leaderboards/functions/supagame/${name}`,
     ),
+    'modules/live-leaderboards/migrations/001_broadcast.sql',
     'packages/contracts/src/generated.ts',
   ].sort();
   expect(Object.keys(snapshot(join(tool, 'dist/assets'))).sort()).toEqual(expected);

@@ -85,3 +85,20 @@ it('lets the real Supabase client refresh an expired persisted session before pl
   expect(Boolean(refreshed && refreshed.expires_at! > Date.now() / 1000)).toBe(true);
   expect(Boolean(refreshed && refreshed.refresh_token !== existing.refresh_token)).toBe(true);
 });
+
+it('receives database Broadcast over a private channel and refreshes authoritative HTTP ranks', async () => {
+  const pages: number[] = [];
+  const statuses: string[] = [];
+  const errors: unknown[] = [];
+  const subscription = game.leaderboards.subscribe(boards[1]!, {
+    onUpdate: page => { pages.push(page.entries.find(e=>e.playerId===users[0])?.score ?? -1); },
+    onStatus: value => { statuses.push(value); }, onError: error => errors.push(error),
+  });
+  try {
+    await expect.poll(()=>statuses.includes('connected'),{timeout:10000}).toBe(true);
+    await expect.poll(()=>pages.length,{timeout:10000}).toBeGreaterThan(0);
+    await game.leaderboards.submit(boards[1]!,99);
+    await expect.poll(()=>pages.at(-1),{timeout:10000}).toBe(99);
+    expect(errors).toEqual([]);
+  } finally { subscription.unsubscribe(); await supabase.removeAllChannels(); }
+});

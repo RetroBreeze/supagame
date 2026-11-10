@@ -1,6 +1,6 @@
 import type { DesiredFile } from './file-stage.ts';
 
-export type ModuleName = 'core' | 'leaderboards';
+export type ModuleName = 'core' | 'leaderboards' | 'live-leaderboards';
 export const MODULE_VERSION = '0.1.0';
 export const moduleMigrations = [
   ['modules/core/migrations/001_players.sql', '20261108000100_core_players.sql'],
@@ -8,22 +8,25 @@ export const moduleMigrations = [
   ['modules/core/migrations/002_player_functions.sql', '20261108000300_core_player_functions.sql'],
   ['modules/leaderboards/migrations/002_submit_score.sql', '20261108000400_submit_score.sql'],
   ['modules/leaderboards/migrations/003_rank_reads.sql', '20261108000500_rank_reads.sql'],
+  ['modules/live-leaderboards/migrations/001_broadcast.sql', '20261110000100_live_leaderboards.sql'],
 ] as const;
 export interface ModuleRelease {
   module: ModuleName;
   version: string;
   previous?: string;
   requiresCore?: string;
+  requiresLeaderboards?: string;
   // Cumulative immutable SQL history and the complete asset snapshot for this release.
   migrations: readonly DesiredFile[];
   assets: readonly DesiredFile[];
 }
 export type Inventory = readonly ModuleRelease[];
 export function currentInventory(files: readonly DesiredFile[]): Inventory {
-  return (['core', 'leaderboards'] as const).map((module) => ({
+  return (['core', 'leaderboards', 'live-leaderboards'] as const).map((module) => ({
     module,
     version: MODULE_VERSION,
     ...(module === 'leaderboards' ? { requiresCore: MODULE_VERSION } : {}),
+    ...(module === 'live-leaderboards' ? { requiresLeaderboards: MODULE_VERSION } : {}),
     migrations: files.filter((file) =>
       moduleMigrations.some(([source, name]) =>
         source.startsWith(`modules/${module}/`) && file.path === `supabase/migrations/${name}`
@@ -55,7 +58,7 @@ export function validateInventory(inventory: Inventory): void {
     const key = `${release.module}@${release.version}`;
     if (identities.has(key)) throw new Error(`Duplicate inventory release ${key}.`);
     identities.add(key);
-    if (!['core', 'leaderboards'].includes(release.module)) {
+    if (!['core', 'leaderboards', 'live-leaderboards'].includes(release.module)) {
       throw new Error('Unknown inventory module.');
     }
     const paths = new Set<string>();
@@ -90,6 +93,7 @@ export function validateInventory(inventory: Inventory): void {
       release.module === 'leaderboards' &&
       !inventory.some((r) => r.module === 'core' && r.version === release.requiresCore)
     ) throw new Error('Inventory has an incompatible core dependency.');
+    if (release.module === 'live-leaderboards' && !inventory.some(r => r.module === 'leaderboards' && r.version === release.requiresLeaderboards)) throw new Error('Inventory has an incompatible leaderboards dependency.');
     if (release.previous) {
       const old = inventory.find((r) =>
         r.module === release.module && r.version === release.previous

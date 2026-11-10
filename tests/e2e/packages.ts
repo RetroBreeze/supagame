@@ -52,6 +52,8 @@ import { createGameServices, ApiError, type PlayerProfile, type LeaderboardPage 
 const game = createGameServices({ supabase: createClient('https://example.supabase.co', 'sb_publishable_placeholder') });
 const profile: Promise<PlayerProfile> = game.players.getMe();
 const page: Promise<LeaderboardPage> = game.leaderboards.getTop('level-1', { limit: 10 });
+const subscription = game.leaderboards.subscribe('level-1', {onUpdate(page) { void page.entries; }, onRankChange(event) { void event.previousRank; }});
+subscription.unsubscribe();
 void [profile, page, ApiError];\n`);
     run(join(root, 'node_modules/.bin/tsc'), ['--noEmit', '--strict', '--target', 'ES2022', '--module', 'NodeNext', '--lib', 'ES2022,DOM', 'consumer.ts'], root);
     const bundle = await build({ entryPoints: [join(root, 'consumer.ts')], bundle: true, platform: 'browser', format: 'esm', write: false, metafile: true });

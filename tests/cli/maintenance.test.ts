@@ -123,7 +123,7 @@ import type { ProcessRunner } from '../../packages/cli/src/lib/supabase-cli.ts';
 import { vi } from 'vitest';
 
 function future(): Inventory {
-  const current = currentInventory(templateFiles());
+  const current = currentInventory(templateFiles()).filter(r => r.module !== 'live-leaderboards');
   const core = current.find((r) => r.module === 'core')!,
     boards = current.find((r) => r.module === 'leaderboards')!;
   return [...current, {
@@ -299,7 +299,7 @@ function remoteFixture() {
     logs,
     run,
     options: { workdir: root, remote: true, projectRef: ref },
-    deps: { run, log: (s: string) => logs.push(s), inventory: currentInventory(templateFiles()) },
+    deps: { run, log: (s: string) => logs.push(s), inventory: currentInventory(templateFiles()).filter(r => r.module !== 'live-leaderboards') },
     set: (key: string) => {
       if (key === 'unreachable') unreachable = true;
       if (key === 'wrong') wrongTarget = true;
@@ -366,7 +366,7 @@ it.each([['auth', 'auth-drift', 'warning'], ['missing', 'function', 'error'], [
 it('reports the actual known database schema version separately from newer locally staged versions', async () => {
   const f = remoteFixture(), inventory = future();
   upgrade({ workdir: f.root }, inventory);
-  f.deps.inventory = inventory;
+  f.deps.inventory = [...inventory];
   f.set('oldSchema');
   const findings = await doctor(f.options, f.deps);
   expect(findings.find((f) => f.id === 'schema:core')?.message).toMatch(

@@ -150,3 +150,9 @@ the host application owns that peer dependency. Tooling scripts are excluded fro
 the package's runtime file list.
 
 MIT licensed, as specified in the repository's LICENSE.
+
+Live Leaderboards adds `game.leaderboards.subscribe(id, { onUpdate, onRankChange,
+onStatus, onError, topN: 10 })`, returning an idempotent `unsubscribe()` handle.
+Install the optional `live-leaderboards` module and establish a player session
+first. See the repository's `docs/live-leaderboards.md` for lifecycle, security,
+rank semantics and operational requirements.

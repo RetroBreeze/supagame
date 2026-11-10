@@ -5,9 +5,9 @@ import type { LocalOptions } from '../lib/project.ts';
 import { checkMigrationVersions, MODULE_VERSION, templateFiles } from '../lib/templates.ts';
 
 export function add(module: string, options: LocalOptions): void {
-  if (module !== 'leaderboards') {
+  if (module !== 'leaderboards' && module !== 'live-leaderboards') {
     throw new Error(
-      `Unknown module '${module}'. Available module: leaderboards.`,
+      `Unknown module '${module}'. Available modules: leaderboards, live-leaderboards.`,
     );
   }
   const project = readProject(options);
@@ -29,12 +29,13 @@ export function add(module: string, options: LocalOptions): void {
       ...existing.value.modules,
       core: MODULE_VERSION,
       leaderboards: MODULE_VERSION,
+      ...(module === 'live-leaderboards' ? { 'live-leaderboards': MODULE_VERSION } : {}),
     },
   };
-  const unchanged = existing.value.modules.core === MODULE_VERSION &&
+  const unchanged = (module !== 'live-leaderboards' || existing.value.modules[module] === MODULE_VERSION) && existing.value.modules.core === MODULE_VERSION &&
     existing.value.modules.leaderboards === MODULE_VERSION;
   const plan = planFiles(project.root, [
-    ...templateFiles(),
+    ...templateFiles().filter(f => !f.path.endsWith('_live_leaderboards.sql') || !!value.modules['live-leaderboards']),
     {
       path: 'supabase/config.toml',
       content: config,
@@ -47,7 +48,7 @@ export function add(module: string, options: LocalOptions): void {
     },
   ]);
   console.log(
-    `Project reference: ${ref}; core and leaderboards ${MODULE_VERSION} (local staging only).`,
+    `Project reference: ${ref}; ${Object.keys(value.modules).join(', ')} ${MODULE_VERSION} (local staging only).`,
   );
   executePlan(project.root, plan, options.dryRun ?? false);
   if (

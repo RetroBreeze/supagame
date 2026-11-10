@@ -9,7 +9,7 @@ import { templateFiles } from '../../packages/cli/src/lib/templates.ts';
 import { currentInventory } from '../../packages/cli/src/lib/versions.ts';
 import { cli, initialized, project, put, snapshot } from '../cli/project-fixture.ts';
 import { query } from './local-sessions.ts';
-const checks = securityChecks(['core', 'leaderboards']);
+const checks = securityChecks(['core', 'leaderboards', 'live-leaderboards']);
 function inspect(setup = ''): { check: string; ok: boolean }[] {
   return JSON.parse(
     query(
@@ -27,6 +27,8 @@ for (
       'grant delete on public.game_leaderboards to public;',
       'writes:authenticated:game_leaderboards',
     ],
+    ["alter policy supagame_live_receive on realtime.messages using (true);", 'live:authorization'],
+    ["alter table public.game_best_scores disable trigger supagame_live_scores;", 'live:triggers'],
     ['alter table public.game_players disable row level security;', 'rls:public.game_players'],
     [
       'alter policy game_players_visible_read on public.game_players using (true);',
@@ -66,7 +68,7 @@ test('actual local CLI doctor is read-only and verifies migration ledger and cat
       'project_id = "supagame-schema-tests"\n[db]\nport = 55432\n[auth]\nenable_anonymous_sign_ins = true\n',
     );
     initialized(root);
-    const install = cli(root, 'add', 'leaderboards');
+    const install = cli(root, 'add', 'live-leaderboards');
     assert.equal(install.status, 0, install.stderr);
     const before = snapshot(root);
     const findings = await doctor({ workdir: root, local: true }, {

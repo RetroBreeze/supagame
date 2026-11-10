@@ -124,6 +124,7 @@ export async function doctor(
       );
     }
   }
+  if (manifest?.value.modules['live-leaderboards']) local('live-realtime-settings', 'warning', 'Verify Realtime is enabled and private channels are supported in the target project. Public-channel settings and WebSocket delivery require a separate runtime check.');
   const releases: ModuleRelease[] = [];
   if (
     !attempt('inventory', () => {

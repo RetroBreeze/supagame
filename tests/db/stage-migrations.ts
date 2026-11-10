@@ -7,6 +7,7 @@ const migrations = [
   ['../../modules/core/migrations/002_player_functions.sql', '20261108000300_core_player_functions.sql'],
   ['../../modules/leaderboards/migrations/002_submit_score.sql', '20261108000400_submit_score.sql'],
   ['../../modules/leaderboards/migrations/003_rank_reads.sql', '20261108000500_rank_reads.sql'],
+  ['../../modules/live-leaderboards/migrations/001_broadcast.sql', '20261110000100_live_leaderboards.sql'],
 ] as const;
 const destination = new URL('../fixtures/local/supabase/migrations/', import.meta.url);
 await mkdir(destination, { recursive: true });

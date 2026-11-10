@@ -573,7 +573,7 @@ for the database-enforced transaction mode. Management API reads and CLI cache f
 are handled in memory/scratch; raw errors that might contain credentials are withheld.
 
 The production inventory in `packages/cli/src/lib/versions.ts` currently contains
-**core 0.1.0 and leaderboards 0.1.0 only**. An intact installation reports
+**core 0.1.0, leaderboards 0.1.0 and optional live-leaderboards 0.1.0**. An intact installation reports
 “Up to date; no upgrade available” and preserves file bytes and mtimes. Unknown,
 newer-than-supported or incompatible versions fail rather than guessing a migration
 path or downgrading. Missing/modified installed files require manual restoration;
@@ -797,3 +797,13 @@ tarballs/declarations/browser bundling without requiring Docker.
 jobs with pinned tool/action versions. It has no publish/deploy job or hosted
 secrets. See [verification and release gates](docs/verification.md) for measured
 results and explicit limits of local evidence.
+
+## Live Leaderboards and roadmap
+
+**Implemented:** optional [Live Leaderboards](docs/live-leaderboards.md), installed
+with `supagame add live-leaderboards`, with private database Broadcast, SDK
+subscriptions and transient rank-change events. Ordinary leaderboards remain
+independent of this optional module.
+
+**Planned:** Achievements, Cloud saves, Live events, Seasons, Multiplayer,
+Ghosts/replays, Friends, Developer dashboard, Native SDKs.

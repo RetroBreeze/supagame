@@ -22,6 +22,7 @@ export function deploymentFiles(root: string, ref: string) {
       'Run supagame init and supagame add leaderboards with this CLI version first.',
     );
   }
+  if (manifest.value.modules['live-leaderboards'] && manifest.value.modules['live-leaderboards'] !== MODULE_VERSION) throw new Error('Use the matching CLI version for the installed live-leaderboards module.');
   selectedRef(root, ref, manifest.value.projectRef);
   if (!functionConfig(project.bytes, project.config).equals(project.bytes)) {
     throw new Error(
@@ -35,6 +36,7 @@ export function deploymentFiles(root: string, ref: string) {
   }));
   const owned = new Set<string>();
   for (const template of templateFiles()) {
+    if (template.path.endsWith('_live_leaderboards.sql') && !manifest.value.modules['live-leaderboards']) continue;
     if (template.path.endsWith('.env.example')) continue;
     const actual = readProjectFile(root, template.path);
     if (!actual?.equals(template.content)) {
