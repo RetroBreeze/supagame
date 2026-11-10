@@ -118,6 +118,23 @@ export interface paths {
         patch: operations["updateMyProfile"];
         trace?: never;
     };
+    "/achievements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All definitions and current player progress; reads never award achievements */
+        get: operations["getAchievements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -186,6 +203,25 @@ export interface components {
             /** @description Public explanation without SQL details, credentials or tokens. */
             message: string;
         };
+        Achievement: {
+            id: string;
+            title: string;
+            description: string;
+            icon: string | null;
+            category: string | null;
+            metadata: {
+                [key: string]: unknown;
+            };
+            progress: {
+                current: number;
+                threshold: number;
+            };
+            unlocked: boolean;
+            /** Format: date-time */
+            unlockedAt: string | null;
+            historical: boolean;
+        };
+        AchievementList: components["schemas"]["Achievement"][];
     };
     responses: {
         /** @description INVALID_REQUEST, INVALID_SCORE, INVALID_CURSOR or INVALID_DISPLAY_NAME. */
@@ -470,6 +506,27 @@ export interface operations {
             413: components["responses"]["PayloadTooLarge"];
             415: components["responses"]["UnsupportedMediaType"];
             500: components["responses"]["InternalError"];
+        };
+    };
+    getAchievements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Achievements */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
 }

@@ -1,3 +1,4 @@
+import { achievementSql } from '../lib/achievements.ts';
 import { existsSync } from 'node:fs';
 import { projectRoot, readProjectFile, safePath } from '../lib/file-stage.ts';
 import { object, readManifest } from '../lib/manifest.ts';
@@ -196,6 +197,10 @@ export async function doctor(
   }
   const files = attempt('migrations', () => migrations(root));
   if (files && manifest) {
+    for (const a of manifest.value.achievements ?? []) {
+      const found = files.filter(f => f.name.endsWith(`_supagame_achievement_${a.id}.sql`));
+      local(`achievement:${a.id}`, found.length === 1 && found[0]!.content.equals(achievementSql(a)) ? 'healthy' : 'error', `Achievement ${a.id}: manifest/SQL consistency.`);
+    }
     for (const board of manifest.value.leaderboards) {
       const found = files.filter((f) => f.name.endsWith(`_supagame_board_${board.id}.sql`));
       local(

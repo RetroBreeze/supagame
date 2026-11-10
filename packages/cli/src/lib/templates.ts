@@ -20,6 +20,7 @@ export const templateSources = [
   ...functionFiles.map((name) => `modules/leaderboards/functions/supagame/${name}`),
   'packages/contracts/src/generated.ts',
   'deno.lock',
+  'modules/legacy/0.1.0.json',
 ];
 export function templateFiles(): DesiredFile[] {
   // Built packages carry the same inventory inside dist/assets; source development
@@ -96,4 +97,10 @@ export function checkMigrationVersions(root: string): void {
       );
     }
   }
+}
+
+export function legacyTemplateFiles(): DesiredFile[] {
+ const base = import.meta.url.endsWith('.ts') ? new URL('../../../../', import.meta.url) : new URL('../assets/', import.meta.url);
+ const rows = JSON.parse(readFileSync(new URL('modules/legacy/0.1.0.json', base), 'utf8')) as {path:string;content:string}[];
+ return rows.map(f => ({path:f.path,content:Buffer.from(f.content,'base64')}));
 }

@@ -836,3 +836,7 @@ independent of this optional module.
 
 **Planned:** Achievements, Cloud saves, Live events, Seasons, Multiplayer,
 Ghosts/replays, Friends, Developer dashboard, Native SDKs.
+
+The optional [Achievements module](docs/achievements.md) awards permanent unlocks
+from accepted leaderboard scores, with player progress, historical backfill,
+headless notification queues and an optional browser renderer.

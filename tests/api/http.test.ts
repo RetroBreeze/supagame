@@ -623,3 +623,19 @@ Deno.test('cursor rejects unrepresentable JSON property names', async () => {
   }
   assert.equal(f.calls.length, 0);
 });
+
+Deno.test('achievements require verified auth and preserve caller identity', async () => {
+  const f = fixture({ status: 200, body: [] });
+  await error(await f.handle(request('/achievements', { jwt: null })), 401, 'UNAUTHORIZED');
+  assert.equal(f.calls.length, 0);
+  const response = await f.handle(request('/achievements'));
+  assert.equal(response.status, 200);
+  assertSchema('AchievementList', await response.json());
+  assert.equal(f.calls[0]!.name, 'sg_get_achievements');
+  assert.equal(f.calls[0]!.authorization, `Bearer ${validToken}`);
+  await error(
+    await f.handle(request('/achievements', { method: 'POST' })),
+    405,
+    'METHOD_NOT_ALLOWED',
+  );
+});

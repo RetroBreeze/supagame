@@ -23,7 +23,7 @@ export async function packedConsumer() {
   try {
     const tarballs = ['contracts', 'sdk-ts', 'cli'].map((name) => {
       run('pnpm', ['pack', '--pack-destination', root], join(repo, 'packages', name));
-      const archive = join(root, `supagame-${name}-0.1.0.tgz`);
+      const archive = join(root, `supagame-${name}-0.1.1.tgz`);
       const entries = run('tar', ['-tzf', archive]).trim().split('\n');
       assert.ok(entries.includes('package/package.json'));
       assert.ok(entries.includes('package/LICENSE'), `${name} must distribute its MIT license`);
@@ -39,7 +39,7 @@ export async function packedConsumer() {
     assert.match(run(cli, ['--help'], root), /leaderboard/);
     for (const name of ['cli', 'sdk-ts', 'contracts']) {
       const manifest = JSON.parse(readFileSync(join(installed(name), 'package.json'), 'utf8'));
-      assert.equal(manifest.license, 'MIT'); assert.equal(manifest.version, '0.1.0');
+      assert.equal(manifest.license, 'MIT'); assert.equal(manifest.version, '0.1.1');
       assert.equal(manifest.private, true, 'Publishing remains separately authorized');
       assert.ok(!JSON.stringify(manifest.dependencies ?? {}).includes('workspace:'));
     }

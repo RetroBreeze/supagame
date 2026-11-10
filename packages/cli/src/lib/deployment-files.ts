@@ -1,3 +1,4 @@
+import { achievementSql } from './achievements.ts';
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -23,6 +24,7 @@ export function deploymentFiles(root: string, ref: string) {
     );
   }
   if (manifest.value.modules['live-leaderboards'] && manifest.value.modules['live-leaderboards'] !== MODULE_VERSION) throw new Error('Use the matching CLI version for the installed live-leaderboards module.');
+  if (manifest.value.modules.achievements && manifest.value.modules.achievements !== MODULE_VERSION) throw new Error('Upgrade achievements first.');
   selectedRef(root, ref, manifest.value.projectRef);
   if (!functionConfig(project.bytes, project.config).equals(project.bytes)) {
     throw new Error(
@@ -36,6 +38,7 @@ export function deploymentFiles(root: string, ref: string) {
   }));
   const owned = new Set<string>();
   for (const template of templateFiles()) {
+    if (template.path.endsWith('_achievements.sql') && !manifest.value.modules.achievements) continue;
     if (template.path.endsWith('_live_leaderboards.sql') && !manifest.value.modules['live-leaderboards']) continue;
     if (template.path.endsWith('.env.example')) continue;
     const actual = readProjectFile(root, template.path);
@@ -66,6 +69,12 @@ export function deploymentFiles(root: string, ref: string) {
       'Unrecorded leaderboard migration: rerun its create command to reconcile the manifest.',
     );
   }
+  for (const a of manifest.value.achievements ?? []) {
+    const found = sql.filter(f => f.name.endsWith(`_supagame_achievement_${a.id}.sql`));
+    if (found.length !== 1 || !found[0]!.content.equals(achievementSql(a))) throw new Error(`Restore achievement migration ${a.id}.`);
+    owned.add(found[0]!.name);
+  }
+  if (sql.some(f => f.name.includes('_supagame_achievement_') && !owned.has(f.name))) throw new Error('Unrecorded achievement migration.');
   const functionHash = digest(
     Buffer.concat(
       files.filter((f) => f.path.includes('/functions/')).flatMap(

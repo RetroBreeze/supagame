@@ -13,3 +13,5 @@ export type ApiError = components['schemas']['ApiError'];
 
 /** Realtime Broadcast v1 invalidation. Rankings are read through the HTTP API. */
 export interface LiveLeaderboardInvalidation { boardId: string }
+
+export type Achievement = components['schemas']['Achievement'];

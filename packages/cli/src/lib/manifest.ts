@@ -1,3 +1,4 @@
+import { isAchievement, type AchievementDefinition } from './achievements.ts';
 import { mergeOrigins } from './origins.ts';
 import { readProjectFile } from './file-stage.ts';
 
@@ -13,9 +14,10 @@ export interface LeaderboardDefinition {
 export interface Manifest {
   formatVersion: 1;
   projectRef: string;
-  modules: Partial<Record<'core' | 'leaderboards' | 'live-leaderboards', string>>;
+  modules: Partial<Record<'core' | 'leaderboards' | 'live-leaderboards' | 'achievements', string>>;
   leaderboards: LeaderboardDefinition[];
   origins?: string[];
+  achievements?: AchievementDefinition[];
 }
 export function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -56,13 +58,13 @@ export function validateManifest(value: unknown): Manifest {
     );
   if (
     !object(value) ||
-    !keys(value, ['formatVersion', 'projectRef', 'modules', 'leaderboards', ...(Object.hasOwn(value, 'origins') ? ['origins'] : [])]) ||
+    !keys(value, ['formatVersion', 'projectRef', 'modules', 'leaderboards', ...(Object.hasOwn(value, 'achievements') ? ['achievements'] : []), ...(Object.hasOwn(value, 'origins') ? ['origins'] : [])]) ||
     value.formatVersion !== 1 || !projectRef(value.projectRef) ||
     !object(value.modules) || !Array.isArray(value.leaderboards)
   ) throw invalid();
   for (const [module, version] of Object.entries(value.modules)) {
     if (
-      !['core', 'leaderboards', 'live-leaderboards'].includes(module) ||
+      !['core', 'leaderboards', 'live-leaderboards', 'achievements'].includes(module) ||
       typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)
     ) throw invalid();
   }
@@ -74,6 +76,11 @@ export function validateManifest(value: unknown): Manifest {
       value.leaderboards.length
   ) throw invalid();
   if (value.leaderboards.length && !value.modules.leaderboards) throw invalid();
+  if (value.modules.achievements && !value.modules.leaderboards) throw invalid();
+  if (value.achievements !== undefined) {
+    if (!value.modules.achievements || !Array.isArray(value.achievements) || !value.achievements.every(isAchievement) || new Set(value.achievements.map(a => a.id)).size !== value.achievements.length) throw invalid();
+    for (const a of value.achievements) if (!value.leaderboards.some(b => b.id === a.condition.leaderboardId && b.sortDirection === 'desc')) throw invalid();
+  }
   if (value.origins !== undefined) {
     if (!Array.isArray(value.origins) || !value.origins.every(v => typeof v === 'string')) throw invalid();
     try {

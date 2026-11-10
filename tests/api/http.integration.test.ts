@@ -303,6 +303,23 @@ Deno.test('local Supabase Edge/Auth/PostgREST/RLS integration', async (t) => {
         await events.body?.cancel();
       }
     });
+    await t.step(
+      'achievement definitions backfill authoritative scores and isolate players through HTTP',
+      async () => {
+        query(
+          `insert into public.game_achievements(id,title,description,condition_type,leaderboard_id,threshold) values('${board}-award','Score award','One accepted run','score_threshold','${board}',10)`,
+        );
+        const list = await success(
+          await api('/achievements', { jwt: anonymous.access_token }),
+          'AchievementList',
+        );
+        const award = list.find((a: { id: string }) => a.id === `${board}-award`);
+        assert.equal(award.title, 'Score award');
+        assert.equal(award.unlocked, true);
+        assert.equal(award.historical, true);
+        await denied(await api('/achievements'), 401, 'UNAUTHORIZED');
+      },
+    );
     await t.step('hidden entries stay hidden through public Edge reads', async () => {
       query(`update public.game_players set hidden=true where user_id='${permanent.user.id}'`);
       const page = await success(await api(`/leaderboards/${board}/entries`), 'LeaderboardPage');
@@ -314,6 +331,7 @@ Deno.test('local Supabase Edge/Auth/PostgREST/RLS integration', async (t) => {
     });
   } finally {
     for (const id of users) query(`delete from auth.users where id='${id}'`);
+    query(`delete from public.game_achievements where leaderboard_id='${board}'`);
     query(`delete from public.game_leaderboards where id in ('${board}','${off}')`);
   }
 });

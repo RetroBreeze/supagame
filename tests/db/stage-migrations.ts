@@ -2,6 +2,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const migrations = [
+ ['../../modules/achievements/migrations/001_achievements.sql','20261110000200_achievements.sql'],
   ['../../modules/core/migrations/001_players.sql', '20261108000100_core_players.sql'],
   ['../../modules/leaderboards/migrations/001_leaderboards.sql', '20261108000200_leaderboards.sql'],
   ['../../modules/core/migrations/002_player_functions.sql', '20261108000300_core_player_functions.sql'],

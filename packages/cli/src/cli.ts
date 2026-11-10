@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createAchievement } from './commands/achievement-create.ts';
 import { doctor, doctorExitCode } from './commands/doctor.ts';
 import type { DoctorOptions } from './commands/doctor.ts';
 import { upgrade } from './commands/upgrade.ts';
@@ -41,7 +42,7 @@ local(program.command('config').description('Manage installation configuration')
 local(
   program.command('add').description('Stage a game services module').argument(
     '<module>',
-    'Module name: leaderboards or live-leaderboards',
+    'Module name: leaderboards, live-leaderboards or achievements',
   ),
 )
   .action((module: string, options: LocalOptions) => add(module, options));
@@ -56,6 +57,11 @@ local(
   .option('--min <integer>', 'Minimum accepted score')
   .option('--max <integer>', 'Maximum accepted score')
   .action((id: string, options: LocalOptions & BoardOptions) => createLeaderboard(id, options));
+local(program.command('achievement').description('Configure immutable achievement definitions').command('create').argument('<id>'))
+.requiredOption('--title <text>', 'Display title').requiredOption('--description <text>', 'Description')
+.requiredOption('--board <id>', 'Existing descending leaderboard').requiredOption('--threshold <integer>', 'Single accepted score threshold')
+.option('--icon <id>', 'Game-defined icon identifier').option('--category <text>', 'Category').option('--metadata <json>', 'Optional JSON object')
+.action(createAchievement);
 local(
   program.command('deploy').description(
     'Preview all pending migrations and explicitly authorize hosted deployment',

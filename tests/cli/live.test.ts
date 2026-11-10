@@ -10,9 +10,9 @@ it('stages optional live module and dependencies atomically, repeatedly, and in 
     expect(snapshot(root)).toEqual(before);
     expect(cli(root, 'add', 'live-leaderboards').status).toBe(0);
     expect(manifest(root).modules).toEqual({
-      core: '0.1.0',
-      leaderboards: '0.1.0',
-      'live-leaderboards': '0.1.0',
+      core: '0.1.1',
+      leaderboards: '0.1.1',
+      'live-leaderboards': '0.1.1',
     });
     const installed = snapshot(root);
     expect(cli(root, 'add', 'live-leaderboards').status).toBe(0);

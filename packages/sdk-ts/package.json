@@ -1,6 +1,6 @@
 {
   "name": "@supagame/sdk-ts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Browser-compatible TypeScript client for the Supagame HTTP API",
   "type": "module",
@@ -17,6 +17,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "default": "./dist/browser.js"
     }
   },
   "files": [

@@ -4,7 +4,7 @@ import { body, exactFields, pagination, queryParameters, UUID } from './validati
 import type { ApiConfig, RpcCall } from './types.ts';
 
 type Route = {
-  kind: 'boards' | 'entries' | 'standing' | 'scores' | 'profile';
+  kind: 'achievements' | 'boards' | 'entries' | 'standing' | 'scores' | 'profile';
   methods: readonly string[];
   boardId: string;
 };
@@ -12,6 +12,7 @@ function route(pathname: string): Route | null {
   // Supabase strips /functions/v1 before forwarding; direct Deno calls may use
   // /v1. Match only these exact mount paths, never arbitrary suffixes.
   const path = pathname.replace(/^\/(?:functions\/v1\/)?supagame(?=\/)/, '');
+  if (path === '/v1/achievements') return { kind: 'achievements', methods: ['GET'], boardId: '' };
   if (path === '/v1/leaderboards') return { kind: 'boards', methods: ['GET'], boardId: '' };
   if (path === '/v1/players/me') return { kind: 'profile', methods: ['GET', 'PATCH'], boardId: '' };
   const match = /^\/v1\/leaderboards\/([^/]+)\/(entries|me|scores)$/.exec(path);
@@ -37,6 +38,8 @@ function route(pathname: string): Route | null {
 async function callFor(request: Request, url: URL, route: Route): Promise<RpcCall> {
   queryParameters(url, route.kind === 'entries');
   switch (route.kind) {
+    case 'achievements':
+      return { name: 'sg_get_achievements', args: {} };
     case 'boards':
       return { name: 'sg_list_leaderboards', args: {} };
     case 'entries':

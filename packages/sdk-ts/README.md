@@ -156,3 +156,8 @@ onStatus, onError, topN: 10 })`, returning an idempotent `unsubscribe()` handle.
 Install the optional `live-leaderboards` module and establish a player session
 first. See the repository's `docs/live-leaderboards.md` for lifecycle, security,
 rank semantics and operational requirements.
+
+Achievements are available as `game.achievements`, with the framework-independent
+`createAchievementQueue` export. Optional DOM rendering is a separate
+`@supagame/sdk-ts/browser` entry point. See [Achievements](../../docs/achievements.md)
+for configuration, security, migration and complete examples.

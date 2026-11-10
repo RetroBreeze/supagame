@@ -86,6 +86,8 @@ it('bundles only the versioned allowlist, excluding local or hidden module files
     ),
     'modules/live-leaderboards/migrations/001_broadcast.sql',
     'packages/contracts/src/generated.ts',
+    'modules/achievements/migrations/001_achievements.sql',
+    'modules/legacy/0.1.0.json',
   ].sort();
   expect(Object.keys(snapshot(join(tool, 'dist/assets'))).sort()).toEqual(expected);
 });

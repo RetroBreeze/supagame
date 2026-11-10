@@ -22,8 +22,8 @@ it('doctor checks healthy local files without credentials or filesystem changes'
   expect(result.status, result.stderr).toBe(0);
   expect(result.stdout).toContain('HEALTHY');
   expect(result.stdout).toContain(ref);
-  expect(result.stdout).toContain('core 0.1.0');
-  expect(result.stdout).toContain('leaderboards 0.1.0');
+  expect(result.stdout).toContain('core 0.1.1');
+  expect(result.stdout).toContain('leaderboards 0.1.1');
   expect(result.stdout).toContain('CANNOT VERIFY');
   expect(result.stdout).toContain('--local');
   expect(snapshot(root)).toEqual(before);
@@ -123,13 +123,13 @@ import type { ProcessRunner } from '../../packages/cli/src/lib/supabase-cli.ts';
 import { vi } from 'vitest';
 
 function future(): Inventory {
-  const current = currentInventory(templateFiles()).filter(r => r.module !== 'live-leaderboards');
+  const current = currentInventory(templateFiles()).filter(r => ['core','leaderboards'].includes(r.module) && r.version === '0.1.1').map(r => ({...r,previous:undefined}));
   const core = current.find((r) => r.module === 'core')!,
     boards = current.find((r) => r.module === 'leaderboards')!;
   return [...current, {
     ...core,
     version: '0.2.0',
-    previous: '0.1.0',
+    previous: '0.1.1',
     migrations: [...core.migrations, {
       path: 'supabase/migrations/20261109000100_core_fixture.sql',
       content: Buffer.from('-- test fixture only\nselect 1;\n'),
@@ -137,7 +137,7 @@ function future(): Inventory {
   }, {
     ...boards,
     version: '0.2.0',
-    previous: '0.1.0',
+    previous: '0.1.1',
     requiresCore: '0.2.0',
     migrations: [...boards.migrations, {
       path: 'supabase/migrations/20261109000200_boards_fixture.sql',
@@ -301,7 +301,7 @@ function remoteFixture() {
     logs,
     run,
     options: { workdir: root, remote: true, projectRef: ref },
-    deps: { run, log: (s: string) => logs.push(s), inventory: currentInventory(templateFiles()).filter(r => r.module !== 'live-leaderboards') },
+    deps: { run, log: (s: string) => logs.push(s), inventory: currentInventory(templateFiles()).filter(r => ['core','leaderboards'].includes(r.module) && r.version === '0.1.1').map((r): ModuleRelease => ({...r,previous:undefined})) },
     set: (key: string) => {
       if (key === 'unreachable') unreachable = true;
       if (key === 'wrong') wrongTarget = true;
@@ -373,7 +373,7 @@ it('reports the actual known database schema version separately from newer local
   f.set('oldSchema');
   const findings = await doctor(f.options, f.deps);
   expect(findings.find((f) => f.id === 'schema:core')?.message).toMatch(
-    /schema 0.1.0.*expected 0.2.0/,
+    /schema 0.1.1.*expected 0.2.0/,
   );
 });
 it('reports missing security evidence as cannot verify, never healthy', async () => {

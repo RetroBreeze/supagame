@@ -1,3 +1,4 @@
+import { achievementSql } from '../lib/achievements.ts';
 import { existsSync } from 'node:fs';
 import { executePlan, planFiles, readProjectFile, safePath } from '../lib/file-stage.ts';
 import type { DesiredFile } from '../lib/file-stage.ts';
@@ -63,7 +64,11 @@ export function upgrade(
           `Migration version conflict with ${collision.name}; resolve it without renaming applied migrations.`,
         );
       }
-      desired.push({ path: file.path, content: file.content });
+      for (const a of value.achievements ?? []) {
+    const found = disk.filter(f => f.name.endsWith(`_supagame_achievement_${a.id}.sql`));
+    if (found.length !== 1 || !found[0]!.content.equals(achievementSql(a))) throw new Error(`Restore original achievement migration ${a.id}.`);
+  }
+  desired.push({ path: file.path, content: file.content });
     }
     for (const file of target.assets) {
       const before = installed.assets.find((f) => f.path === file.path);
