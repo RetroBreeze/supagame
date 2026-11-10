@@ -28,6 +28,9 @@ export function processEnvironment(
       'TMP',
       'TMPDIR',
       'XDG_CONFIG_HOME',
+      // Linux Secret Service/keyring discovery for Supabase's saved login.
+      'DBUS_SESSION_BUS_ADDRESS',
+      'XDG_RUNTIME_DIR',
       'SUPABASE_ACCESS_TOKEN',
       'SUPABASE_DB_PASSWORD',
     ]
@@ -75,30 +78,30 @@ export class SupabaseCli {
     this.ref = ref;
   }
   async checkVersion(): Promise<void> {
-    const result = await this.call(['--version']);
+    const result = await this.call(['--version'], 'version check');
     if (result.stdout.trim() !== '3.0.0') {
       throw new Error(
         'This CLI adapter requires Supabase CLI 3.0.0. Install the tested version before deploying.',
       );
     }
   }
-  private async call(args: string[]): Promise<ProcessResult> {
+  private async call(args: string[], operation: string): Promise<ProcessResult> {
     let result: ProcessResult;
     try {
       result = await this.run(args, this.cwd);
     } catch {
       throw new Error(
-        'Supabase CLI could not complete the operation. Inspect CLI availability, authentication and network access; raw output is withheld.',
+        `Supabase CLI ${operation} could not complete. Inspect CLI availability, authentication and network access; raw output is withheld.`,
       );
     }
     if (result.code !== 0) {
       throw new Error(
-        'Supabase CLI failed or was interrupted. Inspect CLI availability, authentication and network access; raw output is withheld.',
+        `Supabase CLI ${operation} failed or was interrupted. Inspect CLI availability, authentication and network access; raw output is withheld.`,
       );
     }
     return result;
   }
-  private async json(args: string[]): Promise<Record<string, unknown>> {
+  private async json(args: string[], operation: string): Promise<Record<string, unknown>> {
     const result = await this.call([
       ...args,
       `--remote=${this.ref}`,
@@ -106,7 +109,7 @@ export class SupabaseCli {
       this.cwd,
       '--output-format',
       'json',
-    ]);
+    ], operation);
     let value: unknown;
     try {
       value = JSON.parse(result.stdout);
@@ -126,7 +129,7 @@ export class SupabaseCli {
     return value;
   }
   async inspect(files: MigrationFile[]): Promise<RemotePlan> {
-    const history = await this.json(['migration', 'list']);
+    const history = await this.json(['migration', 'list'], 'migration inspection');
     if (!Array.isArray(history.migrations)) {
       throw new Error('Cannot determine remote migration history.');
     }
@@ -155,7 +158,7 @@ export class SupabaseCli {
       '--dry-run',
       '--include-all',
       '--skip-vault',
-    ]);
+    ], 'database preview');
     const pending = files.filter((f) => !applied.includes(f.version)).map((f) => f.name);
     if (
       preview.dryRun !== true || !Array.isArray(preview.migrations) ||
@@ -170,7 +173,7 @@ export class SupabaseCli {
     return { pending, applied: applied.sort(), fn: await this.functionInfo() };
   }
   async functionInfo(): Promise<RemoteFunction | null> {
-    const value = await this.json(['functions', 'list']);
+    const value = await this.json(['functions', 'list'], 'function inspection');
     if (
       !Array.isArray(value.functions) ||
       value.functions.some((f) => !object(f) || typeof f.slug !== 'string')
@@ -204,7 +207,7 @@ export class SupabaseCli {
     };
   }
   async push(): Promise<void> {
-    await this.json(['db', 'push', '--include-all', '--skip-vault', '--yes']);
+    await this.json(['db', 'push', '--include-all', '--skip-vault', '--yes'], 'database deployment');
   }
   async deployFunction(): Promise<void> {
     const result = await this.json([
@@ -212,7 +215,7 @@ export class SupabaseCli {
       'deploy',
       'supagame',
       '--yes',
-    ]);
+    ], 'function deployment');
     if (
       result.project_ref !== this.ref || !Array.isArray(result.functions) ||
       result.functions.length !== 1 || result.functions[0] !== 'supagame'
