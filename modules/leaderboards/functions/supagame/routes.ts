@@ -1,10 +1,11 @@
+import { saveCall } from './saves.ts';
 import { callerClient } from './auth.ts';
 import { ApiFailure, databaseFailure, failure, json } from './responses.ts';
 import { body, exactFields, pagination, queryParameters, UUID } from './validation.ts';
 import type { ApiConfig, RpcCall } from './types.ts';
 
 type Route = {
-  kind: 'achievements' | 'boards' | 'entries' | 'standing' | 'scores' | 'profile';
+  kind: 'saves' | 'achievements' | 'boards' | 'entries' | 'standing' | 'scores' | 'profile';
   methods: readonly string[];
   boardId: string;
 };
@@ -12,7 +13,15 @@ function route(pathname: string): Route | null {
   // Supabase strips /functions/v1 before forwarding; direct Deno calls may use
   // /v1. Match only these exact mount paths, never arbitrary suffixes.
   const path = pathname.replace(/^\/(?:functions\/v1\/)?supagame(?=\/)/, '');
-  if (path === '/v1/achievements') return { kind: 'achievements', methods: ['GET'], boardId: '' };
+  if (path === '/v1/saves') return { kind: 'saves', methods: ['GET'], boardId: '' };
+  if (path === '/v1/saves/cleanup') {
+    return { kind: 'saves', methods: ['POST'], boardId: '~cleanup' };
+  }
+  const save = /^\/v1\/saves\/([a-zA-Z0-9][a-zA-Z0-9_-]{0,63})$/.exec(path);
+  if (save) return { kind: 'saves', methods: ['GET', 'POST'], boardId: save[1]! };
+  if (path === '/v1/achievements') {
+    return { kind: 'achievements', methods: ['GET'], boardId: '' };
+  }
   if (path === '/v1/leaderboards') return { kind: 'boards', methods: ['GET'], boardId: '' };
   if (path === '/v1/players/me') return { kind: 'profile', methods: ['GET', 'PATCH'], boardId: '' };
   const match = /^\/v1\/leaderboards\/([^/]+)\/(entries|me|scores)$/.exec(path);
@@ -38,6 +47,8 @@ function route(pathname: string): Route | null {
 async function callFor(request: Request, url: URL, route: Route): Promise<RpcCall> {
   queryParameters(url, route.kind === 'entries');
   switch (route.kind) {
+    case 'saves':
+      return saveCall(request, route.boardId);
     case 'achievements':
       return { name: 'sg_get_achievements', args: {} };
     case 'boards':
@@ -130,6 +141,10 @@ export function createApi(
       const { data, error } = await client.rpc(call.name, call.args);
       if (error) throw databaseFailure(error);
       if (data === null && call.name !== 'sg_get_my_score') throw new ApiFailure('INTERNAL_ERROR');
+      if (
+        call.name === 'sg_cloud_save' && data && typeof data === 'object' && 'code' in data &&
+        data.code === 'SAVE_CONFLICT'
+      ) return json(data, 409, headers);
       return json(data, 200, headers);
     } catch (error) {
       return failure(error instanceof ApiFailure ? error.code : 'INTERNAL_ERROR', headers);

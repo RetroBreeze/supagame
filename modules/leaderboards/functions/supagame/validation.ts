@@ -23,7 +23,11 @@ function exactInteger(value: number, source: string): boolean {
   }
   return (negative ? -integer : integer) === BigInt(value);
 }
-function parseJson(text: string, precisionError: 'INVALID_SCORE' | 'INVALID_CURSOR'): unknown {
+function parseJson(
+  text: string,
+  precisionError: 'INVALID_SCORE' | 'INVALID_CURSOR',
+  scores = true,
+): unknown {
   return JSON.parse(text, (key: string, value: unknown, context?: { source?: string }) => {
     if (key.includes('\u0000') || !key.isWellFormed()) {
       throw new ApiFailure(
@@ -42,9 +46,10 @@ function parseJson(text: string, precisionError: 'INVALID_SCORE' | 'INVALID_CURS
       );
     }
     if (
-      key === 'score' && typeof value === 'number' &&
+      scores && key === 'score' && typeof value === 'number' &&
       (!context?.source || !exactInteger(value, context.source))
     ) throw new ApiFailure(precisionError);
+    if (typeof value === 'number' && !Number.isFinite(value)) throw new ApiFailure('INVALID_SAVE');
     return value;
   });
 }
@@ -58,7 +63,11 @@ export function exactFields(value: Record<string, unknown>, fields: string[]) {
     throw new ApiFailure('INVALID_REQUEST');
   }
 }
-export async function body(request: Request): Promise<Record<string, unknown>> {
+export async function body(
+  request: Request,
+  maxBody = MAX_BODY,
+  scores = true,
+): Promise<Record<string, unknown>> {
   const type = request.headers.get('content-type') ?? '';
   if (
     !/^application\/json(?:\s*;\s*charset\s*=\s*(?:utf-8|"utf-8"))?\s*$/i.test(type) ||
@@ -71,7 +80,7 @@ export async function body(request: Request): Promise<Record<string, unknown>> {
   if (length !== null && (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length)))) {
     throw new ApiFailure('INVALID_REQUEST');
   }
-  if (length !== null && Number(length) > MAX_BODY) throw new ApiFailure('PAYLOAD_TOO_LARGE');
+  if (length !== null && Number(length) > maxBody) throw new ApiFailure('PAYLOAD_TOO_LARGE');
   if (!request.body) throw new ApiFailure('INVALID_REQUEST');
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -81,7 +90,7 @@ export async function body(request: Request): Promise<Record<string, unknown>> {
       const { value, done } = await reader.read();
       if (done) break;
       total += value.byteLength;
-      if (total > MAX_BODY) {
+      if (total > maxBody) {
         await reader.cancel();
         throw new ApiFailure('PAYLOAD_TOO_LARGE');
       }
@@ -98,7 +107,11 @@ export async function body(request: Request): Promise<Record<string, unknown>> {
   }
   let value: unknown;
   try {
-    value = parseJson(new TextDecoder('utf-8', { fatal: true }).decode(bytes), 'INVALID_SCORE');
+    value = parseJson(
+      new TextDecoder('utf-8', { fatal: true }).decode(bytes),
+      'INVALID_SCORE',
+      scores,
+    );
   } catch (error) {
     if (error instanceof ApiFailure) throw error;
     throw new ApiFailure('INVALID_REQUEST');

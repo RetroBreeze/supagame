@@ -1,3 +1,4 @@
+import type { SaveRecord } from '@supagame/contracts';
 export type ErrorKind = 'authentication' | 'api' | 'network' | 'invalid_parameter' | 'unexpected_response';
 
 /** Errors contain public metadata only, never underlying transport/auth causes or tokens. */
@@ -5,6 +6,7 @@ export class GameServicesError extends Error {
   readonly kind: ErrorKind;
   /** Reuse this key when manually retrying a failed score submission. */
   submissionKey?: string;
+  operationId?: string;
   constructor(kind: ErrorKind, message: string) {
     super(message);
     this.name = new.target.name;
@@ -24,6 +26,7 @@ export class ApiError extends GameServicesError {
   }
 }
 export class NetworkError extends GameServicesError {
+  readonly code = 'NETWORK_UNAVAILABLE';
   constructor() { super('network', 'The request could not reach Supagame or its response was lost.'); }
 }
 export class InvalidParameterError extends GameServicesError {
@@ -31,4 +34,11 @@ export class InvalidParameterError extends GameServicesError {
 }
 export class UnexpectedResponseError extends GameServicesError {
   constructor() { super('unexpected_response', 'Supagame returned a response that does not match the v1 API contract.'); }
+}
+
+export class SaveConflictError extends ApiError {
+  constructor(readonly current: SaveRecord | null, message = 'The save changed. Resolve using the latest revision; keep your local copy.') { super(409, 'SAVE_CONFLICT', message); }
+}
+export class StorageError extends ApiError {
+  constructor(code = 'STORAGE_UNAVAILABLE', status = 503) { super(status, code, 'The Storage operation failed. The previous committed save is preserved.'); }
 }

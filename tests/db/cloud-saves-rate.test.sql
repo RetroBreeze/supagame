@@ -1,0 +1,12 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select no_plan();
+insert into auth.users(id,is_anonymous) values('c2000000-0000-4000-8000-000000000001',true);
+set local role authenticated;
+set local request.jwt.claims='{"sub":"c2000000-0000-4000-8000-000000000001"}';
+select public.sg_cloud_save('save','profile','{"operationId":"d2000000-0000-4000-8000-000000000001","expectedRevision":0,"schemaVersion":1,"metadata":{},"data":{}}');
+do $$ begin for i in 1..59 loop perform public.sg_cloud_save('save','profile',jsonb_build_object('operationId',gen_random_uuid(),'expectedRevision',i,'schemaVersion',1,'metadata','{}'::jsonb,'data','{}'::jsonb)); end loop; end $$;
+select throws_ok($$select public.sg_cloud_save('save','profile',jsonb_build_object('operationId',gen_random_uuid(),'expectedRevision',60,'schemaVersion',1,'metadata','{}'::jsonb,'data','{}'::jsonb))$$,'P0001','RATE_LIMITED','61st new write in a minute rejected');
+select is(public.sg_cloud_save('save','profile','{"operationId":"d2000000-0000-4000-8000-000000000001","expectedRevision":0,"schemaVersion":1,"metadata":{},"data":{}}')->'save'->>'revision','1','receipt replay remains free at rate limit');
+reset role;
+select * from finish();rollback;

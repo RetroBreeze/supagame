@@ -1,3 +1,4 @@
+import { saveLimitsSql, saveLimitsSuffix } from './cloud-saves.ts';
 import { achievementSql } from './achievements.ts';
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -7,7 +8,7 @@ import { readProjectFile, safePath } from './file-stage.ts';
 import { readManifest } from './manifest.ts';
 import { leaderboardSql, migrations } from './migration-generator.ts';
 import { functionConfig, readProject, selectedRef } from './project.ts';
-import { MODULE_VERSION, templateFiles } from './templates.ts';
+import { MODULE_VERSION, templateFiles, migrationModule } from './templates.ts';
 
 export function digest(bytes: Buffer | string): string {
   return createHash('sha256').update(bytes).digest('hex');
@@ -25,6 +26,7 @@ export function deploymentFiles(root: string, ref: string) {
   }
   if (manifest.value.modules['live-leaderboards'] && manifest.value.modules['live-leaderboards'] !== MODULE_VERSION) throw new Error('Use the matching CLI version for the installed live-leaderboards module.');
   if (manifest.value.modules.achievements && manifest.value.modules.achievements !== MODULE_VERSION) throw new Error('Upgrade achievements first.');
+  if (manifest.value.modules['cloud-saves'] && manifest.value.modules['cloud-saves'] !== MODULE_VERSION) throw new Error('Upgrade cloud-saves first.');
   selectedRef(root, ref, manifest.value.projectRef);
   if (!functionConfig(project.bytes, project.config).equals(project.bytes)) {
     throw new Error(
@@ -38,8 +40,8 @@ export function deploymentFiles(root: string, ref: string) {
   }));
   const owned = new Set<string>();
   for (const template of templateFiles()) {
-    if (template.path.endsWith('_achievements.sql') && !manifest.value.modules.achievements) continue;
-    if (template.path.endsWith('_live_leaderboards.sql') && !manifest.value.modules['live-leaderboards']) continue;
+    const module = migrationModule(template.path);
+    if (module && !manifest.value.modules[module]) continue;
     if (template.path.endsWith('.env.example')) continue;
     const actual = readProjectFile(root, template.path);
     if (!actual?.equals(template.content)) {
@@ -75,6 +77,11 @@ export function deploymentFiles(root: string, ref: string) {
     owned.add(found[0]!.name);
   }
   if (sql.some(f => f.name.includes('_supagame_achievement_') && !owned.has(f.name))) throw new Error('Unrecorded achievement migration.');
+  if (manifest.value.cloudSaves) {
+    const last = sql.filter(f => f.name.includes('_supagame_save_limits_')).at(-1);
+    if (!last || !last.name.endsWith(saveLimitsSuffix(manifest.value.cloudSaves)) || !last.content.equals(saveLimitsSql(manifest.value.cloudSaves))) throw new Error('Cloud Saves quota migration does not match the manifest.');
+    owned.add(last.name);
+  }
   const functionHash = digest(
     Buffer.concat(
       files.filter((f) => f.path.includes('/functions/')).flatMap(

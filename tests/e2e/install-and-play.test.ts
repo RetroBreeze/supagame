@@ -22,7 +22,8 @@ test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → b
     cli('init', '--project-ref', 'abcdefghijklmnopqrst', '--origin', `http://127.0.0.1:${project.browserPort}`);
     assert.match(readFileSync(join(project.root, 'supabase/functions/.env'), 'utf8'), /SG_ALLOWED_ORIGINS/);
     cli('add', 'leaderboards');
-    const before = snapshot(); cli('init'); cli('add', 'leaderboards'); assert.deepEqual(snapshot(), before);
+    cli('add', 'cloud-saves');
+    const before = snapshot(); cli('init'); cli('add', 'leaderboards'); cli('add', 'cloud-saves'); assert.deepEqual(snapshot(), before);
     cli('leaderboard', 'create', 'level-1', '--type', 'time', '--order', 'asc', '--keep-best', '--min', '0', '--max', '1000000');
     cli('leaderboard', 'create', 'arcade', '--type', 'points', '--order', 'desc', '--keep-best', '--min', '0', '--max', '1000000');
     const boards = snapshot();
@@ -33,7 +34,7 @@ test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → b
   project.start();
   // Realtime service initialization owns its schema; stage the optional migration afterwards.
   cli('add', 'live-leaderboards');
-  project.supabase(['migration', 'up']);
+  project.supabase(['migration', 'up', '--include-all']);
   const liveFiles = snapshot(); cli('add', 'live-leaderboards'); assert.deepEqual(snapshot(), liveFiles);
   // Never print the status object: it also contains privileged local fixture keys.
   const status = JSON.parse(project.supabase(['status', '--output', 'json'])) as Record<string, string>;
@@ -57,6 +58,21 @@ test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → b
   });
   const userId = (await supabase.auth.getSession()).data.session!.user.id;
   const token = (await supabase.auth.getSession()).data.session!.access_token;
+  await t.test('installed SDK saves JSON and binary data with revisions and private ownership', async () => {
+    const first = await game.saves.save('profile', { level: 2 }, { schemaVersion: 3 });
+    assert.equal(first.revision, 1);
+    assert.deepEqual((await game.saves.load('profile')).data, { level: 2 });
+    assert.equal((await game.saves.list())[0]?.schemaVersion, 3);
+    await assert.rejects(game.saves.save('profile', {}, { expectedRevision: 0 }), { code: 'SAVE_CONFLICT' });
+    const binary = await game.saves.saveBinary('rpg', new Blob(['rpg-data']));
+    assert.equal(await (await game.saves.loadBinary('rpg')).data.text(), 'rpg-data');
+    await game.saves.delete('rpg', { expectedRevision: binary.revision });
+    await game.saves.cleanup();
+    await game.saves.cleanup();
+    const result = await raw('/saves/profile', undefined, token);
+    assert.equal(result.status, 200);
+    assert.equal((await result.json()).save.revision, 1);
+  });
   for (const [board, better, worse] of [['level-1', 40, 60], ['arcade', 60, 40]] as const) {
     await t.test(`${board}: best-only, equal scores, raw HTTP, replay, stable tied pagination`, async () => {
       assert.equal(await game.leaderboards.getMine(board), null);

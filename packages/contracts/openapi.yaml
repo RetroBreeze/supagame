@@ -43,8 +43,10 @@ info:
     Scores are PostgreSQL BIGINT values restricted in JSON to
     Number.isSafeInteger(score).
 
-    JSON request bodies are limited to 4096 UTF-8 bytes. Errors are flat
-    ApiError objects.
+    Leaderboard/profile bodies are limited to 4096 UTF-8 bytes. Save bodies
+    allow 2 MiB transport overhead; JSON data is limited by the installed save
+    configuration (maximum 1 MiB). Binary bytes travel directly to private
+    Storage after reservation. Errors are flat ApiError objects.
 servers:
   - url: /functions/v1/supagame/v1
 paths:
@@ -296,6 +298,268 @@ paths:
               schema:
                 $ref: "#/components/schemas/AchievementList"
         "401": *a2
+  /saves:
+    get:
+      operationId: listSaves
+      security:
+        - PublishableKey: []
+          PlayerSession: []
+      responses:
+        "200":
+          description: SaveList
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveList"
+        "400":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "413":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "503":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /saves/cleanup:
+    post:
+      operationId: cleanupSaves
+      security:
+        - PublishableKey: []
+          PlayerSession: []
+      responses:
+        "200":
+          description: SaveObjects
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveObjects"
+        "400":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "413":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "503":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /saves/{slot}:
+    parameters:
+      - name: slot
+        in: path
+        required: true
+        schema: &a3
+          type: string
+          pattern: ^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$
+    get:
+      operationId: loadSave
+      security:
+        - PublishableKey: []
+          PlayerSession: []
+      responses:
+        "200":
+          description: SaveResult
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveResult"
+        "400":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "413":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "503":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+    post:
+      operationId: mutateSave
+      security:
+        - PublishableKey: []
+          PlayerSession: []
+      responses:
+        "200":
+          description: SaveResult
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/SaveResult"
+                  - $ref: "#/components/schemas/SaveUpload"
+                  - $ref: "#/components/schemas/SaveObjects"
+        "400":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "401":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "413":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "500":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "503":
+          description: ApiError
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+      description: JSON save/delete, or binary prepare/commit/abort. Prepare returns
+        SaveUpload; abort returns SaveObjects. expectedRevision=0 is
+        create-only. Every successful mutation is idempotent by operationId.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveMutation"
 components:
   securitySchemes:
     PublishableKey:
@@ -481,6 +745,12 @@ components:
         message:
           type: string
           description: Public explanation without SQL details, credentials or tokens.
+        current:
+          anyOf:
+            - $ref: "#/components/schemas/SaveRecord"
+            - type: "null"
+          description: Latest slot on SAVE_CONFLICT (null if absent); keep the attempted
+            local copy.
     Achievement:
       type: object
       additionalProperties: false
@@ -541,6 +811,196 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/Achievement"
+    SaveRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - slot
+        - revision
+        - schemaVersion
+        - kind
+        - metadata
+        - sizeBytes
+        - deleted
+        - createdAt
+        - updatedAt
+        - objectPath
+      properties:
+        slot: *a3
+        revision:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        schemaVersion:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        kind:
+          type: string
+          enum:
+            - json
+            - binary
+        metadata:
+          type: object
+          additionalProperties: true
+        sizeBytes:
+          type: integer
+          minimum: 0
+          maximum: 9007199254740991
+        deleted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        objectPath:
+          type:
+            - string
+            - "null"
+        data: {}
+    SaveList:
+      type: object
+      additionalProperties: false
+      required:
+        - slots
+      properties:
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/SaveRecord"
+    SaveResult:
+      type: object
+      additionalProperties: false
+      required:
+        - save
+      properties:
+        save:
+          $ref: "#/components/schemas/SaveRecord"
+    SaveUpload:
+      type: object
+      additionalProperties: false
+      required:
+        - upload
+      properties:
+        upload:
+          type: object
+          additionalProperties: false
+          required:
+            - bucket
+            - path
+            - operationId
+          properties:
+            bucket:
+              type: string
+              const: supagame-saves
+            path:
+              type: string
+            operationId:
+              type: string
+              format: uuid
+    SaveObjects:
+      type: object
+      additionalProperties: false
+      required:
+        - objects
+      properties:
+        objects:
+          type: array
+          items:
+            type: string
+    SaveMutation:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - action
+            - expectedRevision
+            - operationId
+            - schemaVersion
+            - metadata
+            - data
+          properties:
+            action:
+              const: save
+              type: string
+            expectedRevision: &a4
+              type: integer
+              minimum: 0
+              maximum: 9007199254740991
+            operationId: &a5
+              type: string
+              format: uuid
+            schemaVersion: &a6
+              type: integer
+              minimum: 1
+              maximum: 2147483647
+            metadata: &a7
+              type: object
+              additionalProperties: true
+            data: {}
+        - type: object
+          additionalProperties: false
+          required:
+            - action
+            - expectedRevision
+            - operationId
+          properties:
+            action:
+              const: delete
+              type: string
+            expectedRevision: *a4
+            operationId: *a5
+        - type: object
+          additionalProperties: false
+          required:
+            - action
+            - expectedRevision
+            - operationId
+            - schemaVersion
+            - metadata
+            - sizeBytes
+            - checksum
+          properties:
+            action:
+              const: prepare
+              type: string
+            expectedRevision: *a4
+            operationId: *a5
+            schemaVersion: *a6
+            metadata: *a7
+            sizeBytes:
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+            checksum:
+              type: string
+              pattern: ^[0-9a-f]{64}$
+        - type: object
+          additionalProperties: false
+          required:
+            - action
+            - operationId
+          properties:
+            action:
+              const: commit
+              type: string
+            operationId: *a5
+        - type: object
+          additionalProperties: false
+          required:
+            - action
+            - operationId
+          properties:
+            action:
+              const: abort
+              type: string
+            operationId: *a5
+    SavePreparation:
+      oneOf:
+        - $ref: "#/components/schemas/SaveUpload"
+        - $ref: "#/components/schemas/SaveResult"
   responses:
     BadRequest:
       description: INVALID_REQUEST, INVALID_SCORE, INVALID_CURSOR or INVALID_DISPLAY_NAME.

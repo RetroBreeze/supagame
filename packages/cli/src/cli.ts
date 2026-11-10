@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { cleanupSaves } from './commands/saves-cleanup.ts';
+import { configureSaves } from './commands/saves-configure.ts';
 import { createAchievement } from './commands/achievement-create.ts';
 import { doctor, doctorExitCode } from './commands/doctor.ts';
 import type { DoctorOptions } from './commands/doctor.ts';
@@ -42,7 +44,7 @@ local(program.command('config').description('Manage installation configuration')
 local(
   program.command('add').description('Stage a game services module').argument(
     '<module>',
-    'Module name: leaderboards, live-leaderboards or achievements',
+    'Module name: leaderboards, live-leaderboards, achievements or cloud-saves',
   ),
 )
   .action((module: string, options: LocalOptions) => add(module, options));
@@ -86,6 +88,14 @@ program.command('doctor').description('Read-only installation, schema and securi
     const findings = await doctor(options);
     process.exitCode = doctorExitCode(findings, Boolean(options.local || options.remote));
   });
+const savesCommand = program.command('saves').description('Configure and maintain Cloud Saves');
+local(savesCommand.command('cleanup')).option('--local', 'Clean only the local stack').option('--remote', 'Clean an explicitly selected hosted project').option('--project-ref <ref>', 'Exact hosted destination').option('--allow-remote', 'Authorize the displayed hosted cleanup without a prompt').action(cleanupSaves);
+local(savesCommand.command('configure'))
+  .option('--max-slots <integer>', 'Active slots per player')
+  .option('--max-json-bytes <integer>', 'Maximum JSON bytes per slot (up to 1 MiB)')
+  .option('--max-binary-bytes <integer>', 'Maximum binary bytes per slot')
+  .option('--max-total-bytes <integer>', 'Total bytes per player, including incomplete uploads')
+  .action(configureSaves);
 local(program.command('upgrade').description('Stage known forward-only module upgrades locally'))
   .action((options: LocalOptions) => upgrade(options));
 if (process.argv.length === 2) program.help();

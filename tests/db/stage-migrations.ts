@@ -2,6 +2,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const migrations = [
+ ['../../modules/cloud-saves/migrations/006_save_throttling.sql','20261110000305_save_throttling.sql'],
+ ['../../modules/cloud-saves/migrations/005_garbage_collection.sql','20261110000304_save_garbage_collection.sql'],
+ ['../../modules/cloud-saves/migrations/004_storage_preflight.sql','20261110000303_save_storage_preflight.sql'],
+ ['../../modules/cloud-saves/migrations/003_upload_quota_guard.sql','20261110000302_save_upload_quota.sql'],
+ ['../../modules/cloud-saves/migrations/002_binary_integrity.sql','20261110000301_save_binary_integrity.sql'],
+ ['../../modules/cloud-saves/migrations/001_cloud_saves.sql','20261110000300_cloud_saves.sql'],
  ['../../modules/achievements/migrations/001_achievements.sql','20261110000200_achievements.sql'],
   ['../../modules/core/migrations/001_players.sql', '20261108000100_core_players.sql'],
   ['../../modules/leaderboards/migrations/001_leaderboards.sql', '20261108000200_leaderboards.sql'],

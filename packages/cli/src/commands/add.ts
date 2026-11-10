@@ -1,13 +1,14 @@
+import { storageConfig } from '../lib/cloud-saves.ts';
 import { executePlan, planFiles } from '../lib/file-stage.ts';
 import { MANIFEST, manifestBytes, object, readManifest } from '../lib/manifest.ts';
 import { functionConfig, readProject, selectedRef } from '../lib/project.ts';
 import type { LocalOptions } from '../lib/project.ts';
-import { checkMigrationVersions, MODULE_VERSION, templateFiles } from '../lib/templates.ts';
+import { checkMigrationVersions, MODULE_VERSION, templateFiles, migrationModule } from '../lib/templates.ts';
 
 export function add(module: string, options: LocalOptions): void {
-  if (module !== 'leaderboards' && module !== 'live-leaderboards' && module !== 'achievements') {
+  if (module !== 'leaderboards' && module !== 'live-leaderboards' && module !== 'achievements' && module !== 'cloud-saves') {
     throw new Error(
-      `Unknown module '${module}'. Available modules: leaderboards, live-leaderboards, achievements.`,
+      `Unknown module '${module}'. Available modules: leaderboards, live-leaderboards, achievements, cloud-saves.`,
     );
   }
   const project = readProject(options);
@@ -22,21 +23,23 @@ export function add(module: string, options: LocalOptions): void {
     }
   }
   checkMigrationVersions(project.root);
-  const config = functionConfig(project.bytes, project.config);
+  const functionBytes = functionConfig(project.bytes, project.config);
+  const config = module === 'cloud-saves' ? storageConfig(functionBytes) : functionBytes;
   const value = {
     ...existing.value,
     modules: {
       ...existing.value.modules,
       core: MODULE_VERSION,
       leaderboards: MODULE_VERSION,
+      ...(module === 'cloud-saves' ? { 'cloud-saves': MODULE_VERSION } : {}),
       ...(module === 'achievements' ? { achievements: MODULE_VERSION } : {}),
       ...(module === 'live-leaderboards' ? { 'live-leaderboards': MODULE_VERSION } : {}),
     },
   };
-  const unchanged = (module !== 'achievements' || existing.value.modules.achievements === MODULE_VERSION) && (module !== 'live-leaderboards' || existing.value.modules[module] === MODULE_VERSION) && existing.value.modules.core === MODULE_VERSION &&
+  const unchanged = (module !== 'cloud-saves' || existing.value.modules['cloud-saves'] === MODULE_VERSION) && (module !== 'achievements' || existing.value.modules.achievements === MODULE_VERSION) && (module !== 'live-leaderboards' || existing.value.modules[module] === MODULE_VERSION) && existing.value.modules.core === MODULE_VERSION &&
     existing.value.modules.leaderboards === MODULE_VERSION;
   const plan = planFiles(project.root, [
-    ...templateFiles().filter(f => (!f.path.endsWith('_live_leaderboards.sql') || !!value.modules['live-leaderboards']) && (!f.path.endsWith('_achievements.sql') || !!value.modules.achievements)),
+    ...templateFiles().filter(f => { const module = migrationModule(f.path); return !module || !!value.modules[module]; }),
     {
       path: 'supabase/config.toml',
       content: config,

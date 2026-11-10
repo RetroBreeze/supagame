@@ -43,3 +43,15 @@ export function mountAchievementNotifications(
     },
   };
 }
+
+export { createIndexedDbStore } from './indexeddb.js';
+
+/** Optional reconnect wiring; failures are reported, never reclassified as offline. */
+export function watchSaveConnectivity(
+  saves: { sync(slot: string): Promise<unknown> },
+  options: { slots: readonly string[]; onError: (error: unknown) => void },
+) {
+  const sync = () => { for (const slot of options.slots) void saves.sync(slot).catch(options.onError); };
+  window.addEventListener('online', sync);
+  return { sync, dispose: () => window.removeEventListener('online', sync) };
+}

@@ -71,8 +71,8 @@ describe('add leaderboards', () => {
       ),
     ).toEqual(readFileSync(join(repo, 'packages/contracts/src/generated.ts')));
     expect(manifest(root).modules).toEqual({
-      core: '0.1.1',
-      leaderboards: '0.1.1',
+      core: '0.1.2',
+      leaderboards: '0.1.2',
     });
     expect(readFileSync(join(root, 'supabase/config.toml'), 'utf8')).toContain(
       config,
@@ -149,7 +149,7 @@ describe('add leaderboards', () => {
     rmSync(join(root, 'supagame.config.json'));
     expect(cli(root, 'add', 'leaderboards').stderr).toContain('supagame init');
     initialized(root);
-    expect(cli(root, 'add', 'cloud-saves').stderr).toContain('Unknown module');
+    expect(cli(root, 'add', 'unknown-module').stderr).toContain('Unknown module');
     const value = manifest(root);
     value.modules = { core: '0.2.0', leaderboards: '0.2.0' };
     put(root, 'supagame.config.json', JSON.stringify(value));

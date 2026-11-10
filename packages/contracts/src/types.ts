@@ -15,3 +15,10 @@ export type ApiError = components['schemas']['ApiError'];
 export interface LiveLeaderboardInvalidation { boardId: string }
 
 export type Achievement = components['schemas']['Achievement'];
+
+export type SaveRecord = components['schemas']['SaveRecord'];
+export type SaveResult = components['schemas']['SaveResult'];
+export type SaveList = components['schemas']['SaveList'];
+export type SaveUpload = components['schemas']['SaveUpload'];
+export type SaveObjects = components['schemas']['SaveObjects'];
+export type SaveMutation = components['schemas']['SaveMutation'];

@@ -639,3 +639,73 @@ Deno.test('achievements require verified auth and preserve caller identity', asy
     'METHOD_NOT_ALLOWED',
   );
 });
+
+Deno.test('cloud saves authenticate, preserve arbitrary JSON scores, and expose conflicts safely', async () => {
+  const result = {
+    save: {
+      slot: 'profile',
+      revision: 1,
+      schemaVersion: 1,
+      kind: 'json',
+      data: { score: 1.5 },
+      metadata: {},
+      sizeBytes: 13,
+      deleted: false,
+      objectPath: null,
+      createdAt: profile.createdAt,
+      updatedAt: profile.createdAt,
+    },
+  };
+  const f = fixture({ status: 200, body: result });
+  const response = await f.handle(
+    request('/saves/profile', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'save',
+        expectedRevision: 0,
+        operationId: submissionKey,
+        schemaVersion: 1,
+        metadata: {},
+        data: { score: 1.5 },
+      }),
+    }),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), result);
+  assert.equal(f.calls[0]!.name, 'sg_cloud_save');
+  assert.equal(f.calls[0]!.authorization, `Bearer ${validToken}`);
+  await error(await f.handle(request('/saves', { jwt: null })), 401, 'UNAUTHORIZED');
+  await error(
+    await f.handle(
+      request('/saves/profile', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'save', ownerId: userId }),
+      }),
+    ),
+    400,
+    'INVALID_SAVE',
+  );
+  const conflict = fixture({
+    status: 200,
+    body: { code: 'SAVE_CONFLICT', message: 'Conflict', current: result.save },
+  });
+  const rejected = await conflict.handle(
+    request('/saves/profile', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'delete', expectedRevision: 0, operationId: submissionKey }),
+    }),
+  );
+  assert.equal(rejected.status, 409);
+  assert.equal((await rejected.json()).current.revision, 1);
+});
+
+Deno.test('cloud saves fail closed for expired and invalid credentials', async () => {
+  const f = fixture();
+  await error(
+    await f.handle(request('/saves', { jwt: await token({ exp: 1 }) })),
+    401,
+    'UNAUTHORIZED',
+  );
+  await error(await f.handle(request('/saves/profile', { jwt: 'invalid' })), 401, 'UNAUTHORIZED');
+  assert.equal(f.calls.length, 0);
+});

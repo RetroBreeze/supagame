@@ -13,7 +13,7 @@ const document = await SwaggerParser.dereference(contract) as OpenAPIV3_1.Docume
 const ajv = new Ajv2020({ strict: false, code: { source: true, esm: true } });
 addFormats.default(ajv);
 const exports: Record<string, string> = {};
-for (const name of ['AchievementList', 'PlayerProfile', 'LeaderboardPage', 'MyScore', 'SubmitScoreResult', 'SubmitScoreRequest', 'UpdatePlayerRequest', 'ApiError']) {
+for (const name of ['SavePreparation', 'SaveRecord', 'SaveResult', 'SaveList', 'SaveUpload', 'SaveObjects', 'SaveMutation', 'AchievementList', 'PlayerProfile', 'LeaderboardPage', 'MyScore', 'SubmitScoreResult', 'SubmitScoreRequest', 'UpdatePlayerRequest', 'ApiError']) {
   const schema = document.components?.schemas?.[name];
   if (!schema) throw new Error(`Missing contract schema: ${name}`);
   ajv.addSchema(schema, name);

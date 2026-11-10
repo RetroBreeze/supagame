@@ -2,7 +2,7 @@ import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { AuthenticationError } from './errors.js';
 
 /** Only public client capabilities are used; generated database client types remain compatible. */
-export type SupabaseConnection = Pick<SupabaseClient, 'auth' | 'functions'> & Partial<Pick<SupabaseClient, 'channel' | 'removeChannel' | 'realtime'>>;
+export type SupabaseConnection = Pick<SupabaseClient, 'auth' | 'functions'> & Partial<Pick<SupabaseClient, 'channel' | 'removeChannel' | 'realtime' | 'storage'>>;
 const pendingSignIns = new WeakMap<SupabaseConnection['auth'], Promise<{ userId: string }>>();
 
 async function authOperation<T>(operation: () => Promise<T>): Promise<T> {

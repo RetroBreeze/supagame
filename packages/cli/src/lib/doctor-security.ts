@@ -1,3 +1,4 @@
+import { saveSecurityChecks } from './doctor-saves.ts';
 import { realtimePrerequisites } from "./realtime-prerequisites.ts";
 import { sqlLiteral } from "./migration-generator.ts";
 import type { ModuleName } from "./versions.ts";
@@ -219,6 +220,7 @@ export function securityChecks(
     "exists(select 1 from pg_trigger where tgname='award_score_achievements' and tgrelid='sg_private.game_submission_events'::regclass and tgenabled='O')",
     "Restore accepted-score achievement trigger.",
   );
+  if (modules.includes('cloud-saves')) checks.push(...saveSecurityChecks());
   return checks;
 }
 export function securityQuery(checks: readonly SecurityCheck[]): string {

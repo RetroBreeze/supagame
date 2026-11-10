@@ -5,9 +5,34 @@ export type ModuleName =
   | "core"
   | "leaderboards"
   | "live-leaderboards"
-  | "achievements";
-export const MODULE_VERSION = "0.1.1";
+  | "achievements"
+  | "cloud-saves";
+export const MODULE_VERSION = "0.1.2";
 export const moduleMigrations = [
+  [
+    "modules/cloud-saves/migrations/006_save_throttling.sql",
+    "20261110000305_save_throttling.sql",
+  ],
+  [
+    "modules/cloud-saves/migrations/005_garbage_collection.sql",
+    "20261110000304_save_garbage_collection.sql",
+  ],
+  [
+    "modules/cloud-saves/migrations/004_storage_preflight.sql",
+    "20261110000303_save_storage_preflight.sql",
+  ],
+  [
+    "modules/cloud-saves/migrations/003_upload_quota_guard.sql",
+    "20261110000302_save_upload_quota.sql",
+  ],
+  [
+    "modules/cloud-saves/migrations/001_cloud_saves.sql",
+    "20261110000300_cloud_saves.sql",
+  ],
+  [
+    "modules/cloud-saves/migrations/002_binary_integrity.sql",
+    "20261110000301_save_binary_integrity.sql",
+  ],
   [
     "modules/core/migrations/001_players.sql",
     "20261108000100_core_players.sql",
@@ -49,39 +74,66 @@ export interface ModuleRelease {
 }
 export type Inventory = readonly ModuleRelease[];
 export function currentInventory(files: readonly DesiredFile[]): Inventory {
-  const releases =
-    (["core", "leaderboards", "live-leaderboards", "achievements"] as const)
-      .map((module) => ({
-        module,
-        version: MODULE_VERSION,
-        ...(module !== "achievements" ? { previous: "0.1.0" } : {}),
-        ...(module === "leaderboards" ? { requiresCore: MODULE_VERSION } : {}),
-        ...((module === "live-leaderboards" || module === "achievements")
-          ? { requiresLeaderboards: MODULE_VERSION }
-          : {}),
-        migrations: files.filter((file) =>
-          moduleMigrations.some(([source, name]) =>
+  const names: ModuleName[] = [
+    "core",
+    "leaderboards",
+    "live-leaderboards",
+    "achievements",
+    "cloud-saves",
+  ];
+  const releases = names.map((module) => ({
+    module,
+    version: MODULE_VERSION,
+    ...(module !== "cloud-saves" ? { previous: "0.1.1" } : {}),
+    ...(module === "leaderboards" ? { requiresCore: MODULE_VERSION } : {}),
+    ...(["live-leaderboards", "achievements", "cloud-saves"].includes(module)
+      ? { requiresLeaderboards: MODULE_VERSION }
+      : {}),
+    migrations: files
+      .filter((file) =>
+        moduleMigrations.some(
+          ([source, name]) =>
             source.startsWith(`modules/${module}/`) &&
-            file.path === `supabase/migrations/${name}`
-          )
+            file.path === `supabase/migrations/${name}`,
         ),
-        assets: module === "leaderboards"
-          ? files.filter((f) =>
-            f.path.startsWith("supabase/functions/supagame/")
-          )
-          : [],
-      }));
-  const legacy = legacyTemplateFiles();
+      )
+      .sort((a, b) => a.path.localeCompare(b.path)),
+    assets:
+      module === "leaderboards"
+        ? files.filter((f) => f.path.startsWith("supabase/functions/supagame/"))
+        : [],
+  }));
+  const old = (version: string, modules: ModuleName[]) =>
+    modules.map((module) => {
+      const release = releases.find((r) => r.module === module)!;
+      const snapshot = legacyTemplateFiles(version);
+      return {
+        ...release,
+        version,
+        previous:
+          version === "0.1.1" && module !== "achievements"
+            ? "0.1.0"
+            : undefined,
+        ...(release.requiresCore ? { requiresCore: version } : {}),
+        ...(release.requiresLeaderboards
+          ? { requiresLeaderboards: version }
+          : {}),
+        assets:
+          module === "leaderboards"
+            ? snapshot.filter((f) =>
+                f.path.startsWith("supabase/functions/supagame/"),
+              )
+            : [],
+      };
+    });
   return [
-    ...releases.filter((r) => r.module !== "achievements").map((r) => ({
-      ...r,
-      version: "0.1.0",
-      previous: undefined,
-      ...(r.requiresCore ? { requiresCore: "0.1.0" } : {}),
-      ...(r.requiresLeaderboards ? { requiresLeaderboards: "0.1.0" } : {}),
-      migrations: r.migrations,
-      assets: r.assets.map((f) => legacy.find((old) => old.path === f.path)!),
-    })),
+    ...old("0.1.0", ["core", "leaderboards", "live-leaderboards"]),
+    ...old("0.1.1", [
+      "core",
+      "leaderboards",
+      "live-leaderboards",
+      "achievements",
+    ]),
     ...releases,
   ];
 }
@@ -98,7 +150,8 @@ function components(version: string): number[] {
   return parts;
 }
 export function compareVersions(a: string, b: string): number {
-  const left = components(a), right = components(b);
+  const left = components(a),
+    right = components(b);
   for (let i = 0; i < 3; i++) {
     if (left[i] !== right[i]) return left[i]! < right[i]! ? -1 : 1;
   }
@@ -118,9 +171,13 @@ export function validateInventory(inventory: Inventory): void {
     }
     identities.add(key);
     if (
-      !["core", "leaderboards", "live-leaderboards", "achievements"].includes(
-        release.module,
-      )
+      ![
+        "core",
+        "leaderboards",
+        "live-leaderboards",
+        "achievements",
+        "cloud-saves",
+      ].includes(release.module)
     ) {
       throw new Error("Unknown inventory module.");
     }
@@ -128,14 +185,16 @@ export function validateInventory(inventory: Inventory): void {
     for (const file of [...release.migrations, ...release.assets]) {
       const sql = release.migrations.includes(file);
       if (
-        !Buffer.isBuffer(file.content) || (sql
+        !Buffer.isBuffer(file.content) ||
+        (sql
           ? !/^supabase\/migrations\/\d{14}_[a-zA-Z0-9_-]+\.sql$/.test(
-            file.path,
-          )
+              file.path,
+            )
           : !/^supabase\/functions\/supagame\/[a-zA-Z0-9_.-]+$/.test(
-            file.path,
-          )) ||
-        file.replace !== undefined || paths.has(file.path)
+              file.path,
+            )) ||
+        file.replace !== undefined ||
+        paths.has(file.path)
       ) {
         throw new Error(
           `Invalid inventory path or duplicate asset: ${file.path}.`,
@@ -146,7 +205,8 @@ export function validateInventory(inventory: Inventory): void {
         const version = file.path.split("/").at(-1)!.slice(0, 14);
         const known = migrationOwners.get(version);
         if (
-          known && (known.module !== release.module || known.path !== file.path)
+          known &&
+          (known.module !== release.module || known.path !== file.path)
         ) {
           throw new Error(`Inventory migration version collision: ${version}.`);
         }
@@ -162,21 +222,25 @@ export function validateInventory(inventory: Inventory): void {
     }
     if (
       release.module === "leaderboards" &&
-      !inventory.some((r) =>
-        r.module === "core" && r.version === release.requiresCore
+      !inventory.some(
+        (r) => r.module === "core" && r.version === release.requiresCore,
       )
-    ) throw new Error("Inventory has an incompatible core dependency.");
+    )
+      throw new Error("Inventory has an incompatible core dependency.");
     if (
       (release.module === "live-leaderboards" ||
-        release.module === "achievements") &&
-      !inventory.some((r) =>
-        r.module === "leaderboards" &&
-        r.version === release.requiresLeaderboards
+        release.module === "achievements" ||
+        release.module === "cloud-saves") &&
+      !inventory.some(
+        (r) =>
+          r.module === "leaderboards" &&
+          r.version === release.requiresLeaderboards,
       )
-    ) throw new Error("Inventory has an incompatible leaderboards dependency.");
+    )
+      throw new Error("Inventory has an incompatible leaderboards dependency.");
     if (release.previous) {
-      const old = inventory.find((r) =>
-        r.module === release.module && r.version === release.previous
+      const old = inventory.find(
+        (r) => r.module === release.module && r.version === release.previous,
       );
       if (!old || compareVersions(old.version, release.version) >= 0) {
         throw new Error(
@@ -185,8 +249,8 @@ export function validateInventory(inventory: Inventory): void {
       }
       for (const file of old.migrations) {
         if (
-          !release.migrations.some((f) =>
-            f.path === file.path && f.content.equals(file.content)
+          !release.migrations.some(
+            (f) => f.path === file.path && f.content.equals(file.content),
           )
         ) {
           throw new Error(
@@ -199,10 +263,14 @@ export function validateInventory(inventory: Inventory): void {
           throw new Error("Inventory cannot remove an existing asset.");
         }
       }
-      const last = old.migrations.map((f) => f.path).sort().at(-1);
+      const last = old.migrations
+        .map((f) => f.path)
+        .sort()
+        .at(-1);
       for (const file of release.migrations) {
         if (
-          !old.migrations.some((f) => f.path === file.path) && last &&
+          !old.migrations.some((f) => f.path === file.path) &&
+          last &&
           file.path <= last
         ) {
           throw new Error(
@@ -218,8 +286,8 @@ export function releaseFor(
   module: ModuleName,
   version: string,
 ): ModuleRelease {
-  const release = inventory.find((r) =>
-    r.module === module && r.version === version
+  const release = inventory.find(
+    (r) => r.module === module && r.version === version,
   );
   if (!release) {
     throw new Error(
@@ -232,9 +300,10 @@ export function latestRelease(
   inventory: Inventory,
   module: ModuleName,
 ): ModuleRelease {
-  const release = inventory.filter((r) => r.module === module).sort((a, b) =>
-    compareVersions(a.version, b.version)
-  ).at(-1);
+  const release = inventory
+    .filter((r) => r.module === module)
+    .sort((a, b) => compareVersions(a.version, b.version))
+    .at(-1);
   if (!release) throw new Error(`No release inventory for ${module}.`);
   return release;
 }

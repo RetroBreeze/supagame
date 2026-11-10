@@ -23,7 +23,7 @@ export async function packedConsumer() {
   try {
     const tarballs = ['contracts', 'sdk-ts', 'cli'].map((name) => {
       run('pnpm', ['pack', '--pack-destination', root], join(repo, 'packages', name));
-      const archive = join(root, `supagame-${name}-0.1.1.tgz`);
+      const archive = join(root, `supagame-${name}-0.1.2.tgz`);
       const entries = run('tar', ['-tzf', archive]).trim().split('\n');
       assert.ok(entries.includes('package/package.json'));
       assert.ok(entries.includes('package/LICENSE'), `${name} must distribute its MIT license`);
@@ -39,7 +39,7 @@ export async function packedConsumer() {
     assert.match(run(cli, ['--help'], root), /leaderboard/);
     for (const name of ['cli', 'sdk-ts', 'contracts']) {
       const manifest = JSON.parse(readFileSync(join(installed(name), 'package.json'), 'utf8'));
-      assert.equal(manifest.license, 'MIT'); assert.equal(manifest.version, '0.1.1');
+      assert.equal(manifest.license, 'MIT'); assert.equal(manifest.version, '0.1.2');
       assert.equal(manifest.private, true, 'Publishing remains separately authorized');
       assert.ok(!JSON.stringify(manifest.dependencies ?? {}).includes('workspace:'));
     }
@@ -50,6 +50,9 @@ export async function packedConsumer() {
     writeFileSync(join(root, 'consumer.ts'), `import { createClient } from '@supabase/supabase-js';
 import { createGameServices, ApiError, type PlayerProfile, type LeaderboardPage } from '@supagame/sdk-ts';
 const game = createGameServices({ supabase: createClient('https://example.supabase.co', 'sb_publishable_placeholder') });
+const saves = game.saves;
+const save = saves.save('profile', {coins: 5}, {expectedRevision: 0});
+void save;
 const profile: Promise<PlayerProfile> = game.players.getMe();
 const page: Promise<LeaderboardPage> = game.leaderboards.getTop('level-1', { limit: 10 });
 const subscription = game.leaderboards.subscribe('level-1', {onUpdate(page) { void page.entries; }, onRankChange(event) { void event.previousRank; }});

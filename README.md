@@ -840,3 +840,12 @@ Ghosts/replays, Friends, Developer dashboard, Native SDKs.
 The optional [Achievements module](docs/achievements.md) awards permanent unlocks
 from accepted leaderboard scores, with player progress, historical backfill,
 headless notification queues and an optional browser renderer.
+
+### Cloud Saves
+
+`supagame add cloud-saves` stages private JSON/binary saves, optimistic revisions,
+quotas, Storage policies and diagnostics. The TypeScript SDK exposes
+`game.saves.save/load/list/delete`, `saveBinary/loadBinary`, and an optional
+IndexedDB queue. See [Cloud Saves quickstart and architecture](docs/cloud-saves.md)
+and [verification](docs/cloud-saves-verification.md). All provisioning remains
+project-owned and explicitly confirmed before hosted changes.

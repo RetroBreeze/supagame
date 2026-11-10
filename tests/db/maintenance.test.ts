@@ -9,7 +9,7 @@ import { templateFiles } from '../../packages/cli/src/lib/templates.ts';
 import { currentInventory } from '../../packages/cli/src/lib/versions.ts';
 import { cli, initialized, project, put, snapshot } from '../cli/project-fixture.ts';
 import { execFileSync } from 'node:child_process';
-const checks = securityChecks(['core', 'leaderboards', 'live-leaderboards', 'achievements']);
+const checks = securityChecks(['core', 'leaderboards', 'live-leaderboards', 'achievements', 'cloud-saves']);
 function inspect(setup = ''): { check: string; ok: boolean }[] {
   return JSON.parse(
     execFileSync('docker', ['exec', '-i', 'supabase_db_supagame-schema-tests', 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1', '-U', 'supabase_admin', '-d', 'postgres', '-c', `begin; ${setup} select jsonb_agg(result) from (${securityQuery(checks)}) result; rollback;`], { encoding: 'utf8', timeout: 15000 }),
@@ -22,6 +22,9 @@ for (
   const [sql, id] of [
     ["alter policy achievements_own on public.game_player_achievements using (true);", 'policies:achievements'],
     ["grant update(threshold) on public.game_achievements to authenticated;", 'writes:authenticated:game_achievements'],
+    ["alter policy supagame_saves_read_guard on storage.objects using (true);", 'saves:storage-guards'],
+    ["update storage.buckets set public=true where id='supagame-saves';", 'saves:bucket'],
+    ["alter policy supagame_saves_owner on public.game_saves using (true);", 'saves:owner-policy'],
     ['grant update(score) on public.game_best_scores to anon;', 'writes:anon:game_best_scores'],
     [
       'grant delete on public.game_leaderboards to public;',
@@ -77,6 +80,7 @@ test('actual local CLI doctor is read-only and verifies migration ledger and cat
     const install = cli(root, 'add', 'live-leaderboards');
     assert.equal(install.status, 0, install.stderr);
     assert.equal(cli(root, 'add', 'achievements').status, 0);
+    assert.equal(cli(root, 'add', 'cloud-saves').status, 0);
     const before = snapshot(root);
     const findings = await doctor({ workdir: root, local: true }, {
       run: runSupabase,

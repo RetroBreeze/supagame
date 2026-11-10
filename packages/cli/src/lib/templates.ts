@@ -4,12 +4,14 @@ import { join } from 'node:path';
 import type { DesiredFile } from './file-stage.ts';
 import { safePath } from './file-stage.ts';
 
+import type { ModuleName } from './versions.ts';
 import { moduleMigrations as migrations } from './versions.ts';
 export { MODULE_VERSION } from './versions.ts';
 export { migrations };
 const functionFiles = [
   'index.ts',
   'routes.ts',
+  'saves.ts',
   'auth.ts',
   'responses.ts',
   'types.ts',
@@ -21,6 +23,7 @@ export const templateSources = [
   'packages/contracts/src/generated.ts',
   'deno.lock',
   'modules/legacy/0.1.0.json',
+  'modules/legacy/0.1.1.json',
 ];
 export function templateFiles(): DesiredFile[] {
   // Built packages carry the same inventory inside dist/assets; source development
@@ -99,8 +102,13 @@ export function checkMigrationVersions(root: string): void {
   }
 }
 
-export function legacyTemplateFiles(): DesiredFile[] {
+export function legacyTemplateFiles(version = '0.1.0'): DesiredFile[] {
  const base = import.meta.url.endsWith('.ts') ? new URL('../../../../', import.meta.url) : new URL('../assets/', import.meta.url);
- const rows = JSON.parse(readFileSync(new URL('modules/legacy/0.1.0.json', base), 'utf8')) as {path:string;content:string}[];
+ const rows = JSON.parse(readFileSync(new URL(`modules/legacy/${version}.json`, base), 'utf8')) as {path:string;content:string}[];
  return rows.map(f => ({path:f.path,content:Buffer.from(f.content,'base64')}));
+}
+
+export function migrationModule(path: string): ModuleName | undefined {
+  const entry = migrations.find(([,name]) => path === `supabase/migrations/${name}`);
+  return entry ? entry[0].split("/")[1] as ModuleName : undefined;
 }

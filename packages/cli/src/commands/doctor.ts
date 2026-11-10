@@ -127,6 +127,7 @@ export async function doctor(
   }
   if (manifest) local('origins', manifest.value.origins ? 'healthy' : 'warning', manifest.value.origins ? `${manifest.value.origins.length} browser origins declared locally; hosted values require remote inspection.` : 'Browser origins are unmanaged. Use supagame config origins add <origin>, then preview deployment. Existing hosted configuration is preserved.');
   if (manifest?.value.modules['live-leaderboards'] && project && object(project.config.realtime) && project.config.realtime.enabled === false) local('live-realtime-settings', 'action required', 'Local Realtime is explicitly disabled. Review [realtime].enabled in supabase/config.toml and restart the local stack; hosted settings are separate.');
+  if (manifest?.value.modules['cloud-saves'] && project) local('cloud-saves-storage', object(project.config.storage) && project.config.storage.enabled === true ? 'healthy' : 'action required', 'Cloud Saves requires local Storage; add cloud-saves stages its configuration. Hosted bucket, limits and policies require --remote inspection; platform-wide Storage limits cannot be inferred from SQL.');
   const releases: ModuleRelease[] = [];
   if (
     !attempt('inventory', () => {

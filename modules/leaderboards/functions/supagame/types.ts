@@ -11,6 +11,10 @@ export interface Database {
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
     Functions: {
+      sg_cloud_save: FunctionSpec<
+        { p_action: string; p_slot: string | null; p_request: Json },
+        Json
+      >;
       sg_get_achievements: FunctionSpec<Record<string, never>, DTO['AchievementList']>;
       sg_list_leaderboards: FunctionSpec<Record<string, never>, DTO['LeaderboardSummary'][]>;
       sg_get_entries: FunctionSpec<

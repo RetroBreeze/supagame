@@ -102,3 +102,43 @@ it('receives database Broadcast over a private channel and refreshes authoritati
     expect(errors).toEqual([]);
   } finally { subscription.unsubscribe(); await supabase.removeAllChannels(); }
 });
+
+it('Cloud Saves round-trips JSON, detects races, isolates players and preserves binary versions', async () => {
+  const slot=`save-${crypto.randomUUID()}`;
+  const first=await game.saves.save(slot,{coins:4,nested:{score:1.5}},{schemaVersion:2});
+  expect(first.revision).toBe(1);
+  const otherTab=createGameServices({supabase});
+  await otherTab.saves.load(slot);
+  expect((await game.saves.save(slot,{coins:5},{expectedRevision:1})).revision).toBe(2);
+  await expect(otherTab.saves.save(slot,{coins:6})).rejects.toMatchObject({code:'SAVE_CONFLICT',current:{revision:2,data:{coins:5}}});
+  expect((await game.saves.list()).some(s=>s.slot===slot)).toBe(true);
+  const other=makeClient(),otherGame=createGameServices({supabase:other});users.push((await otherGame.players.ensureAnonymousSession()).userId);
+  await expect(otherGame.saves.load(slot)).rejects.toMatchObject({code:'SAVE_NOT_FOUND'});
+  const direct=await other.from('game_saves').select('*');expect(direct.data).toEqual([]);
+  const denied=await other.storage.from('supagame-saves').upload(`${users[0]}/${crypto.randomUUID()}`,new Blob(['no']));expect(denied.error).not.toBeNull();
+  const binarySlot=`rpg-${crypto.randomUUID()}`,id=crypto.randomUUID();
+  const binary=await game.saves.saveBinary(binarySlot,new Blob(['RPG save data']),{operationId:id,expectedRevision:0});
+  expect(binary.revision).toBe(1);expect((await game.saves.loadBinary(binarySlot)).data.size).toBe(13);
+  expect((await game.saves.saveBinary(binarySlot,new Blob(['RPG save data']),{operationId:id,expectedRevision:0})).revision).toBe(1);
+  await expect(game.saves.saveBinary(binarySlot,new Blob(['RPG save datb']),{operationId:id,expectedRevision:0})).rejects.toMatchObject({code:'DUPLICATE_KEY_CONFLICT'});
+  const read=await other.storage.from('supagame-saves').download(binary.objectPath!);expect(read.error).not.toBeNull();
+  const remove=await supabase.storage.from('supagame-saves').remove([binary.objectPath!]);expect(remove.data??[]).toHaveLength(0);
+  expect(await (await game.saves.loadBinary(binarySlot)).data.text()).toBe('RPG save data');
+  const replacement=await game.saves.saveBinary(binarySlot,new Blob(['updated RPG data']),{expectedRevision:1});expect(replacement.revision).toBe(2);
+  expect(await game.saves.cleanup()).toBeGreaterThanOrEqual(1);
+  expect(await (await game.saves.loadBinary(binarySlot)).data.text()).toBe('updated RPG data');
+  await game.saves.delete(binarySlot,{expectedRevision:2});await game.saves.cleanup();await game.saves.cleanup();
+  await game.saves.delete(slot,{expectedRevision:2});await expect(game.saves.load(slot)).rejects.toMatchObject({code:'SAVE_NOT_FOUND'});
+},30000);
+
+it('recovers after upload succeeds but its acknowledgement or metadata commit is interrupted',async()=>{
+ const slot=`interrupted-${crypto.randomUUID()}`,operationId=crypto.randomUUID(),blob=new Blob(['unfinished']);
+ const checksum=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join('');
+ const request={operationId,expectedRevision:0,schemaVersion:1,metadata:{},sizeBytes:blob.size,checksum};
+ const prepared=await supabase.rpc('sg_cloud_save',{p_action:'prepare',p_slot:slot,p_request:request});expect(prepared.error).toBeNull();
+ const path=prepared.data.upload.path;
+ expect((await supabase.storage.from('supagame-saves').upload(path,await blob.arrayBuffer(),{upsert:false,contentType:'application/octet-stream'})).error).toBeNull();
+ const recovered=await game.saves.saveBinary(slot,blob,{operationId,expectedRevision:0});expect(recovered.revision).toBe(1);
+ expect(await(await game.saves.loadBinary(slot)).data.text()).toBe('unfinished');
+ await game.saves.delete(slot,{expectedRevision:1});await game.saves.cleanup();await game.saves.cleanup();
+});

@@ -25,7 +25,8 @@ enabled = false
 enabled = true
 
 [storage]
-enabled = false
+enabled = true
+file_size_limit = "50MiB"
 
 [local_smtp]
 enabled = false

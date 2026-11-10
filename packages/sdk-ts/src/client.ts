@@ -1,7 +1,7 @@
 import type { ApiError as ApiErrorBody } from '@supagame/contracts';
 import type { Session } from '@supabase/supabase-js';
 import type { SupabaseConnection } from './auth.js';
-import { ApiError, AuthenticationError, InvalidParameterError, NetworkError, UnexpectedResponseError } from './errors.js';
+import { ApiError, SaveConflictError, AuthenticationError, InvalidParameterError, NetworkError, UnexpectedResponseError } from './errors.js';
 import * as validators from './validation.generated.js';
 
 export interface GameServicesOptions {
@@ -30,6 +30,7 @@ async function httpFailure(response: Response): Promise<never> {
   catch { throw new UnexpectedResponseError(); }
   if (!matches('ApiError', body)) throw new UnexpectedResponseError();
   const error = body as ApiErrorBody;
+  if (error.code === 'SAVE_CONFLICT' && Object.hasOwn(error, 'current')) throw new SaveConflictError(error.current ?? null, error.message);
   throw new ApiError(response.status, error.code, error.message);
 }
 function customBase(options: GameServicesOptions): string | undefined {
