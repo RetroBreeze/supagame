@@ -28,7 +28,7 @@
     "check:edge": "deno check --frozen modules/leaderboards/functions/supagame/index.ts tests/api/http.test.ts tests/api/http.integration.test.ts",
     "lint:edge": "deno lint modules/leaderboards/functions/supagame tests/api/http*.ts && deno fmt --check deno.json modules/leaderboards/functions/supagame tests/api/http*.ts",
     "test:sdk:integration": "vitest run --config tests/sdk/vitest.integration.config.ts",
-    "test:e2e": "node --test tests/e2e/install-and-play.test.ts",
+    "test:e2e": "node --test tests/e2e/admin-dashboard.test.ts tests/e2e/install-and-play.test.ts",
     "test:packages": "node --test tests/e2e/packages.test.ts"
   },
   "devDependencies": {

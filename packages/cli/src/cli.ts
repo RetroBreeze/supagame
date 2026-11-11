@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { dashboard } from './commands/admin-dashboard.ts';
 import { adminCommand } from './commands/admin.ts';
 import { configureAuth } from './commands/auth.ts';
 import { cleanupSaves } from './commands/saves-cleanup.ts';
@@ -110,6 +111,7 @@ local(savesCommand.command('configure'))
 local(program.command('upgrade').description('Stage known forward-only module upgrades locally'))
   .action((options: LocalOptions) => upgrade(options));
 const admin = program.command('admin').description('Trusted operator administration; requires optional Admin module');
+admin.command('dashboard').description('Launch the authenticated loopback dashboard for this project').option('--workdir <directory>','Explicit project root').option('--local','Use the local database').option('--remote','Explicitly use the configured hosted project').option('--port <port>','Loopback HTTP port (default: 4173)').action(dashboard);
 for (const [kind, verbs] of Object.entries({leaderboard:['list','inspect','reset','disable','enable'],score:['inspect','hide','restore'],player:['inspect','restrict','reinstate'],audit:['list'],doctor:['doctor']})) {
  const group = kind === 'doctor' ? admin : admin.command(kind);
  for (const verb of verbs) {

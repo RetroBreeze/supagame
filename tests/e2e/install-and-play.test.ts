@@ -1,3 +1,4 @@
+import { dashboardSession } from './dashboard-session.ts';
 import { execFile, spawnSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import assert from 'node:assert/strict';
@@ -269,6 +270,34 @@ test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → b
       const score=await sdk.leaderboards.getMine('arcade');
       assert.ok(score===null || score.score===3,'submission belongs wholly before or after reset');
     } finally {sub.unsubscribe();await client.removeAllChannels();}
+  });
+
+  await t.test('installed dashboard executes every Admin action through the isolated operator connection',async()=>{
+    const dashboard=await dashboardSession(consumer.cli,project.root);
+    try {
+      const request=dashboard.request;
+      const read=async(view:string,extra:Record<string,unknown>={})=>{const result=await request('/api/read',{view,...extra});assert.equal(result.status,200,JSON.stringify(result.body));return result.body;};
+      const preview=async(action:string,target:string)=>{const result=await request('/api/preview',{action,target});assert.equal(result.status,200);return result.body;};
+      const execute=async(p:{id:string;target:string})=>request('/api/execute',{previewId:p.id,reason:'Isolated dashboard verification',confirmation:p.target});
+      const apply=async(action:string,target:string)=>{const p=await preview(action,target);const result=await execute(p);assert.equal(result.status,200,JSON.stringify(result.body));return p;};
+      const overview=await read('overview');assert.equal(overview.project.ref,'abcdefghijklmnopqrst');assert.equal(overview.project.environment,'local');assert.ok(overview.counts.leaderboards>=2);
+      const client=makeClient(),sdk=consumer.sdk.createGameServices({supabase:client});const player=await sdk.players.ensureAnonymousSession();await sdk.leaderboards.submit('arcade',15);
+      const page=await read('scores',{board:'arcade',search:player.userId});assert.equal(page.items.length,1);const score=page.items[0].id;
+      await read('leaderboard',{target:'arcade'});await read('player',{target:player.userId});await read('score',{target:score});
+      const hidden=await apply('score.hide',score);assert.equal(await sdk.leaderboards.getMine('arcade'),null);assert.equal((await execute(hidden)).body.replayed,true);
+      await apply('score.restore',score);assert.equal((await sdk.leaderboards.getMine('arcade'))?.score,15);
+      await apply('player.restrict',player.userId);await assert.rejects(sdk.leaderboards.submit('arcade',16));await apply('player.reinstate',player.userId);await sdk.leaderboards.submit('arcade',16);
+      await apply('leaderboard.disable','arcade');await assert.rejects(sdk.leaderboards.submit('arcade',17));await apply('leaderboard.enable','arcade');await sdk.leaderboards.submit('arcade',17);
+      assert.match(player.userId,/^[a-f0-9-]{36}$/);
+      project.supabase(['db','query',`insert into sg_private.game_submission_events(user_id,leaderboard_id,submission_key,submitted_score,outcome,created_at,best_score,generation) select '${player.userId}','arcade',gen_random_uuid(),1,'not_best',clock_timestamp()+n*interval '1 microsecond',17,(select generation from public.game_leaderboards where id='arcade') from generate_series(1,55)n`,'--yes']);
+      const pageOne=await read('scores',{board:'arcade',search:player.userId});assert.equal(pageOne.items.length,50);assert.ok(pageOne.next);
+      const pageTwo=await read('scores',{board:'arcade',search:player.userId,cursor:pageOne.next});assert.equal(pageTwo.items.length,8);assert.equal(pageTwo.next,null);
+      assert.equal(new Set([...pageOne.items,...pageTwo.items].map((r:{id:string})=>r.id)).size,58);
+      const first=await preview('leaderboard.reset','arcade'),stale=await preview('leaderboard.reset','arcade');assert.equal((await execute(first)).status,200);assert.equal((await execute(stale)).status,409);assert.equal(await sdk.leaderboards.getMine('arcade'),null);
+      const audit=await read('audit');assert.ok(audit.some((a:{operation_id:string})=>a.operation_id===first.id));
+      await client.removeAllChannels();
+    }finally{await dashboard.close();}
+    await assert.rejects(fetch(dashboard.url));
   });
 
 });

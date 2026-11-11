@@ -7,9 +7,9 @@ import {
   type AdminKind,
   adminMutation,
 } from "../lib/admin.ts";
-import { DoctorInspector, inspectionWorkspace } from "../lib/doctor-inspect.ts";
-import { object, readManifest } from "../lib/manifest.ts";
-import { type LocalOptions, readProject, selectedRef } from "../lib/project.ts";
+import { AdminFailure, openAdminService } from "../lib/admin-service.ts";
+import { object } from "../lib/manifest.ts";
+import { type LocalOptions } from "../lib/project.ts";
 import { type ProcessRunner, runSupabase } from "../lib/supabase-cli.ts";
 export interface AdminOptions extends LocalOptions {
   local?: boolean;
@@ -54,32 +54,14 @@ export async function adminCommand(
   if (!!options.local === !!options.remote) {
     throw new Error("Choose --local or --remote --project-ref <ref>.");
   }
-  const project = readProject(options), manifest = readManifest(project.root);
-  if (!manifest?.value.modules.admin) {
-    throw new Error("Install Admin with supagame add admin first.");
-  }
   if (options.remote && !options.projectRef) {
     throw new Error("Hosted administration requires --project-ref.");
   }
-  const ref = selectedRef(
-    project.root,
-    options.projectRef,
-    manifest.value.projectRef,
-  );
+  const service = await openAdminService(options, deps.run);
   const destination = options.remote
-    ? ref
-    : `local:${String(project.config.project_id)}`;
-  const connection = {
-    projectId: String(project.config.project_id),
-    port: object(project.config.db)
-      ? Number(project.config.db.port ?? 54322)
-      : 54322,
-    ...(options.remote ? { ref } : {}),
-  };
-  const workspace = inspectionWorkspace(connection, []);
+    ? service.target.ref
+    : `local:${service.target.name}`;
   try {
-    const inspector = new DoctorInspector(deps.run, workspace.root, connection);
-    await inspector.version();
     const mutation = !["inspect", "list", "doctor"].includes(verb);
     const sql = kind === "doctor"
       ? adminDoctorSql
@@ -94,7 +76,7 @@ export async function adminCommand(
           ? undefined
           : Number(options.generation),
       );
-    const preview = await inspector.query(sql);
+    const preview = await service.query(sql);
     if (!options.json) deps.log(`Admin destination: ${destination}`);
     deps.log(JSON.stringify(preview, null, 2));
     if (
@@ -130,7 +112,7 @@ export async function adminCommand(
         "Retries with --operation-id require --expected-revision from the original preview.",
       );
     }
-    const statement = adminMutation({
+    const operation = {
       action: `${kind}.${verb}` as AdminAction,
       target: target!,
       revision: options.expectedRevision === undefined
@@ -138,7 +120,8 @@ export async function adminCommand(
         : Number(options.expectedRevision),
       operationId,
       reason: options.reason,
-    });
+    };
+    adminMutation(operation);
     if (!(options.remote ? options.allowRemote : options.yes)) {
       if (!deps.interactive) {
         throw new Error(
@@ -151,27 +134,19 @@ export async function adminCommand(
         ) !== `${verb} ${target} ${destination}`
       ) throw new Error("Declined; no changes made.");
     }
-    const result = await deps.run([
-      "db",
-      "query",
-      statement,
-      "--yes",
-      ...(options.remote ? [`--remote=${ref}`] : []),
-      "--workdir",
-      workspace.root,
-      "--agent=no",
-      "--output",
-      "json",
-    ], workspace.root);
-    if (result.code !== 0) {
-      throw new Error(
-        `Admin operation failed or its outcome is unknown. Inspect audit history before retrying with --operation-id ${operationId} --expected-revision ${
-          options.expectedRevision ?? revision
-        }. Raw diagnostics withheld.`,
-      );
+    try {
+      const result = await service.execute(operation);
+      deps.log(JSON.stringify(result));
+    } catch (error) {
+      if (error instanceof AdminFailure && error.code === "OUTCOME_UNKNOWN") {
+        throw new Error(
+          `${error.message} Retry with --operation-id ${operation.operationId} --expected-revision ${operation.revision}.`,
+          { cause: error },
+        );
+      }
+      throw error;
     }
-    deps.log(result.stdout);
   } finally {
-    workspace.remove();
+    service.close();
   }
 }

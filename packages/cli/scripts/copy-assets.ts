@@ -13,3 +13,12 @@ for (const path of templateSources) {
   mkdirSync(new URL('./', destination), { recursive: true });
   copyFileSync(original, destination);
 }
+
+// The loopback UI is shipped with the CLI, never fetched from a CDN.
+const dashboardSource = new URL('../dashboard/', import.meta.url);
+const dashboardTarget = new URL('../dist/dashboard/', import.meta.url);
+mkdirSync(dashboardTarget, { recursive: true });
+for (const file of ['index.html', 'style.css']) copyFileSync(new URL(file,dashboardSource),new URL(file,dashboardTarget));
+const { build } = await import('esbuild');
+const { fileURLToPath } = await import('node:url');
+await build({entryPoints:[fileURLToPath(new URL('app.ts',dashboardSource))],outfile:fileURLToPath(new URL('app.js',dashboardTarget)),bundle:true,platform:'browser',target:'es2022',format:'esm',minify:true});

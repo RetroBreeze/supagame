@@ -40,13 +40,14 @@ export function processEnvironment(
   env.SUPABASE_YES = 'false';
   return env;
 }
-export const runSupabase: ProcessRunner = (args, cwd) =>
+export const createSupabaseRunner = (timeout = 300_000, signal?: AbortSignal): ProcessRunner => (args, cwd) =>
   new Promise((resolve) => {
     const child = execFile('supabase', [...args], {
       cwd,
       env: processEnvironment(process.env),
       encoding: 'utf8',
-      timeout: 300_000,
+      timeout,
+      ...(signal ? {signal} : {}),
       maxBuffer: 8 * 1024 * 1024,
     }, (error, stdout, stderr) => {
       resolve({
@@ -57,6 +58,7 @@ export const runSupabase: ProcessRunner = (args, cwd) =>
     });
     child.stdin?.end();
   });
+export const runSupabase = createSupabaseRunner();
 export interface RemoteFunction {
   version: number;
   status: string;

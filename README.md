@@ -860,5 +860,7 @@ Install with `supagame add admin` after upgrading module templates. The optional
 module provides generation-based leaderboard resets, disable/enable, reversible
 score moderation, player submission restrictions and audit history. Every
 mutation requires a reason and explicit confirmation; all support read-only
-`--dry-run`. See [Admin documentation](docs/admin.md). No dashboard or public
-administrative endpoint is installed.
+`--dry-run`. See [Admin documentation](docs/admin.md). CLI 0.1.5 also bundles a
+[local dashboard](docs/admin-dashboard.md), launched with
+`supagame admin dashboard --remote` or `--local`. No hosted administrative
+endpoint is installed.

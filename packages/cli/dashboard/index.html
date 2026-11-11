@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Supagame Admin</title>
+    <link rel="stylesheet" href="/style.css">
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body><a class="skip" href="#main">Skip to content</a>
+<section id="login" class="login"><div class="brand"><span class="mark">S</span> SUPAGAME <span class="muted">/ ADMIN</span></div><h1>Your project.<br>Your controls.</h1><p>This dashboard is locked to the project selected in your terminal. Enter its launch code to connect.</p><form id="login-form"><label for="launch-code">Launch code</label><input id="launch-code" type="password" required autocomplete="off" spellcheck="false" placeholder="Paste the code printed by Supagame"><button class="primary" type="submit">Unlock dashboard →</button></form><p id="login-error" role="alert"></p><small>Local operator access · No credentials are stored in this browser</small></section>
+<div id="app" hidden><aside><div class="brand"><span class="mark">S</span> SUPAGAME</div><div class="workspace-label">ADMIN WORKSPACE</div><nav aria-label="Main navigation"><button data-view="overview" class="selected">Overview</button><button data-view="boards">Leaderboards</button><button data-view="scores">Score moderation</button><button data-view="players">Players</button><button data-view="audit">Audit log</button></nav><div class="aside-footer"><span class="dot"></span> Local secure session<br><small>Credentials stay in the CLI</small><button id="lock">Lock dashboard</button></div></aside>
+<div class="workspace"><header><div><span id="environment" class="badge"></span><strong id="project-name"></strong><code id="project-ref"></code></div><button id="refresh">Refresh</button></header><main id="main" tabindex="-1"><div class="page-heading"><div><p class="eyebrow">PROJECT ADMINISTRATION</p><h1 id="page-title">Overview</h1><p id="page-description" class="muted"></p></div><span class="badge subtle">OPERATOR ACCESS</span></div><div id="status" role="status" aria-live="polite"></div><section id="content" aria-label="Current section"></section></main><footer>Supagame Admin · One project per session · No public administrative endpoints</footer></div></div>
+<dialog id="operation-dialog" aria-labelledby="operation-title"><form id="operation-form"><div class="dialog-header"><span class="eyebrow">REVIEW OPERATION</span><button id="cancel-operation" type="button" aria-label="Close operation">×</button></div><h2 id="operation-title"></h2><p id="operation-project" class="target"></p><p id="operation-impact"></p><pre id="operation-state"></pre><label for="reason">Reason <span class="muted">Recorded in the audit log</span></label><textarea id="reason" maxlength="1000" required rows="3" placeholder="Explain why this change is needed"></textarea><label for="confirmation" id="confirmation-label"></label><input id="confirmation" required autocomplete="off" spellcheck="false"><p id="operation-error" role="alert"></p><div id="operation-result" role="status"></div><div class="dialog-actions"><button id="execute" class="danger" type="submit" disabled>Confirm operation</button></div></form></dialog>
+  </body>
+</html>

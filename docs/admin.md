@@ -1,6 +1,6 @@
 # Optional Admin (CLI first)
 
-Admin is for trusted Supabase project operators. It installs no dashboard and no
+Admin is for trusted Supabase project operators. Its optional local dashboard installs no hosted service or
 public administrative API. Use Node 24 and Supabase CLI 3.0.0 with your existing
 Supabase login (or existing supported CLI environment credentials). Never put
 operator credentials in a game bundle, browser, repository or shared log.
@@ -32,7 +32,8 @@ Forward migrations:
 
 ## Commands
 
-Every command requires `--local` or `--remote --project-ref <exact-ref>`.
+Operational CLI commands require `--local` or `--remote --project-ref <exact-ref>`.
+The dashboard uses `--local` or `--remote`, pinning the configured reference at startup.
 Hosted references must agree with the manifest and existing link metadata.
 The following examples target a local test installation; substitute
 `--remote --project-ref abcdefghijklmnopqrst` for a hosted project.
@@ -137,3 +138,11 @@ holding the Supabase CLI credential. Use project operator access logs for that
 correlation. As with all project-owned SQL, the database owner can bypass or
 repair schema protections; this is not a tamper-proof log against the owner.
 Audit listing returns the latest 100 operations. Do not put secrets in reasons.
+
+## Local dashboard
+
+CLI 0.1.5 adds `supagame admin dashboard --remote` (or `--local`) with `--workdir`
+and `--port`. It is a bundled loopback interface over the existing Admin service,
+with a private launch code, explicit previews and confirmations. No new migration
+or hosted deployment is needed when Admin 0.1.4 is already installed. See
+[Admin Dashboard](admin-dashboard.md) for setup, SSH access, security and limits.

@@ -147,4 +147,8 @@ are complementary checks, not a guarantee that no vulnerabilities exist.
 See [Admin trust boundaries](admin.md#trust-boundaries-and-bootstrap). Operator
 credentials stay in the trusted Supabase CLI process. Private functions, RLS,
 revocable assignments, atomic audit records, operation IDs and administrative
-revisions protect the CLI workflow; no privileged browser endpoint is installed.
+revisions protect the CLI workflow. The optional
+[local dashboard](admin-dashboard.md#security-and-session-lifecycle) binds only
+to loopback and requires a private per-launch code, authenticated sessions,
+exact Host/Origin validation and CSRF tokens. Privileged credentials remain
+server-side; no hosted administrative endpoint is installed.
