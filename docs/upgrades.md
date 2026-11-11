@@ -60,3 +60,11 @@ Rollback of schema/data is not automatic. Use forward fixes or an independently
 planned recovery from backups. Changing an existing board's definition is rejected
 by `leaderboard create`; semantic changes need a separately reviewed additive
 migration. Do not edit its old migration or manifest alone to disguise drift.
+
+## Module templates 0.1.4: optional Admin
+
+Upgrade stages immutable forward migrations and preserves the 0.1.3 asset
+snapshot. `supagame add admin` installs the optional operator module. Read
+[Admin](admin.md) before deployment: reset uses retained generations; cursors
+become generation-specific; disabled Admin boards remain readable. Existing
+installations without Admin retain their previous gameplay behavior.

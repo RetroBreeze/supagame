@@ -1,4 +1,5 @@
 const errors = {
+  PLAYER_RESTRICTED: [403, 'This player is restricted from submitting scores.'],
   INVALID_SAVE: [400, 'The save payload is invalid.'],
   SAVE_NOT_FOUND: [404, 'The save slot or upload was not found.'],
   SAVE_QUOTA_EXCEEDED: [413, 'The save size or player quota was exceeded.'],
@@ -40,6 +41,7 @@ export function failure(code: ErrorCode, headers = new Headers()): Response {
 export function databaseFailure(error: { code: string; message: string }): ApiFailure {
   // Require both SQLSTATE and the exact known message. Never echo SQL details.
   const pairs: Record<string, ErrorCode> = {
+    '42501:PLAYER_RESTRICTED': 'PLAYER_RESTRICTED',
     '22023:INVALID_SAVE': 'INVALID_SAVE',
     'P0002:SAVE_NOT_FOUND': 'SAVE_NOT_FOUND',
     '54000:SAVE_QUOTA_EXCEEDED': 'SAVE_QUOTA_EXCEEDED',

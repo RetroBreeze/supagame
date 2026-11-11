@@ -1,3 +1,5 @@
+import { execFile, spawnSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import assert from 'node:assert/strict';
 import { cpSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -47,7 +49,9 @@ test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → b
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   await t.test('starts staged assets, enables Auth and verifies schema/security using doctor', async () => {
-    assert.match(cli('doctor', '--local'), /HEALTHY/);
+    const diagnostic=spawnSync(consumer.cli,['doctor','--local','--workdir',project.root],{encoding:'utf8'});
+    assert.equal(diagnostic.status,0,diagnostic.stdout);
+    assert.match(diagnostic.stdout,/HEALTHY/);
     const listed = await raw('/leaderboards'); assert.equal(listed.status, 200);
     assert.deepEqual((await listed.json() as { id: string; sortDirection: string }[]).map(({ id, sortDirection }) => [id, sortDirection]).sort(), [['arcade', 'desc'], ['level-1', 'asc']]);
     assert.deepEqual(await game.leaderboards.getTop('level-1'), { entries: [], nextCursor: null });
@@ -224,6 +228,47 @@ test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → b
       await sdk.leaderboards.submit('arcade', 999999);
       await wait(() => updated);
     } finally { subscription.unsubscribe(); await client.removeAllChannels(); }
+  });
+
+  await t.test('optional Admin installs from tarball, resets with live refresh and rejects stale operations', async () => {
+    cli('add','admin');
+    project.supabase(['migration','up','--include-all']);
+    assert.match(cli('admin','doctor','--local'), /restricted_execution/);
+    const client = makeClient(); const sdk = consumer.sdk.createGameServices({supabase:client});
+    const player = await sdk.players.ensureAnonymousSession();
+    await sdk.leaderboards.submit('arcade',12345);
+    let connected=false, empty=false;
+    const sub=sdk.leaderboards.subscribe('arcade',{onStatus:s=>{connected ||= s==='connected';},onUpdate:p=>{empty=p.entries.length===0;}});
+    const wait=async (condition:()=>boolean)=>{const deadline=Date.now()+15000;while(!condition()){assert.ok(Date.now()<deadline,'Admin broadcast convergence');await new Promise(r=>setTimeout(r,50));}};
+    try {
+      await wait(()=>connected);
+      const before=cli('admin','leaderboard','inspect','arcade','--local','--json');
+      cli('admin','leaderboard','reset','arcade','--local','--dry-run');
+      assert.equal(cli('admin','leaderboard','inspect','arcade','--local','--json'),before);
+      cli('admin','leaderboard','reset','arcade','--local','--yes','--reason','new competition','--operation-id','90000000-0000-4000-8000-000000000001','--expected-revision','0');
+      await wait(()=>empty);
+      assert.equal(await sdk.leaderboards.getMine('arcade'),null);
+      cli('admin','leaderboard','reset','arcade','--local','--yes','--reason','new competition','--operation-id','90000000-0000-4000-8000-000000000001','--expected-revision','0');
+      await sdk.leaderboards.submit('arcade',1);
+      assert.equal((await sdk.leaderboards.getMine('arcade'))?.score,1);
+      cli('admin','player','restrict',player.userId,'--local','--yes','--reason','test restriction');
+      await assert.rejects(sdk.leaderboards.submit('arcade',2),(e:unknown)=>e instanceof consumer.sdk.ApiError && e.code==='PLAYER_RESTRICTED');
+      cli('admin','player','reinstate',player.userId,'--local','--yes','--reason','appeal');
+      await sdk.leaderboards.submit('arcade',2);
+      const execute=promisify(execFile);
+      const reset=(id:string)=>execute(consumer.cli,['admin','leaderboard','reset','arcade','--local','--yes','--reason','concurrent competition','--operation-id',id,'--expected-revision','1','--workdir',project.root]);
+      const results=await Promise.allSettled([
+        reset('90000000-0000-4000-8000-000000000002'),
+        reset('90000000-0000-4000-8000-000000000003'),
+        sdk.leaderboards.submit('arcade',3),
+      ]);
+      assert.equal(results.slice(0,2).filter(r=>r.status==='fulfilled').length,1,'one concurrent reset wins');
+      assert.equal(results[2]?.status,'fulfilled','concurrent submission is accepted exactly once');
+      const inspected=JSON.parse(cli('admin','leaderboard','inspect','arcade','--local','--json'));
+      assert.equal(inspected[0].result.generation,3);
+      const score=await sdk.leaderboards.getMine('arcade');
+      assert.ok(score===null || score.score===3,'submission belongs wholly before or after reset');
+    } finally {sub.unsubscribe();await client.removeAllChannels();}
   });
 
 });

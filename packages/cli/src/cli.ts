@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { adminCommand } from './commands/admin.ts';
 import { configureAuth } from './commands/auth.ts';
 import { cleanupSaves } from './commands/saves-cleanup.ts';
 import { configureSaves } from './commands/saves-configure.ts';
@@ -45,7 +46,7 @@ local(program.command('config').description('Manage installation configuration')
 local(
   program.command('add').description('Stage a game services module').argument(
     '<module>',
-    'Module name: leaderboards, live-leaderboards, achievements or cloud-saves',
+    'Module name: leaderboards, live-leaderboards, achievements, cloud-saves or admin',
   ),
 )
   .action((module: string, options: LocalOptions) => add(module, options));
@@ -108,6 +109,18 @@ local(savesCommand.command('configure'))
   .action(configureSaves);
 local(program.command('upgrade').description('Stage known forward-only module upgrades locally'))
   .action((options: LocalOptions) => upgrade(options));
+const admin = program.command('admin').description('Trusted operator administration; requires optional Admin module');
+for (const [kind, verbs] of Object.entries({leaderboard:['list','inspect','reset','disable','enable'],score:['inspect','hide','restore'],player:['inspect','restrict','reinstate'],audit:['list'],doctor:['doctor']})) {
+ const group = kind === 'doctor' ? admin : admin.command(kind);
+ for (const verb of verbs) {
+  const cmd = local(group.command(verb)).option('--local','Use local database').option('--remote','Use hosted database')
+   .option('--project-ref <ref>','Exact matching hosted project').option('--reason <text>','Required modification reason')
+   .option('--generation <integer>','Inspect historical generation submissions').option('--operation-id <uuid>','Original operation UUID for retry').option('--expected-revision <integer>','Original revision for retry')
+   .option('--allow-remote','Explicit authorization for hosted modification').option('--yes','Explicit authorization for local modification').option('--json','Machine-readable inspection output');
+  if(!['list','doctor'].includes(verb)) cmd.argument('<target>').action((target,opts)=>adminCommand(kind as 'leaderboard'|'score'|'player',verb,target,opts));
+  else cmd.action(opts=>adminCommand(kind as 'leaderboard'|'audit'|'doctor',verb,undefined,opts));
+ }
+}
 if (process.argv.length === 2) program.help();
 try {
   await program.parseAsync();

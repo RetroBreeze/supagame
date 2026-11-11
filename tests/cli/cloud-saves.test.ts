@@ -232,7 +232,7 @@ it("upgrades an installed 0.1.2 Cloud Saves module additively, preserving old SQ
     expect(snapshot(root)).toEqual(before);
     const result = cli(root, "upgrade");
     expect(result.status, result.stderr).toBe(0);
-    expect(manifest(root).modules["cloud-saves"]).toBe("0.1.3");
+    expect(manifest(root).modules["cloud-saves"]).toBe("0.1.4");
     const after = snapshot(root);
     for (const [path, content] of Object.entries(before))
       if (path.includes("/migrations/") || path === "notes.txt")

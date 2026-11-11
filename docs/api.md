@@ -152,3 +152,9 @@ try {
 
 Other typed errors: `NetworkError`, `InvalidParameterError`, `UnexpectedResponseError`.
 See the [SDK README](../packages/sdk-ts/README.md) for browser/runtime details.
+
+With optional Admin installed, restricted players receive HTTP 403 with
+`code: "PLAYER_RESTRICTED"` when submitting scores. Admin's reset changes the
+active generation; discard old cursors after `INVALID_CURSOR` and reload the
+first page. Disabled Admin boards remain readable. See [Admin](admin.md) for
+history, moderation, restrictions and the separate trusted operator boundary.

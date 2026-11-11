@@ -6,9 +6,12 @@ export type ModuleName =
   | "leaderboards"
   | "live-leaderboards"
   | "achievements"
-  | "cloud-saves";
-export const MODULE_VERSION = "0.1.3";
+  | "cloud-saves"
+  | "admin";
+export const MODULE_VERSION = "0.1.4";
 export const moduleMigrations = [
+  ["modules/live-leaderboards/migrations/002_admin_reads.sql", "20261111000200_live_admin_reads.sql"],
+  ["modules/admin/migrations/001_admin.sql", "20261111000100_admin.sql"],
   [
     "modules/cloud-saves/migrations/007_save_revisions.sql",
     "20261110000306_save_revisions.sql",
@@ -84,13 +87,14 @@ export function currentInventory(files: readonly DesiredFile[]): Inventory {
     "live-leaderboards",
     "achievements",
     "cloud-saves",
+    "admin",
   ];
   const releases = names.map((module) => ({
     module,
     version: MODULE_VERSION,
-    previous: "0.1.2",
+    previous: module === "admin" ? undefined : "0.1.3",
     ...(module === "leaderboards" ? { requiresCore: MODULE_VERSION } : {}),
-    ...(["live-leaderboards", "achievements", "cloud-saves"].includes(module)
+    ...(["live-leaderboards", "achievements", "cloud-saves", "admin"].includes(module)
       ? { requiresLeaderboards: MODULE_VERSION }
       : {}),
     migrations: files
@@ -115,7 +119,7 @@ export function currentInventory(files: readonly DesiredFile[]): Inventory {
         ...release,
         version,
         previous:
-          version === "0.1.2" && module !== "cloud-saves"
+          version === "0.1.3" ? "0.1.2" : version === "0.1.2" && module !== "cloud-saves"
             ? "0.1.1"
             : version === "0.1.1" && module !== "achievements"
               ? "0.1.0"
@@ -143,7 +147,8 @@ export function currentInventory(files: readonly DesiredFile[]): Inventory {
       "live-leaderboards",
       "achievements",
     ]),
-    ...old("0.1.2", names),
+    ...old("0.1.2", names.filter(n => n !== "admin")),
+    ...old("0.1.3", names.filter(n => n !== "admin")),
     ...releases,
   ];
 }
@@ -187,6 +192,7 @@ export function validateInventory(inventory: Inventory): void {
         "live-leaderboards",
         "achievements",
         "cloud-saves",
+        "admin",
       ].includes(release.module)
     ) {
       throw new Error("Unknown inventory module.");

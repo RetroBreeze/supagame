@@ -1,3 +1,4 @@
+import { adminDoctorSql } from './admin.ts';
 import { inspectHostedConfiguration } from './doctor-hosted.ts';
 import type { Diagnostic } from '../commands/doctor.ts';
 import type { DeploymentState } from './deployment-state.ts';
@@ -43,6 +44,11 @@ export async function inspectLive(context: LiveInspection): Promise<void> {
       ...(context.remote ? { ref } : {}),
     });
     await inspector.version();
+    if (releases.some(r => r.module === 'admin')) {
+      const admin = await inspector.query(adminDoctorSql);
+      const healthy = Array.isArray(admin) && admin.length === 1 && object(admin[0]) && Object.entries(admin[0]).every(([key,value]) => key === 'module' || value === true);
+      report('database','admin-security',healthy ? 'healthy' : 'error','Admin private execution grants and RLS inspection.');
+    }
     const history = await inspector.json(['migration', 'list']);
     if (
       !object(history) || !Array.isArray(history.migrations) ||

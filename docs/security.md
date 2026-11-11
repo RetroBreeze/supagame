@@ -141,3 +141,10 @@ advisory. Reassess if linting untrusted glob configuration is introduced.
 The npm audit does not cover the separately locked Deno graph, container images,
 or hosted infrastructure. Existing local security regressions and source review
 are complementary checks, not a guarantee that no vulnerabilities exist.
+
+## Optional Admin
+
+See [Admin trust boundaries](admin.md#trust-boundaries-and-bootstrap). Operator
+credentials stay in the trusted Supabase CLI process. Private functions, RLS,
+revocable assignments, atomic audit records, operation IDs and administrative
+revisions protect the CLI workflow; no privileged browser endpoint is installed.

@@ -25,3 +25,9 @@ export type SaveMutation = components['schemas']['SaveMutation'];
 
 export type SaveRevision = components['schemas']['SaveRevision'];
 export type SaveRevisionList = components['schemas']['SaveRevisionList'];
+
+/** Trusted operator command contract; never send operator credentials to game clients. */
+export type AdminPermission = 'leaderboards.read' | 'leaderboards.manage' | 'scores.moderate' | 'players.restrict' | 'admins.manage' | 'audit.read';
+export type AdminAction = 'leaderboard.reset' | 'leaderboard.disable' | 'leaderboard.enable' | 'score.hide' | 'score.restore' | 'player.restrict' | 'player.reinstate';
+export interface AdminOperation { action: AdminAction; target: string; revision: number; operationId: string; reason: string }
+export interface AdminAuditRecord { operation_id: string; actor: string; action: AdminAction; target: string; target_type: string; created_at: string; reason: string; outcome: 'applied'; before_state: Record<string, unknown>; after_state: Record<string, unknown> }

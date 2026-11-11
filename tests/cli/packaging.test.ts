@@ -76,6 +76,9 @@ it(
 it('bundles only the versioned allowlist, excluding local or hidden module files', () => {
   const expected = [
     'deno.lock',
+    'modules/admin/migrations/001_admin.sql',
+    'modules/live-leaderboards/migrations/002_admin_reads.sql',
+    'modules/legacy/0.1.3.json',
     'modules/core/migrations/001_players.sql',
     'modules/core/migrations/002_player_functions.sql',
     'modules/leaderboards/migrations/001_leaderboards.sql',

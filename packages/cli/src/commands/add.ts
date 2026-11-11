@@ -6,9 +6,9 @@ import type { LocalOptions } from '../lib/project.ts';
 import { checkMigrationVersions, MODULE_VERSION, templateFiles, migrationModule } from '../lib/templates.ts';
 
 export function add(module: string, options: LocalOptions): void {
-  if (module !== 'leaderboards' && module !== 'live-leaderboards' && module !== 'achievements' && module !== 'cloud-saves') {
+  if (module !== 'leaderboards' && module !== 'live-leaderboards' && module !== 'achievements' && module !== 'cloud-saves' && module !== 'admin') {
     throw new Error(
-      `Unknown module '${module}'. Available modules: leaderboards, live-leaderboards, achievements, cloud-saves.`,
+      `Unknown module '${module}'. Available modules: leaderboards, live-leaderboards, achievements, cloud-saves, admin.`,
     );
   }
   const project = readProject(options);
@@ -29,6 +29,7 @@ export function add(module: string, options: LocalOptions): void {
     ...existing.value,
     modules: {
       ...existing.value.modules,
+      ...(module === 'admin' ? { admin: MODULE_VERSION } : {}),
       core: MODULE_VERSION,
       leaderboards: MODULE_VERSION,
       ...(module === 'cloud-saves' ? { 'cloud-saves': MODULE_VERSION } : {}),
@@ -36,7 +37,7 @@ export function add(module: string, options: LocalOptions): void {
       ...(module === 'live-leaderboards' ? { 'live-leaderboards': MODULE_VERSION } : {}),
     },
   };
-  const unchanged = (module !== 'cloud-saves' || existing.value.modules['cloud-saves'] === MODULE_VERSION) && (module !== 'achievements' || existing.value.modules.achievements === MODULE_VERSION) && (module !== 'live-leaderboards' || existing.value.modules[module] === MODULE_VERSION) && existing.value.modules.core === MODULE_VERSION &&
+  const unchanged = (module !== 'admin' || existing.value.modules.admin === MODULE_VERSION) && (module !== 'cloud-saves' || existing.value.modules['cloud-saves'] === MODULE_VERSION) && (module !== 'achievements' || existing.value.modules.achievements === MODULE_VERSION) && (module !== 'live-leaderboards' || existing.value.modules[module] === MODULE_VERSION) && existing.value.modules.core === MODULE_VERSION &&
     existing.value.modules.leaderboards === MODULE_VERSION;
   const plan = planFiles(project.root, [
     ...templateFiles().filter(f => { const module = migrationModule(f.path); return !module || !!value.modules[module]; }),

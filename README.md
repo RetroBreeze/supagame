@@ -853,3 +853,12 @@ project-owned and explicitly confirmed before hosted changes.
 Account linking and recovery: see [Accounts and save conflict resolution](docs/accounts.md)
 for Google setup, PKCE callbacks, durable guest snapshots, backups, custom merges and
 `supagame auth configure` / `supagame auth doctor`.
+
+### Optional CLI administration
+
+Install with `supagame add admin` after upgrading module templates. The optional
+module provides generation-based leaderboard resets, disable/enable, reversible
+score moderation, player submission restrictions and audit history. Every
+mutation requires a reason and explicit confirmation; all support read-only
+`--dry-run`. See [Admin documentation](docs/admin.md). No dashboard or public
+administrative endpoint is installed.

@@ -76,7 +76,7 @@ export function securityChecks(
     const where = `schemaname=${sqlLiteral(t.schema)} and tablename=${
       sqlLiteral(t.name)
     }`;
-    const qual = t.qual?.replace(/\s+/g, "");
+    const qual = (modules.includes("admin") && t.name === "game_leaderboards" ? "true" : t.qual)?.replace(/\s+/g, "");
     const expected = t.policy
       ? `pg_catalog.count(*)=1 and pg_catalog.bool_and(policyname=${
         sqlLiteral(t.policy)
@@ -98,8 +98,9 @@ export function securityChecks(
         `exists(select 1 from pg_catalog.pg_class c join pg_catalog.pg_roles r on r.rolname=${r} where c.oid=${oid} and not r.rolsuper and not r.rolbypassrls and not pg_catalog.pg_has_role(r.oid,c.relowner,'MEMBER') and not pg_catalog.has_table_privilege(${r},c.oid,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') and not pg_catalog.has_any_column_privilege(${r},c.oid,'INSERT,UPDATE,REFERENCES'))`,
         "Prohibited direct write/ownership/bypass privilege. Revoke unintended grants with a reviewed migration; never grant API roles direct writes.",
       );
-      const array = t.columns.length
-        ? `array[${t.columns.map(sqlLiteral).join(",")}]::pg_catalog.text[]`
+      const columns = [...t.columns, ...(modules.includes("admin") && t.name === "game_leaderboards" ? ["generation", "admin_revision"] : [])].sort();
+      const array = columns.length
+        ? `array[${columns.map(sqlLiteral).join(",")}]::pg_catalog.text[]`
         : "array[]::pg_catalog.text[]";
       add(
         t.module,
@@ -161,12 +162,12 @@ export function securityChecks(
   add(
     "live-leaderboards",
     "live:authorization",
-    `exists(select 1 from pg_catalog.pg_policies where schemaname='realtime' and tablename='messages' and policyname='supagame_live_receive' and cmd='SELECT' and roles=array['authenticated']::name[] and pg_catalog.regexp_replace(qual,'\\s+','','g')=${
+    `exists(select 1 from pg_catalog.pg_policies where schemaname='realtime' and tablename='messages' and policyname='supagame_live_receive' and cmd='SELECT' and roles=array['authenticated']::name[] and pg_catalog.regexp_replace(qual,'\\s+','','g') in (${
       sqlLiteral(
         "((extension = 'broadcast'::text) AND (EXISTS ( SELECT 1 FROM game_leaderboards b WHERE (b.enabled AND (realtime.topic() = ('supagame:leaderboard:'::text || b.id))))))"
           .replace(/\s+/g, ""),
       )
-    }) and exists(select 1 from pg_catalog.pg_policies where schemaname='realtime' and tablename='messages' and policyname='supagame_live_no_client_send' and cmd='INSERT' and permissive='RESTRICTIVE' and roles @> array['anon','authenticated']::name[] and pg_catalog.cardinality(roles)=2 and with_check=${
+    },${sqlLiteral("((extension = 'broadcast'::text) AND (EXISTS ( SELECT 1 FROM game_leaderboards b WHERE (realtime.topic() = ('supagame:leaderboard:'::text || b.id)))))".replace(/\s+/g,""))})) and exists(select 1 from pg_catalog.pg_policies where schemaname='realtime' and tablename='messages' and policyname='supagame_live_no_client_send' and cmd='INSERT' and permissive='RESTRICTIVE' and roles @> array['anon','authenticated']::name[] and pg_catalog.cardinality(roles)=2 and with_check=${
       sqlLiteral("(realtime.topic() !~~ 'supagame:leaderboard:%'::text)")
     })`,
     "Restore private receive authorization and restrictive client-send denial. Review other Realtime policies for broad receive access.",

@@ -123,3 +123,9 @@ anonymous Auth requires Auth configuration write access. Origin inspection/write
 requires Edge Function secrets read/write respectively. Migration/function deployment
 retains its existing permissions. Missing permissions fail closed with a remedy.
 Score bounds/rate limits remain abuse controls, not complete anti-cheat protection.
+
+## Admin
+
+`supagame add admin` stages optional administration with core/leaderboard
+dependencies. Use `supagame admin doctor --local` or an explicitly selected remote
+target to check it. See [commands, security and migration details](admin.md).

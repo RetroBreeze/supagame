@@ -15,7 +15,7 @@ export interface LeaderboardDefinition {
 export interface Manifest {
   formatVersion: 1;
   projectRef: string;
-  modules: Partial<Record<'core' | 'leaderboards' | 'live-leaderboards' | 'achievements' | 'cloud-saves', string>>;
+  modules: Partial<Record<'core' | 'leaderboards' | 'live-leaderboards' | 'achievements' | 'cloud-saves' | 'admin', string>>;
   leaderboards: LeaderboardDefinition[];
   origins?: string[];
   cloudSaves?: SaveLimits;
@@ -66,10 +66,11 @@ export function validateManifest(value: unknown): Manifest {
   ) throw invalid();
   for (const [module, version] of Object.entries(value.modules)) {
     if (
-      !['core', 'leaderboards', 'live-leaderboards', 'achievements', 'cloud-saves'].includes(module) ||
+      !['core', 'leaderboards', 'live-leaderboards', 'achievements', 'cloud-saves', 'admin'].includes(module) ||
       typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)
     ) throw invalid();
   }
+  if (value.modules.admin && !value.modules.leaderboards) throw invalid();
   if (value.modules['live-leaderboards'] && !value.modules.leaderboards) throw invalid();
   if (value.modules.leaderboards && !value.modules.core) throw invalid();
   if (
