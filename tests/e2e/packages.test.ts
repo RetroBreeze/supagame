@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { packedConsumer, run } from './packages.ts';
+import { packagedHostedOperator } from './admin-operator-transport.ts';
 test('CLI, contracts and SDK tarballs install and work outside the repository', { timeout: 300_000 }, async () => {
   const consumer = await packedConsumer();
   try {
@@ -12,5 +13,6 @@ test('CLI, contracts and SDK tarballs install and work outside the repository', 
     run(consumer.cli,['admin','dashboard','--help'],consumer.root);
     for(const file of ['index.html','app.js','style.css']) assert.ok(existsSync(join(consumer.root,'node_modules/@supagame/cli/dist/dashboard',file)));
     run(consumer.cli,['upgrade','--dry-run'],consumer.root);
+    await packagedHostedOperator(consumer.cli, consumer.root);
   } finally { consumer.remove(); }
 });

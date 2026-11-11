@@ -1,6 +1,6 @@
 # Local Admin Dashboard v1
 
-The dashboard is bundled with `@supagame/cli` 0.1.5. It administers **one configured
+The dashboard is bundled with `@supagame/cli` 0.1.6. It administers **one configured
 project per launch** using the existing optional Admin module. It does not deploy
 anything, install a hosted service or add public Edge Function endpoints. No new
 database migration is required; Admin module 0.1.4 remains unchanged.
@@ -25,7 +25,7 @@ pnpm build
 mkdir -p /tmp/supagame-dashboard-pack
 pnpm --filter @supagame/cli pack --pack-destination /tmp/supagame-dashboard-pack
 cd ~/Projects/vaccoin
-npm install --save-dev /tmp/supagame-dashboard-pack/supagame-cli-0.1.5.tgz
+npm install --save-dev /tmp/supagame-dashboard-pack/supagame-cli-0.1.6.tgz
 ```
 
 Use your game's package manager equivalent if it uses pnpm. The install updates
@@ -52,6 +52,13 @@ The CLI verifies the selected target, installed Admin security/migration state
 and operator role before starting. It prints the local address, environment,
 project ID/reference and a private **launch code**. Open the address and paste
 that code to unlock the dashboard. Merely opening localhost does not grant access.
+
+Hosted Supabase read-only queries run as `supabase_read_only_user`, even when
+the CLI is authenticated as a project operator. Startup therefore uses the same
+transport as Admin mutations for one fixed, side-effect-free permission SELECT.
+It requires `postgres` or `supabase_admin` **and** EXECUTE on `admin_apply`.
+The probe changes no data and needs no manually supplied database credentials.
+All ordinary reads and installation checks continue using `--read-only`.
 
 The project label is the configured `project_id`; the Supabase reference is the
 manifest's reference, checked against all existing link metadata. It is not a
@@ -188,6 +195,12 @@ sessions. Browser extensions are outside CSP's protection.
   authenticate with the existing CLI. Run `supagame admin doctor --remote
   --project-ref <ref>` (or `--local`). A player JWT or service-role API key is not
   sufficient for these operator-only functions.
+- **Doctor passes but CLI 0.1.5 dashboard denies the operator:** install CLI 0.1.6.
+  Version 0.1.5 incorrectly checked the hosted read-only role's Admin privileges.
+  Doctor verifies installation security; it does not prove operator authorization.
+- **Operator verification failed:** the fixed permission probe could not complete
+  or returned invalid JSON. Check Supabase CLI login, database query permissions
+  and network for the selected project. Raw subprocess diagnostics are withheld.
 - **Port in use:** choose another `--port`, and use that same port in your SSH tunnel.
 - **Host/Origin rejected:** use exactly the printed 127.0.0.1 URL or
   `http://localhost:<port>` through the tunnel. Do not use a LAN address or proxy.

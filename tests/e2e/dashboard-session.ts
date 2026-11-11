@@ -1,7 +1,11 @@
 import { spawn } from "node:child_process";
 import { createServer } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
-export async function dashboardSession(cli: string, root: string) {
+export async function dashboardSession(
+  cli: string,
+  root: string,
+  options: { remote?: boolean; env?: NodeJS.ProcessEnv } = {},
+) {
   const probe = createServer();
   await new Promise<void>((resolve) => probe.listen(0, "127.0.0.1", resolve));
   const address = probe.address();
@@ -11,12 +15,10 @@ export async function dashboardSession(cli: string, root: string) {
   const child = spawn(cli, [
     "admin",
     "dashboard",
-    "--local",
+    options.remote ? "--remote" : "--local",
     "--port",
     String(port),
-    "--workdir",
-    root,
-  ], { stdio: ["ignore", "pipe", "pipe"] });
+  ], { cwd: root, stdio: ["ignore", "pipe", "pipe"], env: options.env ?? process.env });
   let output = "", exited = false;
   child.stdout.on("data", (b) => {
     output += b.toString();

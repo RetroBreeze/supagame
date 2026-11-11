@@ -6,6 +6,7 @@ import {
   openAdminService,
   resolveAdminTarget,
 } from "../../packages/cli/src/lib/admin-service.ts";
+import type { ProcessRunner } from "../../packages/cli/src/lib/supabase-cli.ts";
 const roots: string[] = [];
 function fixture() {
   const root = project();
@@ -143,4 +144,78 @@ it("fails closed on incomplete Admin security inspection results", async () => {
   } finally {
     service.close();
   }
+});
+
+const healthyAdmin = [{
+  module: "admin", installed: true, restricted_execution: true, rls: true,
+  migration_applied: true, private_functions: true, private_tables: true,
+}];
+function hostedTransport(operatorResponse = '[{"permitted":true}]', splitRoles = true) {
+  const calls: { args: readonly string[]; cwd: string }[] = [];
+  const run: ProcessRunner = async (args, cwd) => {
+    calls.push({ args, cwd });
+    const stdout = args[0] === "--version" ? "3.0.0"
+      : args[0] === "migration" ? JSON.stringify({
+        target: { kind: "linked", project_ref: "abcdefghijklmnopqrst" }, migrations: [],
+      })
+      : args[2]?.includes("current_user in")
+      // Supabase 3.0.0 hosted read_only executes as supabase_read_only_user,
+      // even when the same operator credentials authorize normal queries as postgres.
+      ? splitRoles && args.includes("--read-only") ? '[{"permitted":false}]' : operatorResponse
+      : args[2]?.startsWith("select sg_private.admin_apply(") ? '[{"result":{"generation":2}}]'
+      : JSON.stringify(healthyAdmin);
+    return { code: 0, stderr: "", stdout };
+  };
+  return { calls, run };
+}
+it("verifies the hosted mutation operator instead of the read-only query role", async () => {
+  const { run, calls } = hostedTransport();
+  const service = await openAdminService({ workdir: fixture(), remote: true }, run);
+  try {
+    await expect(service.verify()).resolves.toEqual(healthyAdmin);
+    await service.query("select 1");
+    await service.execute({ action: "leaderboard.reset", target: "test", revision: 0,
+      operationId: "90000000-0000-4000-8000-000000000021", reason: "test" });
+    const queries = calls.filter(({ args }) => args[0] === "db");
+    const operator = queries.find(({ args }) => args[2]?.includes("current_user in"))!;
+    const mutation = queries.at(-1)!;
+    expect(operator.args.slice(3)).toEqual(mutation.args.slice(3));
+    expect(operator.cwd).toBe(mutation.cwd);
+    expect(operator.args).toContain("--yes");
+    expect(operator.args).not.toContain("--read-only");
+    for (const call of queries) {
+      expect(call.args).toContain("--remote=abcdefghijklmnopqrst");
+      expect(call.args).not.toContain("--db-url");
+      if (call !== operator && call !== mutation) {
+        expect(call.args).toContain("--read-only");
+        expect(call.args).not.toContain("--yes");
+      }
+    }
+  } finally { service.close(); }
+});
+it.each([
+  '[{"permitted":false}]', '[{"permitted":"true"}]', '[{"permitted":1}]',
+  '[{"permitted":null}]', '[{}]', '[]', '{}',
+  '[{"permitted":true},{"permitted":false}]',
+])("fails closed on an untrusted or ambiguous operator result: %s", async (response) => {
+  const transport = hostedTransport(response, false);
+  const service = await openAdminService({ workdir: fixture(), remote: true }, transport.run);
+  try {
+    await expect(service.verify()).rejects.toMatchObject({ code: "ADMIN_DENIED", status: 403 });
+  } finally { service.close(); }
+});
+it.each(["failure", "throw", "invalid JSON"])("sanitizes an unavailable operator probe: %s", async (mode) => {
+  const transport = hostedTransport();
+  const service = await openAdminService({ workdir: fixture(), remote: true }, async (args, cwd) => {
+    if (!args[2]?.includes("current_user in")) return transport.run(args, cwd);
+    if (mode === "throw") throw new Error("private subprocess diagnostic");
+    return { code: mode === "failure" ? 1 : 0, stdout: "private subprocess diagnostic", stderr: "private subprocess diagnostic" };
+  });
+  try {
+    await expect(service.verify()).rejects.toMatchObject({
+      code: "OPERATOR_CHECK_FAILED", status: 503,
+      message: expect.stringContaining("operator verification"),
+    });
+    await expect(service.verify()).rejects.not.toThrow("private subprocess diagnostic");
+  } finally { service.close(); }
 });

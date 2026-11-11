@@ -155,15 +155,31 @@ export async function openAdminService(
           403,
         );
       }
-      const role = await query(
-        "select current_user in ('postgres','supabase_admin') and has_function_privilege(current_user,'sg_private.admin_apply(text,text,bigint,uuid,text)','execute') as permitted",
-      );
+      // Hosted --read-only uses supabase_read_only_user, even for an operator.
+      // Check the same transport/role as execute(), using only this fixed,
+      // side-effect-free catalog SELECT. Ordinary reads retain --read-only.
+      revalidate();
+      let role: unknown;
+      try {
+        role = await inspector.json([
+          "db", "query",
+          "select current_user in ('postgres','supabase_admin') and has_function_privilege(current_user,'sg_private.admin_apply(text,text,bigint,uuid,text)','execute') as permitted",
+          "--yes",
+        ], true);
+      } catch {
+        throw new AdminFailure(
+          "OPERATOR_CHECK_FAILED",
+          "Supabase operator verification failed. Check CLI login, database query permissions and network for the selected project; raw diagnostics withheld.",
+          503,
+        );
+      }
       if (
-        !Array.isArray(role) || !object(role[0]) || role[0].permitted !== true
+        !Array.isArray(role) || role.length !== 1 || !object(role[0]) ||
+        role[0].permitted !== true
       ) {
         throw new AdminFailure(
           "ADMIN_DENIED",
-          "A trusted Supabase project operator is required.",
+          "A trusted Supabase project operator with Admin execution permission is required. Admin doctor checks installation security, not operator authorization.",
           403,
         );
       }

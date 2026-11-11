@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — CLI 0.1.6
+
+- Fixed hosted Admin Dashboard startup rejecting valid operators: the fixed
+  permission SELECT now uses the same operator transport as Admin CLI mutations,
+  rather than Supabase's separate read-only database role.
+- Retained role/EXECUTE checks, read-only data queries and immutable project
+  selection; reject ambiguous authorization results and sanitize probe failures.
+- Added hosted transport regressions for source and freshly packaged execution,
+  plus real PostgreSQL role/privilege checks. No migration or deployment required.
+
 ## Unreleased — CLI 0.1.5
 
 - Bundled local Admin Dashboard with single-project resolution and explicit local/remote mode.
