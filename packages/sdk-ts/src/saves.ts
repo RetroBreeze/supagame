@@ -1,10 +1,12 @@
-import type { AccountSaves as importAccountSaves } from './account-saves.js';
+import type { AccountSaves as importAccountSaves } from "./account-saves.js";
 import type {
   SaveRecord,
   SaveResult,
   SaveList,
   SaveUpload,
   SaveObjects,
+  SaveRevision,
+  SaveRevisionList,
 } from "@supagame/contracts";
 import type { Session } from "@supabase/supabase-js";
 import { requireSession, type SupabaseConnection } from "./auth.js";
@@ -19,22 +21,40 @@ import {
 import { operationId, validateJson, type JsonValue } from "./save-values.js";
 
 export interface SaveOptions {
+  /** Atomically retain the previous cloud revision; fails closed on older servers. */
+  backupExisting?: boolean;
   expectedPlayerId?: string;
   expectedRevision?: number;
   operationId?: string;
   schemaVersion?: number;
   metadata?: Record<string, JsonValue>;
 }
+export type RestoreRevisionOptions = Pick<
+  SaveOptions,
+  "expectedPlayerId" | "operationId"
+> & { expectedRevision: number };
 export type Saved<T = unknown> = Omit<SaveRecord, "data"> & { data?: T };
 export interface Saves extends importAccountSaves {
   save<T>(slot: string, data: T, options?: SaveOptions): Promise<Saved<T>>;
   load<T = unknown>(slot: string): Promise<Saved<T>>;
   list(): Promise<SaveRecord[]>;
+  listRevisions(slot: string): Promise<SaveRevision[]>;
+  loadRevision<T = unknown>(slot: string, revision: number): Promise<Saved<T>>;
+  loadBinaryRevision(
+    slot: string,
+    revision: number,
+    options?: { maxBytes?: number },
+  ): Promise<{ save: SaveRecord; data: Blob }>;
+  restoreRevision(
+    slot: string,
+    revision: number,
+    options: RestoreRevisionOptions,
+  ): Promise<SaveRecord>;
   delete(
     slot: string,
     options?: Pick<
       SaveOptions,
-      "expectedRevision" | "operationId" | "expectedPlayerId"
+      "expectedRevision" | "operationId" | "expectedPlayerId" | "backupExisting"
     >,
   ): Promise<SaveRecord>;
   saveBinary(
@@ -42,7 +62,10 @@ export interface Saves extends importAccountSaves {
     data: Blob,
     options?: SaveOptions,
   ): Promise<SaveRecord>;
-  loadBinary(slot: string, options?: {maxBytes?: number; expectedRevision?: number}): Promise<{ save: SaveRecord; data: Blob }>;
+  loadBinary(
+    slot: string,
+    options?: { maxBytes?: number; expectedRevision?: number },
+  ): Promise<{ save: SaveRecord; data: Blob }>;
   abortBinary(slot: string, operationId: string): Promise<void>;
   cleanup(): Promise<number>;
 }
@@ -104,6 +127,9 @@ export function createSaves(
       expectedRevision:
         options.expectedRevision ?? revisions.get(key(session, slot)) ?? 0,
       operationId: id,
+      ...(options.backupExisting !== undefined
+        ? { backupExisting: options.backupExisting }
+        : {}),
       ...(action !== "delete"
         ? {
             schemaVersion: options.schemaVersion ?? 1,
@@ -133,6 +159,51 @@ export function createSaves(
       if (error instanceof GameServicesError) error.operationId = id;
       throw error;
     }
+  }
+  async function revisionRequest<T>(
+    session: Session,
+    slot: string,
+    body: object,
+    schema: "SaveResult" | "SaveRevisionList",
+  ) {
+    if (!matches("SaveMutation", body))
+      throw new InvalidParameterError(
+        "revision",
+        "Use a positive backup revision and an explicit nonnegative current revision for restoration.",
+      );
+    const result = await transport.request<T>(slotPath(slot), "POST", schema, {
+      session,
+      body,
+    });
+    await same(session);
+    return result;
+  }
+  async function download(
+    session: Session,
+    save: SaveRecord,
+    maxBytes?: number,
+  ) {
+    if (
+      maxBytes !== undefined &&
+      (!Number.isSafeInteger(maxBytes) ||
+        maxBytes < 1 ||
+        save.sizeBytes > maxBytes)
+    )
+      throw new InvalidParameterError(
+        "maxBytes",
+        "Binary save exceeds the bounded download budget. Source data is unchanged.",
+      );
+    if (
+      save.kind !== "binary" ||
+      !save.objectPath ||
+      !save.objectPath.startsWith(`${session.user.id}/`)
+    )
+      throw new InvalidParameterError("slot", "This is not a binary save.");
+    await same(session);
+    const result = await storage().download(save.objectPath);
+    if (result.error) storageFailure(result.error);
+    await same(session);
+    return { save, data: result.data! };
   }
   const api: Omit<Saves, keyof importAccountSaves> = {
     async save(slot, data, options = {}) {
@@ -170,6 +241,69 @@ export function createSaves(
       await same(session);
       return result.slots;
     },
+    async listRevisions(slot) {
+      const session = await requireSession(client);
+      return (
+        await revisionRequest<SaveRevisionList>(
+          session,
+          slot,
+          { action: "revisions" },
+          "SaveRevisionList",
+        )
+      ).revisions;
+    },
+    async loadRevision<T>(slot: string, revision: number) {
+      const session = await requireSession(client);
+      return (
+        await revisionRequest<SaveResult>(
+          session,
+          slot,
+          { action: "loadRevision", revision },
+          "SaveResult",
+        )
+      ).save as Saved<T>;
+    },
+    async loadBinaryRevision(slot, revision, options = {}) {
+      const session = await requireSession(client);
+      const result = await revisionRequest<SaveResult>(
+        session,
+        slot,
+        { action: "loadRevision", revision },
+        "SaveResult",
+      );
+      return download(
+        session,
+        result.save,
+        options.maxBytes ?? 64 * 1024 * 1024,
+      );
+    },
+    async restoreRevision(slot, revision, options) {
+      const session = await requireSession(client);
+      if (
+        options.expectedPlayerId !== undefined &&
+        options.expectedPlayerId !== session.user.id
+      )
+        throw new AuthenticationError("The save belongs to another player.");
+      const id = options.operationId ?? operationId();
+      try {
+        const result = await revisionRequest<SaveResult>(
+          session,
+          slot,
+          {
+            action: "restore",
+            revision,
+            expectedRevision: options.expectedRevision,
+            operationId: id,
+          },
+          "SaveResult",
+        );
+        revisions.set(key(session, slot), result.save.revision);
+        return result.save;
+      } catch (error) {
+        if (error instanceof GameServicesError) error.operationId = id;
+        throw error;
+      }
+    },
     async delete(slot, options = {}) {
       const session = await requireSession(client);
       return ((await mutate(slot, "delete", session, options)) as SaveResult)
@@ -198,6 +332,9 @@ export function createSaves(
         // with the union-compatible path below rather than allocating another object.
         const payload = {
           action: "prepare",
+          ...(options.backupExisting !== undefined
+            ? { backupExisting: options.backupExisting }
+            : {}),
           expectedRevision:
             options.expectedRevision ?? revisions.get(key(session, slot)) ?? 0,
           operationId: id,
@@ -269,19 +406,25 @@ export function createSaves(
     async loadBinary(slot, options = {}) {
       const session = await requireSession(client);
       const save = await api.load(slot);
-      if (options.maxBytes !== undefined && (!Number.isSafeInteger(options.maxBytes) || options.maxBytes < 1 || save.sizeBytes > options.maxBytes)) throw new InvalidParameterError('maxBytes', 'Binary save exceeds the bounded download budget. Source data is unchanged.');
-      if (options.expectedRevision !== undefined && save.revision !== options.expectedRevision) throw new SaveConflictError(save, 'Binary save changed before download. Prepare the snapshot again.');
       if (
-        save.kind !== "binary" ||
-        !save.objectPath ||
-        !save.objectPath.startsWith(`${session.user.id}/`)
+        options.maxBytes !== undefined &&
+        (!Number.isSafeInteger(options.maxBytes) ||
+          options.maxBytes < 1 ||
+          save.sizeBytes > options.maxBytes)
       )
-        throw new InvalidParameterError("slot", "This is not a binary save.");
-      await same(session);
-      const result = await storage().download(save.objectPath);
-      if (result.error) storageFailure(result.error);
-      await same(session);
-      return { save, data: result.data! };
+        throw new InvalidParameterError(
+          "maxBytes",
+          "Binary save exceeds the bounded download budget. Source data is unchanged.",
+        );
+      if (
+        options.expectedRevision !== undefined &&
+        save.revision !== options.expectedRevision
+      )
+        throw new SaveConflictError(
+          save,
+          "Binary save changed before download. Prepare the snapshot again.",
+        );
+      return download(session, save, options.maxBytes);
     },
     async abortBinary(slot, id) {
       const session = await requireSession(client);

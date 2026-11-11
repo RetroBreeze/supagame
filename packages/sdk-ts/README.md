@@ -170,3 +170,15 @@ to preserve the guest ID; use `players.signInWithProvider` explicitly for accoun
 recovery. Stage progress with `saves.prepareAccountSwitch`, inspect after authentication,
 and resolve with Keep Cloud, Keep Guest, Cancel or a game-specific merge callback.
 Backups are durable on the preparing device; no scores or achievements are migrated.
+
+Server-side recovery: account replacements now require `backupExisting: true` internally.
+Use `saves.listRevisions(slot)`, `loadRevision(slot, revision)`,
+`loadBinaryRevision(slot, revision, {maxBytes})` and
+`restoreRevision(slot, revision, {expectedRevision, operationId, expectedPlayerId})`.
+Five backups per slot are retained for up to 30 days, within existing quotas. Restoration
+backs up the current valid save and checks its revision. See [recovery](../../docs/accounts.md#backups-and-recovery).
+
+`strategy: 'defer'` returns `status: 'deferred'` and leaves the authenticated target signed
+in. The deprecated `cancel` alias has the same behavior. To stop authentication *before*
+callback exchange while the original session still exists, use
+`players.cancelAuthFlow(flowId)`; it does not restore departed guest credentials.

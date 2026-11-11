@@ -22,3 +22,6 @@ export type SaveList = components['schemas']['SaveList'];
 export type SaveUpload = components['schemas']['SaveUpload'];
 export type SaveObjects = components['schemas']['SaveObjects'];
 export type SaveMutation = components['schemas']['SaveMutation'];
+
+export type SaveRevision = components['schemas']['SaveRevision'];
+export type SaveRevisionList = components['schemas']['SaveRevisionList'];

@@ -503,6 +503,7 @@ paths:
                   - $ref: "#/components/schemas/SaveResult"
                   - $ref: "#/components/schemas/SaveUpload"
                   - $ref: "#/components/schemas/SaveObjects"
+                  - $ref: "#/components/schemas/SaveRevisionList"
         "400":
           description: ApiError
           content:
@@ -551,7 +552,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
-      description: JSON save/delete, or binary prepare/commit/abort. Prepare returns
+      description: JSON save/delete, binary prepare/commit/abort, or revisions/loadRevision/restore.
+        backupExisting=true archives the displaced valid save transactionally (five per slot,
+        30 days, counted against player quota). Restore always archives the current save.
+        Revisions returns SaveRevisionList; loadRevision returns SaveResult. Prepare returns
         SaveUpload; abort returns SaveObjects. expectedRevision=0 is
         create-only. Every successful mutation is idempotent by operationId.
       requestBody:
@@ -910,6 +914,29 @@ components:
           type: array
           items:
             type: string
+    SaveRevision:
+      type: object
+      additionalProperties: false
+      required: [save, archivedAt, expiresAt]
+      properties:
+        save:
+          $ref: "#/components/schemas/SaveRecord"
+        archivedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+    SaveRevisionList:
+      type: object
+      additionalProperties: false
+      required: [revisions]
+      properties:
+        revisions:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/SaveRevision"
     SaveMutation:
       oneOf:
         - type: object
@@ -925,6 +952,8 @@ components:
             action:
               const: save
               type: string
+            backupExisting:
+              type: boolean
             expectedRevision: &a4
               type: integer
               minimum: 0
@@ -950,6 +979,8 @@ components:
             action:
               const: delete
               type: string
+            backupExisting:
+              type: boolean
             expectedRevision: *a4
             operationId: *a5
         - type: object
@@ -966,6 +997,8 @@ components:
             action:
               const: prepare
               type: string
+            backupExisting:
+              type: boolean
             expectedRevision: *a4
             operationId: *a5
             schemaVersion: *a6
@@ -996,6 +1029,34 @@ components:
             action:
               const: abort
               type: string
+            operationId: *a5
+        - type: object
+          additionalProperties: false
+          required: [action]
+          properties:
+            action:
+              type: string
+              const: revisions
+        - type: object
+          additionalProperties: false
+          required: [action, revision]
+          properties:
+            action:
+              type: string
+              const: loadRevision
+            revision: &backupRevision
+              type: integer
+              minimum: 1
+              maximum: 9007199254740991
+        - type: object
+          additionalProperties: false
+          required: [action, revision, expectedRevision, operationId]
+          properties:
+            action:
+              type: string
+              const: restore
+            revision: *backupRevision
+            expectedRevision: *a4
             operationId: *a5
     SavePreparation:
       oneOf:

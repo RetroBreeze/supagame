@@ -7,8 +7,12 @@ export type ModuleName =
   | "live-leaderboards"
   | "achievements"
   | "cloud-saves";
-export const MODULE_VERSION = "0.1.2";
+export const MODULE_VERSION = "0.1.3";
 export const moduleMigrations = [
+  [
+    "modules/cloud-saves/migrations/007_save_revisions.sql",
+    "20261110000306_save_revisions.sql",
+  ],
   [
     "modules/cloud-saves/migrations/006_save_throttling.sql",
     "20261110000305_save_throttling.sql",
@@ -84,7 +88,7 @@ export function currentInventory(files: readonly DesiredFile[]): Inventory {
   const releases = names.map((module) => ({
     module,
     version: MODULE_VERSION,
-    ...(module !== "cloud-saves" ? { previous: "0.1.1" } : {}),
+    previous: "0.1.2",
     ...(module === "leaderboards" ? { requiresCore: MODULE_VERSION } : {}),
     ...(["live-leaderboards", "achievements", "cloud-saves"].includes(module)
       ? { requiresLeaderboards: MODULE_VERSION }
@@ -111,9 +115,14 @@ export function currentInventory(files: readonly DesiredFile[]): Inventory {
         ...release,
         version,
         previous:
-          version === "0.1.1" && module !== "achievements"
-            ? "0.1.0"
-            : undefined,
+          version === "0.1.2" && module !== "cloud-saves"
+            ? "0.1.1"
+            : version === "0.1.1" && module !== "achievements"
+              ? "0.1.0"
+              : undefined,
+        migrations: release.migrations.filter((f) =>
+          snapshot.some((old) => old.path === f.path),
+        ),
         ...(release.requiresCore ? { requiresCore: version } : {}),
         ...(release.requiresLeaderboards
           ? { requiresLeaderboards: version }
@@ -134,6 +143,7 @@ export function currentInventory(files: readonly DesiredFile[]): Inventory {
       "live-leaderboards",
       "achievements",
     ]),
+    ...old("0.1.2", names),
     ...releases,
   ];
 }

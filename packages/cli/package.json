@@ -1,6 +1,6 @@
 {
   "name": "@supagame/cli",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Provision Supabase Game Services in your own project",
   "type": "module",

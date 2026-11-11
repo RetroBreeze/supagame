@@ -166,5 +166,26 @@ it('imports guest JSON and binary into an authenticated permanent account throug
  expect(await(await targetGame.saves.loadBinary('binary')).data.text()).toBe('guest binary');
  expect((await services.saves.load('state')).data).toEqual({coins:11});
  const backup=await switched.saves.getAccountSwitchRecovery(transition);expect(await backup.slots.find(s=>s.slot==='binary')?.cloud?.binary?.text()).toBe('cloud binary');
- for(const api of [services.saves,targetGame.saves]){await api.delete('state',{expectedRevision:api===services.saves?1:2});await api.delete('binary',{expectedRevision:api===services.saves?1:2});await api.cleanup();}
+ // A fresh SDK with no transition store can recover everything from the server.
+ const recovered=createGameServices({supabase:target}).saves;
+ expect((await recovered.listRevisions('state')).map(r=>r.save.revision)).toEqual([1]);
+ expect((await recovered.loadRevision('state',1)).data).toEqual({coins:30});
+ expect(await(await recovered.loadBinaryRevision('binary',1)).data.text()).toBe('cloud binary');
+ expect(await services.saves.listRevisions('state')).toEqual([]);
+ await expect(services.saves.loadRevision('state',1)).rejects.toMatchObject({code:'SAVE_NOT_FOUND'});
+ const archivedBinary=(await recovered.listRevisions('binary'))[0]!.save;
+ expect((await guest.storage.from('supagame-saves').download(archivedBinary.objectPath!)).error).not.toBeNull();
+ await recovered.cleanup();
+ expect(await(await recovered.loadBinaryRevision('binary',1)).data.text()).toBe('cloud binary');
+ const restoreId=crypto.randomUUID();
+ expect((await recovered.restoreRevision('state',1,{expectedRevision:2,operationId:restoreId})).revision).toBe(3);
+ expect((await recovered.restoreRevision('state',1,{expectedRevision:2,operationId:restoreId})).revision).toBe(3);
+ expect((await recovered.loadRevision('state',2)).data).toEqual({coins:12});
+ await expect(recovered.restoreRevision('state',2,{expectedRevision:2})).rejects.toMatchObject({code:'SAVE_CONFLICT',current:{revision:3}});
+ expect((await recovered.restoreRevision('binary',1,{expectedRevision:2})).revision).toBe(3);
+ expect(await(await recovered.loadBinary('binary')).data.text()).toBe('cloud binary');
+ expect(await(await recovered.loadBinaryRevision('binary',2)).data.text()).toBe('guest binary');
+ query(`update sg_private.save_revisions set expires_at=now()-interval '1 second' where user_id='${signed.data.user!.id}'`);
+ for(const api of [services.saves,targetGame.saves]){await api.delete('state',{expectedRevision:api===services.saves?1:3});await api.delete('binary',{expectedRevision:api===services.saves?1:3});await api.cleanup();await api.cleanup();}
+
 },30000);

@@ -33,7 +33,9 @@ export interface SwitchReview {
   slots: SwitchSlot[];
   previousReviews?: SwitchSlot[][];
 }
-export type SwitchStrategy = "keepCloud" | "keepGuest" | "merge" | "cancel";
+/** defer pauses save resolution; authentication is unchanged. cancel is a deprecated alias. */
+export type SwitchStrategy =
+  "keepCloud" | "keepGuest" | "merge" | "defer" | "cancel";
 export interface ResolveSwitchOptions {
   strategy: SwitchStrategy;
   targetPlayerId: string;
@@ -43,7 +45,7 @@ export interface ResolveSwitchOptions {
   merge?: (slot: SwitchSlot) => TransferSave | Promise<TransferSave>;
 }
 export interface SwitchResult {
-  status: "complete" | "cancelled";
+  status: "complete" | "deferred";
   strategy: SwitchStrategy;
   targetPlayerId: string;
   completedSlots: string[];
@@ -228,7 +230,10 @@ export function createAccountSaves(
         "Save exceeds the 64 MiB transfer limit. Source data is unchanged.",
       );
     if (record.kind === "binary" && !record.deleted) {
-      const result = await saves.loadBinary(slot, {maxBytes:MAX_FILE, expectedRevision:record.revision});
+      const result = await saves.loadBinary(slot, {
+        maxBytes: MAX_FILE,
+        expectedRevision: record.revision,
+      });
       if (result.save.revision !== record.revision)
         throw new AccountError(
           "SNAPSHOT_CHANGED",
@@ -383,7 +388,7 @@ export function createAccountSaves(
             "Explicit consent and recoverable backups are required.",
           );
         if (
-          !["keepCloud", "keepGuest", "merge", "cancel"].includes(
+          !["keepCloud", "keepGuest", "merge", "defer", "cancel"].includes(
             options.strategy,
           )
         )
@@ -393,10 +398,10 @@ export function createAccountSaves(
             "RESOLUTION_STARTED",
             "Resume the already selected resolution; its journal and backups are preserved.",
           );
-        if (options.strategy === "cancel")
+        if (options.strategy === "cancel" || options.strategy === "defer")
           return {
-            status: "cancelled",
-            strategy: "cancel",
+            status: "deferred",
+            strategy: options.strategy,
             targetPlayerId: options.targetPlayerId,
             completedSlots: [],
           };
@@ -462,6 +467,7 @@ export function createAccountSaves(
           await current(options.targetPlayerId);
           size(w.value);
           const settings: SaveOptions = {
+            backupExisting: true,
             expectedPlayerId: options.targetPlayerId,
             expectedRevision: w.expectedRevision,
             operationId: w.operationId,

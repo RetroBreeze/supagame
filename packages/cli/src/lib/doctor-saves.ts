@@ -16,6 +16,7 @@ export function saveSecurityChecks(): SecurityCheck[] {
     "sg_private.save_config",
     "sg_private.save_objects",
     "sg_private.save_operations",
+    "sg_private.save_revisions",
   ]) {
     add(
       `saves:rls:${table}`,
@@ -26,6 +27,12 @@ export function saveSecurityChecks(): SecurityCheck[] {
         `saves:writes:${role}:${table}`,
         `not has_table_privilege('${role}','${table}','INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') and not has_any_column_privilege('${role}','${table}','INSERT,UPDATE,REFERENCES')`,
       );
+  }
+  for (const role of ["anon", "authenticated", "service_role"]) {
+    add(
+      `saves:recovery-private:${role}`,
+      `not has_table_privilege('${role}','sg_private.save_revisions','SELECT') and not has_function_privilege('${role}','sg_private.prune_save_revisions(uuid)','EXECUTE')`,
+    );
   }
   add(
     "saves:owner-policy",

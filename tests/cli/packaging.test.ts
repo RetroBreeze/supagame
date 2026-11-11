@@ -89,12 +89,14 @@ it('bundles only the versioned allowlist, excluding local or hidden module files
     'modules/achievements/migrations/001_achievements.sql',
     'modules/legacy/0.1.0.json',
     'modules/legacy/0.1.1.json',
+    'modules/legacy/0.1.2.json',
     'modules/cloud-saves/migrations/001_cloud_saves.sql',
     'modules/cloud-saves/migrations/002_binary_integrity.sql',
     'modules/cloud-saves/migrations/003_upload_quota_guard.sql',
     'modules/cloud-saves/migrations/004_storage_preflight.sql',
     'modules/cloud-saves/migrations/005_garbage_collection.sql',
     'modules/cloud-saves/migrations/006_save_throttling.sql',
+    'modules/cloud-saves/migrations/007_save_revisions.sql',
   ].sort();
   expect(Object.keys(snapshot(join(tool, 'dist/assets'))).sort()).toEqual(expected);
 });

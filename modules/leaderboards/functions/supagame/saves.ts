@@ -27,17 +27,28 @@ export async function saveCall(request: Request, slot: string): Promise<RpcCall>
     ],
     commit: ['action', 'operationId'],
     abort: ['action', 'operationId'],
+    revisions: ['action'],
+    loadRevision: ['action', 'revision'],
+    restore: ['action', 'revision', 'expectedRevision', 'operationId'],
   };
   const action = value.action;
-  const expected = typeof action === 'string' && Object.hasOwn(fields, action)
+  let expected = typeof action === 'string' && Object.hasOwn(fields, action)
     ? fields[action]
     : undefined;
   if (
+    expected && ['save', 'delete', 'prepare'].includes(String(action)) &&
+    Object.hasOwn(value, 'backupExisting')
+  ) {
+    if (typeof value.backupExisting !== 'boolean') throw new ApiFailure('INVALID_SAVE');
+    expected = [...expected, 'backupExisting'];
+  }
+  if (
     !expected || Object.keys(value).length !== expected.length ||
-    !expected.every((key) => Object.hasOwn(value, key)) || typeof value.operationId !== 'string' ||
-    !UUID.test(value.operationId)
+    !expected.every((key) => Object.hasOwn(value, key)) ||
+    (expected.includes('operationId') &&
+      (typeof value.operationId !== 'string' || !UUID.test(value.operationId)))
   ) throw new ApiFailure('INVALID_SAVE');
-  for (const key of ['expectedRevision', 'schemaVersion', 'sizeBytes']) {
+  for (const key of ['expectedRevision', 'schemaVersion', 'sizeBytes', 'revision']) {
     if (
       Object.hasOwn(value, key) &&
       (typeof value[key] !== 'number' || !Number.isSafeInteger(value[key]) ||

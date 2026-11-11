@@ -120,7 +120,7 @@ After displaying both versions and receiving the player's explicit choice:
 
 ```ts
 const result = await game.saves.resolveAccountSwitch(transition, {
-  strategy: 'keepGuest', // 'keepCloud', 'keepGuest', 'merge', or 'cancel'
+  strategy: 'keepGuest', // 'keepCloud', 'keepGuest', 'merge', or 'defer'
   targetPlayerId: review.targetPlayerId,
   confirmed: true,
   backupExisting: true, // Backups are mandatory; false is rejected.
@@ -136,10 +136,26 @@ const result = await game.saves.resolveAccountSwitch(transition, {
   revision checks. The original guest account and its server records are untouched.
 - **Merge:** invokes the developer's resolver, validates the returned JSON/Blob and
   persists the chosen payload and operation ID before attempting writes.
-- **Cancel:** makes no save writes and retains the snapshot. It does not undo OAuth or
-  recover a departed guest's credentials. The player remains signed into the account
-  they just authenticated; keep the conflict UI/gameplay paused until they choose how
-  to continue or explicitly sign out.
+- **Defer:** makes no save writes and retains the snapshot. The result is
+  `status: 'deferred'` and `targetPlayerId` is still authenticated. Label this **Decide
+  later / stay signed in**, never “Cancel account switch.” Keep gameplay paused until
+  the player chooses. `cancel` is a deprecated strategy alias returning `deferred`;
+  it has never signed out or restored a guest session. Neither strategy is available
+  once another resolution has begun; resume or explicitly re-review that operation.
+
+**Cancelling authentication is separate.** Cancel at the provider, or call
+`await game.players.cancelAuthFlow(flowId)` before the callback exchange starts.
+This invalidates the local flow only while its original session is still current;
+callbacks then fail with `FLOW_CANCELLED`. It returns the verified current status.
+`AUTH_IN_PROGRESS` means exchange has started; `ACCOUNT_CHANGED` means the source is no
+longer the current account. Neither case claims to undo authentication. A different tab
+can still change Auth independently: always observe auth state changes.
+
+Offer **Return to guest game** only after verifying the original guest ID is still
+signed in. Once Google has replaced that session, this SDK cannot restore guest Auth:
+it deliberately does not keep guest refresh/access tokens. Sign-out is not guest recovery.
+A save snapshot is data, not a login credential. **Keep Google progress / skip guest
+import** completes the save decision, loads Google state, and retains the guest snapshot.
 
 Results contain `{status, strategy, targetPlayerId, completedSlots}`. Replacement uses
 existing caller-authenticated HTTP mutations, optimistic revisions and stable operation
@@ -193,14 +209,70 @@ recovery keys. JSON.stringify does **not** export Blob contents: export each Blo
 separate binary file in your application, or preserve it using the supplied durable store.
 Vaccoin's Workshop recovery export is JSON because its save is JSON.
 
-Backups are device-local, not an additional hosted revision-history service. Browser data
-clearing, private browsing expiry or device loss can remove them. Export recovery data
-before accepting irreversible loss. `discardAccountSwitch(transition,
-{acceptDataLoss: true})` only removes a completed transition after explicit acceptance;
-no automatic cleanup discards guest progress. Failed or cancelled transitions remain.
-To manually restore a backup, authenticate its target, inspect its current revision,
-confirm the overwrite, then use `saves.save`/`saveBinary` with that revision and
-`expectedPlayerId`. The same concurrency rules still apply.
+Guest snapshots and local review journals remain device-local. Browser data clearing or
+device loss can remove them; export before accepting irreversible loss.
+`discardAccountSwitch(transition, {acceptDataLoss: true})` only removes a completed
+local transition after explicit acceptance; failed/deferred snapshots are retained.
+It does not delete server revisions.
+
+**Replaced cloud saves now also have server-side recovery.** Keep Guest and Merge send
+`backupExisting: true` on JSON, binary and delete mutations. The previous valid slot is
+archived in the same database transaction as replacement. Failed writes leave the old
+live save and previous history recoverable. Stable operation IDs prevent duplicate
+archives on retries. Ordinary saves can opt into the same flag; restoration always
+archives the displaced current save. An older server rejects this flag: update its
+migration and Edge function before using replacement; there is no local-only fallback.
+
+Retention is **at most five archived revisions per slot for 30 days from each archive**.
+A sixth archive removes the oldest; reads/cleanup prune expired entries. Active slot
+contents never expire. JSON backups and all physical binary objects count against the
+existing per-player `max_total_bytes` quota (100 MiB default); per-save and active-slot
+limits still apply. The existing `max_slots` also independently caps the number of slots
+with retained history, including deleted slots, bounding metadata for tiny payloads. Binary backups reference immutable objects in the existing private
+bucket, without uploading a duplicate. Cleanup protects every retained reference and
+the current restored object. Expired/unreferenced bytes become garbage and remain charged
+until `saves.cleanup()` or operator cleanup removes them through Storage. Expiration is
+lazy, with no new scheduler: inactive JSON rows may physically remain until the next save
+request; they cannot be listed/restored after expiry. Operator cleanup also reclaims
+expired binary backups for inactive users. Do not rely on retention beyond these limits.
+A quota error stops replacement; clean eligible garbage or have the operator review quotas.
+
+Authenticate the target on any device to inspect/restore its backups. No transition
+journal or guest credential is required:
+
+```ts
+const owner = await game.players.getAuthStatus();
+const revisions = await game.saves.listRevisions('slot1');
+// Each item: {save: SaveRecord, archivedAt, expiresAt}; newest first, no JSON payload.
+const selected = revisions[0]; // Present metadata; let the player explicitly choose.
+if (!selected) throw Error('No retained backup');
+const oldJson = selected.save.kind === 'json'
+  ? await game.saves.loadRevision('slot1', selected.save.revision)
+  : undefined;
+// Optional binary preview/download, bounded before fetching:
+// await game.saves.loadBinaryRevision('slot1', selected.save.revision, {maxBytes: 8 * 1024 * 1024});
+const current = await game.saves.load('slot1');
+// Show what will be replaced and ask for consent before this call.
+const operationId = crypto.randomUUID(); // Persist with the request if retrying after reload.
+await game.saves.restoreRevision('slot1', selected.save.revision, {
+  expectedRevision: current.revision,
+  expectedPlayerId: owner.userId!,
+  operationId,
+});
+```
+
+Restore uses the retained server payload for JSON or binary; it creates a new monotonically
+increasing revision, with the same CAS/receipt rules as replacement. Retry the identical
+request after a lost response. A deleted slot's tombstone revision comes in
+`SaveConflictError.current`; review it and obtain consent before retrying against it.
+Expired/missing revisions return `SAVE_NOT_FOUND`. Restore never changes scores,
+achievements or identities. No API accepts a different owner's ID. See
+[Cloud Saves](cloud-saves.md) for raw HTTP actions and deployment steps.
+
+Existing device-local backups from older releases are not retroactively uploaded.
+An interrupted operation started with an older SDK may need explicit re-review with a
+new operation ID if its old receipt conflicts with the new backup-required request.
+Do not erase its local journal or assume the previous write gained server protection.
 
 Transfers are sequential and bounded: 64 MiB per binary object, 128 MiB combined guest
 and current target payloads, 1 MiB JSON and 4 KiB metadata. Large source files are rejected

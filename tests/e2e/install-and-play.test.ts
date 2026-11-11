@@ -73,6 +73,21 @@ test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → b
     assert.equal(result.status, 200);
     assert.equal((await result.json()).save.revision, 1);
   });
+  await t.test('installed packages retain and restore server JSON and binary revisions on a fresh installation', async () => {
+    await game.saves.save('profile', {level: 3}, {expectedRevision: 1, backupExisting: true});
+    assert.deepEqual((await game.saves.loadRevision('profile', 1)).data, {level: 2});
+    const recovery = consumer.sdk.createGameServices({supabase}).saves;
+    assert.equal((await recovery.listRevisions('profile')).length, 1);
+    const id = crypto.randomUUID();
+    assert.equal((await recovery.restoreRevision('profile', 1, {expectedRevision: 2, operationId: id})).revision, 3);
+    assert.equal((await recovery.restoreRevision('profile', 1, {expectedRevision: 2, operationId: id})).revision, 3);
+    await game.saves.saveBinary('recovery', new Blob(['original bytes']));
+    await game.saves.saveBinary('recovery', new Blob(['replacement bytes']), {expectedRevision: 1, backupExisting: true});
+    await game.saves.cleanup();
+    assert.equal(await (await recovery.loadBinaryRevision('recovery', 1)).data.text(), 'original bytes');
+    await recovery.restoreRevision('recovery', 1, {expectedRevision: 2});
+    assert.equal(await (await recovery.loadBinary('recovery')).data.text(), 'original bytes');
+  });
   for (const [board, better, worse] of [['level-1', 40, 60], ['arcade', 60, 40]] as const) {
     await t.test(`${board}: best-only, equal scores, raw HTTP, replay, stable tied pagination`, async () => {
       assert.equal(await game.leaderboards.getMine(board), null);

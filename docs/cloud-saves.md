@@ -152,10 +152,59 @@ Operator cleanup handles deleted Auth users and abandoned uploads without requir
 
 Anonymous Auth users are authenticated owners. All slot operations derive identity from verified JWTs and `auth.uid()`. No payload accepts an owner ID. Players have owner-only SELECT under RLS and no direct slot/configuration/receipt writes. Definer functions have an empty search path and narrow grants. Storage insert/read/delete policies are owner scoped; restrictive guards protect the Supagame bucket even alongside unrelated permissive host policies. Unrelated buckets and Supabase configuration remain intact.
 
-An anonymous account is tied to its persisted session. Clearing that session or changing browser/device can make saves unrecoverable. Link an email/provider identity to the existing Supabase user when the game later offers account recovery; do not create a different user and assume saves transfer. See https://supabase.com/docs/guides/auth/auth-anonymous and https://supabase.com/docs/guides/auth/auth-identity-linking. Vaccoin intentionally adds no login UI.
+An anonymous account is tied to its persisted session. Clearing that session or changing browser/device can make saves unrecoverable. Link an email/provider identity to the existing Supabase user when the game later offers account recovery; do not create a different user and assume saves transfer. See https://supabase.com/docs/guides/auth/auth-anonymous and https://supabase.com/docs/guides/auth/auth-identity-linking. Vaccoin now provides optional Google linking and account recovery; see [accounts](accounts.md).
 
 Public errors include `SAVE_NOT_FOUND`, `UNAUTHORIZED`, `SAVE_CONFLICT` (with current state), `SAVE_QUOTA_EXCEEDED`, `INVALID_SAVE`, `DUPLICATE_KEY_CONFLICT`, `FORBIDDEN`, and `STORAGE_UNAVAILABLE`. SDK transport failures use `NetworkError` / `NETWORK_UNAVAILABLE`; invalid local inputs use `InvalidParameterError`. Tokens and SQL details are never copied into public errors.
 
 Storage policies protect access, not truth. Modified clients can fabricate plausible progress and cosmetic wallet balances. Leaderboards and achievements continue using their separate trusted submission/rule paths.
 
 Successful mutations are limited to 60 per player per minute. Idempotent retries do not consume another mutation; excess new writes return `RATE_LIMITED`. Batch game events into checkpoints rather than saving every frame.
+
+## Server revision recovery (module 0.1.3, packages 0.1.4)
+
+Account replacements require durable backups. `save`, `delete` and binary `prepare`
+accept optional `backupExisting: true`; binary `commit` uses the persisted reservation.
+The previous valid JSON/binary slot is archived atomically only when the mutation commits.
+Failed writes preserve it. Ordinary writes leave earlier retained backups protected.
+
+Authenticated `POST /v1/saves/:slot` actions use the existing `sg_cloud_save` RPC:
+
+| Request body | Response |
+| --- | --- |
+| `{ "action": "revisions" }` | `{revisions: [{save, archivedAt, expiresAt}]}` |
+| `{ "action": "loadRevision", "revision": 1 }` | `{save}` including JSON or private binary object path |
+| `{ "action": "restore", "revision": 1, "expectedRevision": 3, "operationId": "<uuid>" }` | `{save}` metadata for the new revision |
+
+Restore always archives the current valid save. The server derives ownership from Auth,
+locks the player, checks revision/quota and records a stable receipt. Retried requests
+return that receipt even if the original backup has since expired. No owner override,
+direct archive-table access, additional bucket or privileged game credential is used.
+SDK equivalents are `listRevisions`, `loadRevision`, `loadBinaryRevision`, and
+`restoreRevision`; see the [copyable recovery example](accounts.md#backups-and-recovery).
+
+Retention: five prior backed-up revisions per slot, each expiring after 30 days. The
+sixth archive prunes the oldest. Expiry is enforced at access, with lazy physical pruning.
+The existing `max_slots` independently caps live slots and slots with retained history
+(including deleted slots), so tiny payloads cannot accumulate unlimited backup metadata.
+Archives share the existing total-byte quota; binary bytes count once per immutable object
+and remain charged until physically cleaned up. JSON copies each count. Restoration
+creates a new revision without copying binary bytes. Current live data never expires.
+`cleanup` protects retained and restored objects; operator cleanup can reclaim expired
+binary objects for inactive users. This is a bounded recovery window, not permanent history.
+
+For an existing installation, the updated CLI retains the exact 0.1.2 asset inventory and
+stages an additive upgrade:
+
+```sh
+supagame upgrade --dry-run
+supagame upgrade
+supagame deploy --project-ref YOUR_PROJECT_REF --dry-run
+# Review migration 20261110000306_save_revisions.sql and the Edge function update.
+# Only after separately authorizing a hosted deployment:
+supagame deploy --project-ref YOUR_PROJECT_REF
+supagame doctor --remote --project-ref YOUR_PROJECT_REF
+```
+
+Both the migration and updated Edge validator must be deployed before the new SDK's
+account replacements work. Retention does not require another hosted service or Auth
+configuration change. No hosted deployment was performed as part of this implementation.

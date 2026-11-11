@@ -71,8 +71,8 @@ describe('add leaderboards', () => {
       ),
     ).toEqual(readFileSync(join(repo, 'packages/contracts/src/generated.ts')));
     expect(manifest(root).modules).toEqual({
-      core: '0.1.2',
-      leaderboards: '0.1.2',
+      core: '0.1.3',
+      leaderboards: '0.1.3',
     });
     expect(readFileSync(join(root, 'supabase/config.toml'), 'utf8')).toContain(
       config,

@@ -1,5 +1,7 @@
 # Account linking verification — 10 November 2026
 
+This records the initial 0.1.3 implementation. See the [0.1.4 cancellation and server-recovery follow-up](account-recovery-verification.md) for current recovery behavior and verification.
+
 Runtime: Node **24.22.2** (official Linux x64 archive checked against published SHA-256).
 All commands ran locally. No hosted Supabase or Google configuration/accounts were changed.
 

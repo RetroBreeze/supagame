@@ -178,7 +178,7 @@ export interface paths {
         };
         get: operations["loadSave"];
         put?: never;
-        /** @description JSON save/delete, or binary prepare/commit/abort. Prepare returns SaveUpload; abort returns SaveObjects. expectedRevision=0 is create-only. Every successful mutation is idempotent by operationId. */
+        /** @description JSON save/delete, binary prepare/commit/abort, or revisions/loadRevision/restore. backupExisting=true archives the displaced valid save transactionally (five per slot, 30 days, counted against player quota). Restore always archives the current save. Revisions returns SaveRevisionList; loadRevision returns SaveResult. Prepare returns SaveUpload; abort returns SaveObjects. expectedRevision=0 is create-only. Every successful mutation is idempotent by operationId. */
         post: operations["mutateSave"];
         delete?: never;
         options?: never;
@@ -311,9 +311,20 @@ export interface components {
         SaveObjects: {
             objects: string[];
         };
+        SaveRevision: {
+            save: components["schemas"]["SaveRecord"];
+            /** Format: date-time */
+            archivedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        SaveRevisionList: {
+            revisions: components["schemas"]["SaveRevision"][];
+        };
         SaveMutation: {
             /** @constant */
             action: "save";
+            backupExisting?: boolean;
             expectedRevision: number;
             /** Format: uuid */
             operationId: string;
@@ -325,12 +336,14 @@ export interface components {
         } | {
             /** @constant */
             action: "delete";
+            backupExisting?: boolean;
             expectedRevision: number;
             /** Format: uuid */
             operationId: string;
         } | {
             /** @constant */
             action: "prepare";
+            backupExisting?: boolean;
             expectedRevision: number;
             /** Format: uuid */
             operationId: string;
@@ -348,6 +361,20 @@ export interface components {
         } | {
             /** @constant */
             action: "abort";
+            /** Format: uuid */
+            operationId: string;
+        } | {
+            /** @constant */
+            action: "revisions";
+        } | {
+            /** @constant */
+            action: "loadRevision";
+            revision: number;
+        } | {
+            /** @constant */
+            action: "restore";
+            revision: number;
+            expectedRevision: number;
             /** Format: uuid */
             operationId: string;
         };
@@ -958,7 +985,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SaveResult"] | components["schemas"]["SaveUpload"] | components["schemas"]["SaveObjects"];
+                    "application/json": components["schemas"]["SaveResult"] | components["schemas"]["SaveUpload"] | components["schemas"]["SaveObjects"] | components["schemas"]["SaveRevisionList"];
                 };
             };
             /** @description ApiError */

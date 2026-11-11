@@ -87,12 +87,108 @@ it("pins queued writes to their original player even if Auth changes before disp
   ).rejects.toMatchObject({ kind: "authentication" });
   expect(f.fetcher).not.toHaveBeenCalled();
 });
-it('bounds binary downloads and rejects changed metadata before reading object bytes',async()=>{
- const f=fixture();f.fetcher.mockImplementation(async()=>Response.json({save:{...record,kind:'binary',objectPath:`${session().user.id}/object`,sizeBytes:1000,revision:3}}));
- const saves=createGameServices({supabase:f.supabase}).saves;
- const before=f.requests.length;
- await expect(saves.loadBinary('profile',{maxBytes:100})).rejects.toMatchObject({kind:'invalid_parameter'});
- expect(f.requests.slice(before).every(r=>!r.url.includes('/storage/'))).toBe(true);
- await expect(saves.loadBinary('profile',{maxBytes:2000,expectedRevision:2})).rejects.toMatchObject({code:'SAVE_CONFLICT'});
- expect(f.requests.every(r=>!r.url.includes('/storage/'))).toBe(true);
+it("bounds binary downloads and rejects changed metadata before reading object bytes", async () => {
+  const f = fixture();
+  f.fetcher.mockImplementation(async () =>
+    Response.json({
+      save: {
+        ...record,
+        kind: "binary",
+        objectPath: `${session().user.id}/object`,
+        sizeBytes: 1000,
+        revision: 3,
+      },
+    }),
+  );
+  const saves = createGameServices({ supabase: f.supabase }).saves;
+  const before = f.requests.length;
+  await expect(
+    saves.loadBinary("profile", { maxBytes: 100 }),
+  ).rejects.toMatchObject({ kind: "invalid_parameter" });
+  expect(
+    f.requests.slice(before).every((r) => !r.url.includes("/storage/")),
+  ).toBe(true);
+  await expect(
+    saves.loadBinary("profile", { maxBytes: 2000, expectedRevision: 2 }),
+  ).rejects.toMatchObject({ code: "SAVE_CONFLICT" });
+  expect(f.requests.every((r) => !r.url.includes("/storage/"))).toBe(true);
+});
+it("requests transactional server backups for JSON, deletion and binary reservations", async () => {
+  const f = fixture();
+  f.fetcher.mockImplementation(async () => Response.json({ save: record }));
+  const saves = createGameServices({ supabase: f.supabase }).saves;
+  await saves.save("profile", {}, { backupExisting: true });
+  expect(
+    JSON.parse(f.fetcher.mock.calls.at(-1)![1]!.body as string).backupExisting,
+  ).toBe(true);
+  await saves.delete("profile", { backupExisting: true });
+  expect(
+    JSON.parse(f.fetcher.mock.calls.at(-1)![1]!.body as string).backupExisting,
+  ).toBe(true);
+  await saves.saveBinary("profile", new Blob(["backup"]), {
+    backupExisting: true,
+  });
+  expect(
+    JSON.parse(f.fetcher.mock.calls.at(-1)![1]!.body as string).backupExisting,
+  ).toBe(true);
+});
+it("lists, reads and explicitly restores server revisions without advancing the live revision cache on a read", async () => {
+  const f = fixture(),
+    saves = createGameServices({ supabase: f.supabase }).saves;
+  const archived = {
+    save: record,
+    archivedAt: record.updatedAt,
+    expiresAt: "2026-12-10T00:00:00Z",
+  };
+  f.fetcher.mockImplementation(async () =>
+    Response.json({ revisions: [archived] }),
+  );
+  expect(await saves.listRevisions("profile")).toEqual([archived]);
+  f.fetcher.mockImplementation(async () => Response.json({ save: record }));
+  expect((await saves.loadRevision("profile", 1)).data).toEqual({ coins: 4 });
+  await saves.save("profile", {});
+  expect(
+    JSON.parse(f.fetcher.mock.calls.at(-1)![1]!.body as string)
+      .expectedRevision,
+  ).toBe(0);
+  const operationId = "10000000-0000-4000-8000-000000000004";
+  await saves.restoreRevision("profile", 1, {
+    expectedRevision: 4,
+    operationId,
+  });
+  expect(JSON.parse(f.fetcher.mock.calls.at(-1)![1]!.body as string)).toEqual({
+    action: "restore",
+    revision: 1,
+    expectedRevision: 4,
+    operationId,
+  });
+  const before = f.fetcher.mock.calls.length;
+  await expect(
+    saves.restoreRevision("profile", 1, {
+      expectedRevision: 4,
+      expectedPlayerId: "other",
+    }),
+  ).rejects.toMatchObject({ kind: "authentication" });
+  await expect(
+    saves.restoreRevision("profile", 1, { expectedRevision: NaN }),
+  ).rejects.toMatchObject({ kind: "invalid_parameter" });
+  expect(f.fetcher).toHaveBeenCalledTimes(before);
+});
+it("bounds binary revision downloads before Storage access", async () => {
+  const f = fixture();
+  f.fetcher.mockImplementation(async () =>
+    Response.json({
+      save: {
+        ...record,
+        kind: "binary",
+        objectPath: `${session().user.id}/object`,
+        sizeBytes: 1000,
+      },
+    }),
+  );
+  const saves = createGameServices({ supabase: f.supabase }).saves;
+  await expect(
+    saves.loadBinaryRevision("profile", 1, { maxBytes: 100 }),
+  ).rejects.toMatchObject({ kind: "invalid_parameter" });
+  expect(f.requests.every((r) => !r.url.includes("/storage/"))).toBe(true);
 });

@@ -2,6 +2,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const migrations = [
+ ['../../modules/cloud-saves/migrations/007_save_revisions.sql','20261110000306_save_revisions.sql'],
  ['../../modules/cloud-saves/migrations/006_save_throttling.sql','20261110000305_save_throttling.sql'],
  ['../../modules/cloud-saves/migrations/005_garbage_collection.sql','20261110000304_save_garbage_collection.sql'],
  ['../../modules/cloud-saves/migrations/004_storage_preflight.sql','20261110000303_save_storage_preflight.sql'],

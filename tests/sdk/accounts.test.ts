@@ -222,8 +222,86 @@ it("offline login fails before creating provider requests", async () => {
     vi.unstubAllGlobals();
   }
 });
-it('sanitizes malformed callback URLs and recognizes fragment-only provider errors',async()=>{
- const f=setup();await expect(f.game.players.handleAuthCallback('invalid?code=private-code')).rejects.toMatchObject({code:'FLOW_MISSING'});
- const flow=await f.game.players.linkProvider('google',{redirectTo:'https://game.example/'});
- await expect(f.game.players.handleAuthCallback(`https://game.example/?sg_flow=${flow.flowId}#error_code=identity_already_exists`)).rejects.toMatchObject({code:'ACCOUNT_CONFLICT'});
+it("sanitizes malformed callback URLs and recognizes fragment-only provider errors", async () => {
+  const f = setup();
+  await expect(
+    f.game.players.handleAuthCallback("invalid?code=private-code"),
+  ).rejects.toMatchObject({ code: "FLOW_MISSING" });
+  const flow = await f.game.players.linkProvider("google", {
+    redirectTo: "https://game.example/",
+  });
+  await expect(
+    f.game.players.handleAuthCallback(
+      `https://game.example/?sg_flow=${flow.flowId}#error_code=identity_already_exists`,
+    ),
+  ).rejects.toMatchObject({ code: "ACCOUNT_CONFLICT" });
+});
+it("cancels authentication only before exchange while the original session remains, retaining staged data", async () => {
+  const f = setup(),
+    flow = await f.game.players.signInWithProvider("google", {
+      redirectTo: "https://game.example/",
+    });
+  await f.store.update(
+    JSON.stringify(["test-project", "transition", "guest-copy"]),
+    () => ({ data: "unsynced" }),
+  );
+  expect(await f.game.players.cancelAuthFlow(flow.flowId)).toMatchObject({
+    userId,
+    isAnonymous: true,
+  });
+  await expect(
+    f.game.players.handleAuthCallback(
+      `https://game.example/?sg_flow=${flow.flowId}&code=mock`,
+    ),
+  ).rejects.toMatchObject({ code: "FLOW_CANCELLED" });
+  expect(f.exchange).not.toHaveBeenCalled();
+  expect(
+    await f.store.read(
+      JSON.stringify(["test-project", "transition", "guest-copy"]),
+    ),
+  ).toEqual({ data: "unsynced" });
+  expect(await f.game.players.getAuthStatus()).toMatchObject({
+    userId,
+    isAnonymous: true,
+  });
+});
+it("cannot pretend to cancel or resurrect guest authentication after Google sign-in", async () => {
+  const f = setup(),
+    flow = await f.game.players.signInWithProvider("google", {
+      redirectTo: "https://game.example/",
+    });
+  f.permanent("target");
+  await expect(
+    f.game.players.cancelAuthFlow(flow.flowId),
+  ).rejects.toMatchObject({ code: "ACCOUNT_CHANGED" });
+  expect(await f.game.players.getAuthStatus()).toMatchObject({
+    userId: "target",
+    isAnonymous: false,
+  });
+});
+it("refuses cancellation while an OAuth exchange is in flight", async () => {
+  const f = setup(),
+    flow = await f.game.players.signInWithProvider("google", {
+      redirectTo: "https://game.example/",
+    });
+  let finish!: () => void;
+  f.exchange.mockImplementation(async () => {
+    await new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    return {
+      data: { session: session(false), user: session(false).user },
+      error: null,
+    };
+  });
+  const completion = f.game.players.handleAuthCallback(
+    `https://game.example/?sg_flow=${flow.flowId}&code=mock`,
+  );
+  await vi.waitFor(() => expect(f.exchange).toHaveBeenCalledOnce());
+  await expect(
+    f.game.players.cancelAuthFlow(flow.flowId),
+  ).rejects.toMatchObject({ code: "AUTH_IN_PROGRESS" });
+  f.permanent("target");
+  finish();
+  expect(await completion).toMatchObject({ userId: "target" });
 });

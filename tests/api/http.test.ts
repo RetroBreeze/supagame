@@ -709,3 +709,61 @@ Deno.test('cloud saves fail closed for expired and invalid credentials', async (
   await error(await f.handle(request('/saves/profile', { jwt: 'invalid' })), 401, 'UNAUTHORIZED');
   assert.equal(f.calls.length, 0);
 });
+
+Deno.test('revision recovery authenticates, validates exact fields and never accepts owner overrides', async () => {
+  const f = fixture({ status: 200, body: { revisions: [] } });
+  for (
+    const body of [
+      { action: 'revisions' },
+      { action: 'loadRevision', revision: 1 },
+      { action: 'restore', revision: 1, expectedRevision: 2, operationId: submissionKey },
+      {
+        action: 'save',
+        data: { coins: 9 },
+        metadata: {},
+        schemaVersion: 1,
+        expectedRevision: 2,
+        operationId: submissionKey,
+        backupExisting: true,
+      },
+    ]
+  ) {
+    assert.equal(
+      (await f.handle(request('/saves/profile', { method: 'POST', body: JSON.stringify(body) })))
+        .status,
+      200,
+    );
+    assert.equal(f.calls.at(-1)!.name, 'sg_cloud_save');
+    assert.equal(f.calls.at(-1)!.authorization, `Bearer ${validToken}`);
+  }
+  for (
+    const body of [
+      { action: 'revisions', userId },
+      { action: 'loadRevision', revision: 0 },
+      { action: 'restore', revision: 1, operationId: submissionKey },
+      { action: 'restore', revision: 1, expectedRevision: 2, operationId: submissionKey, userId },
+      { action: 'delete', expectedRevision: 2, operationId: submissionKey, backupExisting: 'true' },
+      { action: 'commit', operationId: submissionKey, backupExisting: true },
+    ]
+  ) {
+    await error(
+      await f.handle(request('/saves/profile', { method: 'POST', body: JSON.stringify(body) })),
+      400,
+      'INVALID_SAVE',
+    );
+  }
+  for (const jwt of [null, 'invalid', await token({ exp: 1 })]) {
+    await error(
+      await f.handle(
+        request('/saves/profile', {
+          jwt,
+          method: 'POST',
+          body: JSON.stringify({ action: 'revisions' }),
+        }),
+      ),
+      401,
+      'UNAUTHORIZED',
+    );
+  }
+  assert.equal(f.calls.length, 4);
+});

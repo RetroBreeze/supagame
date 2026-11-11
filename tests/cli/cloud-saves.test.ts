@@ -207,3 +207,53 @@ it.each(["storage-http", "storage-network", "database-ack"] as const)(
     }
   },
 );
+
+it("upgrades an installed 0.1.2 Cloud Saves module additively, preserving old SQL and unrelated files", () => {
+  const root = project();
+  initialized(root);
+  try {
+    expect(cli(root, "add", "cloud-saves").status).toBe(0);
+    const inventory = currentInventory(templateFiles()),
+      value = manifest(root);
+    for (const module of ["core", "leaderboards", "cloud-saves"] as const) {
+      const old = releaseFor(inventory, module, "0.1.2");
+      value.modules[module] = "0.1.2";
+      for (const file of [...old.migrations, ...old.assets])
+        put(root, file.path, file.content.toString());
+    }
+    put(root, "supagame.config.json", JSON.stringify(value));
+    unlinkSync(
+      join(root, "supabase/migrations/20261110000306_save_revisions.sql"),
+    );
+    put(root, "notes.txt", "unrelated");
+    const before = snapshot(root);
+    const preview = cli(root, "upgrade", "--dry-run");
+    expect(preview.status, preview.stderr).toBe(0);
+    expect(snapshot(root)).toEqual(before);
+    const result = cli(root, "upgrade");
+    expect(result.status, result.stderr).toBe(0);
+    expect(manifest(root).modules["cloud-saves"]).toBe("0.1.3");
+    const after = snapshot(root);
+    for (const [path, content] of Object.entries(before))
+      if (path.includes("/migrations/") || path === "notes.txt")
+        expect(after[path]).toEqual(content);
+    expect(
+      readFileSync(
+        join(root, "supabase/migrations/20261110000306_save_revisions.sql"),
+        "utf8",
+      ),
+    ).toContain("create table sg_private.save_revisions");
+    expect(cli(root, "upgrade").status).toBe(0);
+    expect(snapshot(root)).toEqual(after);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}, 20000);
+import { readFileSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
+import { put } from "./project-fixture.ts";
+import {
+  currentInventory,
+  releaseFor,
+} from "../../packages/cli/src/lib/versions.ts";
+import { templateFiles } from "../../packages/cli/src/lib/templates.ts";

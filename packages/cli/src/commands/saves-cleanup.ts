@@ -61,7 +61,7 @@ export async function cleanupSaves(options: Options, deps = defaults()) {
   };
   const scratch = inspectionWorkspace(target, []);
   const candidates =
-    "select path from sg_private.save_objects o where (state='garbage' or (state='pending' and created_at<now()-interval '24 hours') or not exists(select 1 from auth.users where id=o.user_id)) and not exists(select 1 from public.game_saves where object_path=o.path and not deleted) order by created_at,path limit 100";
+    "select path from sg_private.save_objects o where (state='garbage' or (state='pending' and created_at<now()-interval '24 hours') or state='live' or not exists(select 1 from auth.users where id=o.user_id)) and not exists(select 1 from public.game_saves where object_path=o.path and not deleted) and not exists(select 1 from sg_private.save_revisions r where r.user_id=o.user_id and (r.snapshot).object_path=o.path and r.expires_at>now()) order by created_at,path limit 100";
   const paths = (value: unknown): string[] => {
     if (
       !Array.isArray(value) ||

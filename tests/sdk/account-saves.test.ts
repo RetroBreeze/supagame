@@ -412,3 +412,34 @@ it("treats a concurrently deleted target as absent after explicit re-review", as
   });
   expect(remove).toHaveBeenCalledTimes(1);
 });
+it("defers only save resolution and explicitly retains the authenticated target and guest recovery", async () => {
+  const f = setup(),
+    t = await f.game.saves.prepareAccountSwitch(),
+    flowId = await f.auth(t);
+  await f.game.saves.inspectAccountSwitch(t, { flowId });
+  expect(
+    await f.game.saves.resolveAccountSwitch(t, {
+      strategy: "defer",
+      targetPlayerId: "target",
+      confirmed: true,
+    }),
+  ).toMatchObject({ status: "deferred", targetPlayerId: "target" });
+  expect(await f.game.players.getAuthStatus()).toMatchObject({
+    userId: "target",
+    isAnonymous: false,
+  });
+  expect(f.game.saves.save).not.toHaveBeenCalled();
+  expect(
+    (await f.game.saves.getAccountSwitchRecovery(t)).slots[0]?.guest?.data,
+  ).toEqual({ coins: 9 });
+  await f.game.saves.resolveAccountSwitch(t, {
+    strategy: "keepGuest",
+    targetPlayerId: "target",
+    confirmed: true,
+  });
+  expect(f.game.saves.save).toHaveBeenCalledWith(
+    "workshop",
+    { coins: 9 },
+    expect.objectContaining({ backupExisting: true }),
+  );
+});

@@ -24,6 +24,7 @@ export const templateSources = [
   'deno.lock',
   'modules/legacy/0.1.0.json',
   'modules/legacy/0.1.1.json',
+  'modules/legacy/0.1.2.json',
 ];
 export function templateFiles(): DesiredFile[] {
   // Built packages carry the same inventory inside dist/assets; source development

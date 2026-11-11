@@ -36,6 +36,7 @@ export interface AuthFlow {
   expiresAt: number;
   transitionId?: string;
   exchanging?: boolean;
+  cancelled?: boolean;
   targetPlayerId?: string;
 }
 export interface ProviderOptions {
@@ -60,6 +61,8 @@ export interface AccountPlayers {
     options: ProviderOptions,
   ): Promise<{ url: string; flowId: string }>;
   handleAuthCallback(url: string): Promise<AccountCallback>;
+  /** Stops an unexchanged flow only while its source account is still authenticated. Never restores credentials. */
+  cancelAuthFlow(flowId: string): Promise<AccountStatus>;
   signOut(): Promise<void>;
   onAuthStateChange(
     callback: (status: AccountStatus, event: AuthChangeEvent) => void,
@@ -210,8 +213,14 @@ export function createAccountPlayers(
   let callback: Promise<AccountCallback> | undefined;
   async function complete(url: string): Promise<AccountCallback> {
     let parsed: URL;
-    try { parsed = new URL(url); }
-    catch { throw new AccountError("FLOW_MISSING", "The callback URL is invalid. Start authentication again."); }
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new AccountError(
+        "FLOW_MISSING",
+        "The callback URL is invalid. Start authentication again.",
+      );
+    }
     const id = parsed.searchParams.get("sg_flow");
     const flow = id
       ? ((await store.read(key("flow", id))) as AuthFlow | null)
@@ -220,6 +229,11 @@ export function createAccountPlayers(
       throw new AccountError(
         "FLOW_MISSING",
         "No matching authentication flow exists on this device. Start sign-in again.",
+      );
+    if (flow.cancelled)
+      throw new AccountError(
+        "FLOW_CANCELLED",
+        "Authentication was stopped before exchange. Staged saves are retained.",
       );
     if (flow.expiresAt < Date.now())
       throw new AccountError(
@@ -260,10 +274,15 @@ export function createAccountPlayers(
           (flow.operation !== "link" || s.userId === flow.sourcePlayerId);
       }
       if (!recovered) {
-        await store.update(key("flow", flow.id), () => ({
-          ...flow,
-          exchanging: true,
-        }));
+        await store.update(key("flow", flow.id), (value) => {
+          const latest = value as AuthFlow | null;
+          if (!latest || latest.cancelled)
+            throw new AccountError(
+              "FLOW_CANCELLED",
+              "Authentication was stopped. Staged saves are retained.",
+            );
+          return { ...latest, exchanging: true };
+        });
         const result = await client.auth
           .exchangeCodeForSession(
             authCode!,
@@ -317,6 +336,35 @@ export function createAccountPlayers(
         })
         .catch(() => {});
       return callback;
+    },
+    async cancelAuthFlow(flowId) {
+      const current = await getAuthStatus();
+      await store.update(key("flow", flowId), (value) => {
+        const flow = value as AuthFlow | null;
+        if (!flow || flow.version !== 1 || flow.id !== flowId)
+          throw new AccountError(
+            "FLOW_MISSING",
+            "No matching authentication flow exists.",
+          );
+        if (flow.targetPlayerId || flow.sourcePlayerId !== current.userId)
+          throw new AccountError(
+            "ACCOUNT_CHANGED",
+            "Authentication has changed. Keep the signed-in account and choose progress, or defer resolution. Guest data is retained; guest credentials were not copied.",
+          );
+        if (flow.exchanging)
+          throw new AccountError(
+            "AUTH_IN_PROGRESS",
+            "The callback has started. Verify the current account before choosing progress; cancellation cannot undo an exchange.",
+          );
+        return { ...flow, cancelled: true };
+      });
+      const after = await getAuthStatus();
+      if (after.userId !== current.userId)
+        throw new AccountError(
+          "ACCOUNT_CHANGED",
+          "The account changed concurrently. Guest data is retained; review the signed-in account.",
+        );
+      return after;
     },
     async signOut() {
       const result = await client.auth.signOut({ scope: "local" }).catch(() => {

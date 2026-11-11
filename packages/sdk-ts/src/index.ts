@@ -32,10 +32,10 @@ export type { Achievements, AchievementSubscription } from './achievements.js';
 export { createAchievementQueue } from './achievement-notifications.js';
 export type { AchievementQueue } from './achievement-notifications.js';
 
-export type { Saves, SaveOptions, Saved } from './saves.js';
+export type { Saves, SaveOptions, RestoreRevisionOptions, Saved } from './saves.js';
 export type { JsonValue } from './save-values.js';
 export { operationId as createOperationId } from './save-values.js';
-export type { SaveRecord } from '@supagame/contracts';
+export type { SaveRecord, SaveRevision } from '@supagame/contracts';
 export { createOfflineSaves } from './offline-saves.js';
 export type { LocalStore, SaveStore, OfflineEntry, PendingSave } from './offline-saves.js';
 

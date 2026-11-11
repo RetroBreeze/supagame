@@ -23,7 +23,7 @@ export async function packedConsumer() {
   try {
     const tarballs = ['contracts', 'sdk-ts', 'cli'].map((name) => {
       run('pnpm', ['pack', '--pack-destination', root], join(repo, 'packages', name));
-      const archive = join(root, `supagame-${name}-0.1.3.tgz`);
+      const archive = join(root, `supagame-${name}-0.1.4.tgz`);
       const entries = run('tar', ['-tzf', archive]).trim().split('\n');
       assert.ok(entries.includes('package/package.json'));
       assert.ok(entries.includes('package/LICENSE'), `${name} must distribute its MIT license`);
@@ -39,13 +39,14 @@ export async function packedConsumer() {
     assert.match(run(cli, ['--help'], root), /leaderboard/);
     for (const name of ['cli', 'sdk-ts', 'contracts']) {
       const manifest = JSON.parse(readFileSync(join(installed(name), 'package.json'), 'utf8'));
-      assert.equal(manifest.license, 'MIT'); assert.equal(manifest.version, '0.1.3');
+      assert.equal(manifest.license, 'MIT'); assert.equal(manifest.version, '0.1.4');
       assert.equal(manifest.private, true, 'Publishing remains separately authorized');
       assert.ok(!JSON.stringify(manifest.dependencies ?? {}).includes('workspace:'));
     }
     assert.ok(readFileSync(join(installed('cli'), 'dist/assets/modules/leaderboards/functions/supagame/index.ts'), 'utf8').includes('Deno.serve'));
     assert.ok(readFileSync(join(installed('cli'), 'dist/assets/packages/contracts/src/generated.ts'), 'utf8').includes('export interface components'));
     assert.ok(readFileSync(join(installed('contracts'), 'dist/generated.d.ts'), 'utf8').includes('export interface components'));
+    assert.ok(readFileSync(join(installed('cli'), 'dist/assets/modules/cloud-saves/migrations/007_save_revisions.sql'), 'utf8').includes('create table sg_private.save_revisions'));
     assert.ok(readFileSync(join(installed('contracts'), 'openapi.yaml'), 'utf8').includes('openapi: 3.1.0'));
     writeFileSync(join(root, 'consumer.ts'), `import { createClient } from '@supabase/supabase-js';
 import { createGameServices, ApiError, type PlayerProfile, type LeaderboardPage } from '@supagame/sdk-ts';
@@ -53,6 +54,10 @@ const game = createGameServices({ supabase: createClient('https://example.supaba
 const saves = game.saves;
 void game.players.getAuthStatus; void game.players.linkProvider; void game.players.handleAuthCallback;
 void saves.prepareAccountSwitch; void saves.resolveAccountSwitch;
+void game.players.cancelAuthFlow;
+const backups = saves.listRevisions('profile');
+const restored = saves.restoreRevision('profile', 1, {expectedRevision: 2});
+void [backups, restored, saves.loadRevision, saves.loadBinaryRevision];
 const save = saves.save('profile', {coins: 5}, {expectedRevision: 0});
 void save;
 const profile: Promise<PlayerProfile> = game.players.getMe();
