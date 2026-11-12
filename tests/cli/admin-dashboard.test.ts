@@ -113,9 +113,9 @@ it("checks the remote response target and denies operators without execute permi
     service.close();
   }
 });
-it("rejects ambiguous Supabase JSON/TOML configuration", () => {
+it.each(["json", "jsonc"])("rejects ambiguous Supabase %s/TOML configuration", (extension) => {
   const root = fixture();
-  writeFileSync(join(root, "supabase/config.json"), "{}");
+  writeFileSync(join(root, `supabase/config.${extension}`), "{}");
   expect(() => resolveAdminTarget({ workdir: root, remote: true })).toThrow(
     "config.json",
   );

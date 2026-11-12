@@ -14,6 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         node: [24, 26]
+        supabase: [3.0.0, 3.1.0]
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -27,6 +28,12 @@ jobs:
           cache: pnpm
       - run: node --version
       - run: pnpm install --frozen-lockfile
+      - name: Select checksum-verified Supabase CLI for this matrix entry
+        run: node scripts/select-test-supabase.ts "${{ matrix.supabase }}"
+      - name: Actual CLI flags, JSON serialization and unattended consent
+        run: pnpm test:cli:compatibility
+        env:
+          SUPABASE_TEST_VERSION: ${{ matrix.supabase }}
       - run: pnpm -r build
       - name: Install Chromium for browser helper tests
         run: pnpm exec playwright install chromium
@@ -43,6 +50,7 @@ jobs:
       fail-fast: false
       matrix:
         node: [24, 26]
+        supabase: [3.0.0, 3.1.0]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -56,6 +64,12 @@ jobs:
           cache: pnpm
       - run: node --version
       - run: pnpm install --frozen-lockfile
+      - name: Select checksum-verified Supabase CLI for this matrix entry
+        run: node scripts/select-test-supabase.ts "${{ matrix.supabase }}"
+      - name: Actual CLI flags, JSON serialization and unattended consent
+        run: pnpm test:cli:compatibility
+        env:
+          SUPABASE_TEST_VERSION: ${{ matrix.supabase }}
       - run: pnpm -r build
       - name: Install Chromium without optional font-package downloads
         run: pnpm exec playwright install chromium

@@ -11,9 +11,9 @@ export interface InitOptions extends LocalOptions {
 export function init(options: InitOptions): void {
   const root = projectRoot(options.workdir ?? process.cwd());
   const previousConfig = readProjectFile(root, 'supabase/config.toml');
-  if (!previousConfig && readProjectFile(root, 'supabase/config.json')) {
+  if (!previousConfig && ['json', 'jsonc'].some((extension) => readProjectFile(root, `supabase/config.${extension}`))) {
     throw new Error(
-      'Existing supabase/config.json takes precedence over TOML. Review conversion to config.toml before initialization; existing configuration was preserved.',
+      'Existing supabase/config.json or config.jsonc takes precedence over TOML. Review conversion to config.toml before initialization; existing configuration was preserved.',
     );
   }
   const project = previousConfig ? readProject(options) : {

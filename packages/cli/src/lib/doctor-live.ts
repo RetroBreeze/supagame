@@ -214,7 +214,7 @@ export async function inspectLive(context: LiveInspection): Promise<void> {
       context.remote ? 'remote' : 'database',
       'connection',
       'cannot verify',
-      'Inspection unavailable or target unverified. Check Supabase CLI 3.0.0, the local stack or selected remote project read access/network. Raw errors are withheld.',
+      'Inspection unavailable or target unverified. Check Supabase CLI 3.0.0 or 3.1.0, the local stack or selected remote project read access/network. Raw errors are withheld.',
     );
   } finally {
     workspace.remove();

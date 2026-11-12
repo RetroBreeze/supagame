@@ -8,15 +8,15 @@ post-publication workflow. Before then, use the release guide's local tarballs.
 ## npm quickstart
 
 Use **Node.js 24 or 26** (`^24.0.0 || ^26.0.0`). Supagame's deployment
-adapter requires **Supabase CLI 3.0.0 exactly**; newer versions are not yet
-accepted. Install it locally so `npx supagame` can find it on PATH. The SDK needs
+adapter supports **Supabase CLI 3.0.0 and 3.1.0** (`3.0.0 || 3.1.0`).
+Other releases, including prereleases and untested patches, are rejected. Install it locally so `npx supagame` can find it on PATH. The SDK needs
 the caller-owned Supabase JavaScript client (`^2.119.0`, tested at 2.119.0).
 
 From the root of your existing game project:
 
 ```sh
 npm install -D @retrobreeze/supagame-cli
-npm install -D supabase@3.0.0
+npm install -D supabase@3.1.0
 npm install @retrobreeze/supagame-sdk @supabase/supabase-js@2.119.0
 npx supabase --version
 npx supabase login
@@ -33,7 +33,14 @@ Replace `YOUR_PROJECT_REF` with the reference of your existing Supabase project
 and the origin with your game's exact browser origin. `init` records the reference
 locally, preserves existing Supabase configuration and rejects conflicting links.
 If your project already records its reference, `npx supagame init` reuses it.
+Supagame currently manages `supabase/config.toml`; review conversion of JSON or
+JSONC-only projects before initialization. Do not keep ambiguous configuration
+formats for administration. Deployment uses an isolated TOML workspace and
+checks required CLI flags before hosted changes.
 Commit the generated configuration, migrations and function files.
+
+The repository dependency remains pinned to 3.0.0; CI separately selects verified
+3.0.0/3.1.0 binaries. See the [compatibility evidence and hosted limitations](https://github.com/RetroBreeze/supagame/blob/main/SUPABASE-COMPATIBILITY.md).
 
 `deploy` previews the exact destination and pending migrations, then asks for
 confirmation before hosted changes. It configures anonymous Auth, origins,

@@ -37,6 +37,7 @@ function fixture() {
     if (args[0] === '--version') {
       return { code: 0, stdout: badVersion ? '2.0.0' : '3.0.0\n', stderr: '' };
     }
+    if (args.at(-1) === '--help') return { code: 0, stdout: '--remote[=<ref>] --workdir string --output-format choice --include-all --skip-vault --dry-run --yes --env-file string --read-only --agent choice --output choice'.replaceAll(' --', '\n--'), stderr: '' };
     expect(args).toContain(`--remote=${ref}`);
     const target = {
       kind: 'linked',
@@ -122,12 +123,12 @@ function fixture() {
   };
   const options = { workdir: root, projectRef: ref };
   const mutations = () =>
-    calls.filter(({ args }) =>
+    calls.filter(({ args }) => !args.includes('--help') && (
       (args[0] === 'db' && args[1] === 'push' && !args.includes('--dry-run')) ||
       (args[0] === 'functions' && args[1] === 'deploy') ||
       (args[0] === 'config' && args[1] === 'push') ||
       (args[0] === 'secrets' && args[1] === 'set')
-    );
+    ));
   return {
     root,
     realtimeUnavailable: () => { realtimeReady = false; },
@@ -282,6 +283,7 @@ it('rejects new remote changes during confirmation', async () => {
 it('isolates config overrides, seeds, secrets and unrelated functions', async () => {
   const f = fixture();
   put(f.root, '.env', 'SUPABASE_PROJECT_ID=zzzzzzzzzzzzzzzzzzzz');
+  put(f.root, 'supabase/config.jsonc', '{"db":{"seed":{"enabled":true}}}');
   put(f.root, 'supabase/config.json', '{"db":{"seed":{"enabled":true}}}');
   put(f.root, 'supabase/functions/other/index.ts', 'throw new Error();');
   put(f.root, 'supabase/seed.sql', 'select 1;');
@@ -290,6 +292,7 @@ it('isolates config overrides, seeds, secrets and unrelated functions', async ()
     const files = Object.keys(snapshot(cwd));
     expect(files).not.toContain('.env');
     expect(files).not.toContain('supabase/config.json');
+    expect(files).not.toContain('supabase/config.jsonc');
     expect(files).not.toContain('supabase/seed.sql');
     expect(files.some((n) => n.includes('/other/'))).toBe(false);
     return run(args, cwd);
@@ -453,4 +456,47 @@ it('explains initialization when an explicit target has no manifest', async () =
   const run = vi.fn();
   await expect(deploy({ workdir: root, projectRef: ref, dryRun: true }, { run, interactive: false, confirm: vi.fn(), log: vi.fn() })).rejects.toThrow(/init/);
   expect(run).not.toHaveBeenCalled();
+});
+
+it.each(['--remote', '--workdir', '--output-format', '--yes', '--dry-run', '--include-all', '--skip-vault', '--env-file'])('refuses deployment before any mutation if required flag %s is missing or renamed', async (flag) => {
+  const f = fixture();
+  const original = f.deps.run;
+  f.deps.run = async (args, cwd) => {
+    const result = await original(args, cwd);
+    if (args.at(-1) === '--help') return { ...result, stdout: result.stdout.replaceAll(flag, '--incompatible') };
+    return result;
+  };
+  await expect(deploy({ ...f.options, allowRemote: true }, f.deps)).rejects.toThrow(/required flag|capabilit/i);
+  expect(f.mutations()).toHaveLength(0);
+  expect(f.confirm).not.toHaveBeenCalled();
+});
+
+it.each([1, null])('fails closed when capability inspection fails or is interrupted (%s)', async (code) => {
+  const f = fixture();
+  const original = f.deps.run;
+  f.deps.run = (args, cwd) => args.at(-1) === '--help'
+    ? Promise.resolve({ code, stdout: 'SECRET diagnostic', stderr: 'SECRET credential' }) : original(args, cwd);
+  await expect(deploy({ ...f.options, allowRemote: true }, f.deps)).rejects.toThrow(/capabilit/);
+  expect(f.mutations()).toHaveLength(0);
+});
+
+it.each(['migration list', 'db push', 'functions list', 'config diff', 'secrets list'].flatMap((command) =>
+  ['invalid-json', 'null', 'changed-schema', 'wrong-target', 'failed', 'interrupted'].map((response) => ({ command, response })),
+))('stops before mutations for $response during $command', async ({ command, response }) => {
+  const f = fixture();
+  const original = f.deps.run;
+  f.deps.run = async (args, cwd) => {
+    const result = await original(args, cwd);
+    if (args.includes('--help') || args.slice(0, 2).join(' ') !== command) return result;
+    const target = { kind: 'linked', project_ref: ref };
+    const stdout = response === 'invalid-json' ? 'SECRET invalid JSON'
+      : response === 'null' ? 'null'
+      : response === 'changed-schema' ? JSON.stringify({ target })
+      : response === 'wrong-target' ? JSON.stringify({ ...JSON.parse(result.stdout), target: { ...target, project_ref: 'zzzzzzzzzzzzzzzzzzzz' } })
+      : 'SECRET command diagnostic';
+    return { stdout, stderr: 'SECRET credential', code: response === 'failed' ? 1 : response === 'interrupted' ? null : 0 };
+  };
+  await expect(deploy({ ...f.options, allowRemote: true }, f.deps)).rejects.toThrow(/^(?!.*SECRET)/);
+  expect(f.mutations()).toHaveLength(0);
+  expect(f.confirm).not.toHaveBeenCalled();
 });

@@ -29,7 +29,8 @@
     "lint:edge": "deno lint modules/leaderboards/functions/supagame tests/api/http*.ts && deno fmt --check deno.json modules/leaderboards/functions/supagame tests/api/http*.ts",
     "test:sdk:integration": "vitest run --config tests/sdk/vitest.integration.config.ts",
     "test:e2e": "node --test tests/e2e/admin-dashboard.test.ts tests/e2e/install-and-play.test.ts",
-    "test:packages": "node --test tests/e2e/packages.test.ts"
+    "test:packages": "node --test tests/e2e/packages.test.ts",
+    "test:cli:compatibility": "node --test tests/cli/supabase-compatibility.integration.ts"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "13.1.0",

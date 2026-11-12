@@ -107,8 +107,10 @@ it('upgrade refuses modified files and unknown versions without changing anythin
 it('doctor detects local config overrides rather than claiming effective configuration is verified', () => {
   const root = installed();
   put(root, 'supabase/config.json', '{}');
+  put(root, 'supabase/config.jsonc', '{}');
   const before = snapshot(root);
   expect(cli(root, 'doctor').stdout).toMatch(/WARNING.*config.json/i);
+  expect(cli(root, 'doctor').stdout).toMatch(/WARNING.*config.jsonc/i);
   expect(snapshot(root)).toEqual(before);
 });
 

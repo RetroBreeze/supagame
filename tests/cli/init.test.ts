@@ -178,9 +178,9 @@ it('rejects non-string leaderboard enums', () => {
   put(root, 'supagame.config.json', JSON.stringify(value));
   expect(cli(root, 'init').status).toBe(1);
 });
-it('preserves a JSON-only Supabase configuration rather than creating an ignored TOML configuration', () => {
+it.each(['json', 'jsonc'])('preserves a %s-only Supabase configuration rather than creating an ignored TOML configuration', (extension) => {
   const root = fixture(false);
-  put(root, 'supabase/config.json', '{"project_id":"existing-json-project","custom":"keep"}');
+  put(root, `supabase/config.${extension}`, '{"project_id":"existing-json-project","custom":"keep"}');
   const before = snapshot(root);
   const result = cli(root, 'init', '--project-ref', ref);
   expect(result.status).toBe(1);

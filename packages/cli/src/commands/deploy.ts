@@ -83,6 +83,7 @@ export async function deploy(
     isolated = isolatedProject(files);
     const cli = new SupabaseCli(dependencies.run, isolated.directory, ref);
     await cli.checkVersion();
+    await cli.checkCapabilities();
     const plan = await cli.inspect(files.sql);
     hosted = new HostedConfiguration(dependencies.run, ref);
     const configuration = await hosted.inspect();

@@ -95,7 +95,7 @@ export async function doctor(
     return selectedRef(root, options.projectRef, manifest?.value.projectRef);
   });
   if (ref) local('project-reference', 'healthy', `Selected project reference: ${ref}.`);
-  for (const path of ['supabase/config.json', '.env', '.env.local', 'supabase/.env']) {
+  for (const path of ['supabase/config.json', 'supabase/config.jsonc', '.env', '.env.local', 'supabase/.env']) {
     attempt('overrides', () => {
       if (existsSync(safePath(root, path))) {
         local(

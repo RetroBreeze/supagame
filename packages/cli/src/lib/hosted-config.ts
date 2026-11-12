@@ -68,7 +68,7 @@ export class HostedConfiguration {
     const data = await this.inspector.json(['config', 'diff']);
     const invalid = () =>
       new Error(
-        'Cannot verify the narrowly scoped hosted Auth configuration. Check CLI 3.0.0 and config read permissions; no full config push is permitted.',
+        'Cannot verify the narrowly scoped hosted Auth configuration. Check CLI 3.0.0 or 3.1.0 and config read permissions; no full config push is permitted.',
       );
     if (
       !object(data) || data.schema_version !== 1 || !object(data.scope) ||

@@ -2,6 +2,14 @@ import { execFile } from 'node:child_process';
 import { object } from './manifest.ts';
 import type { MigrationFile } from './migration-generator.ts';
 
+// Only these stable releases have passed the real-binary compatibility matrix.
+export const SUPPORTED_SUPABASE_VERSIONS = '3.0.0 || 3.1.0';
+export function assertSupabaseVersion(stdout: string): void {
+  if (!['3.0.0', '3.1.0'].includes(stdout.trim())) {
+    throw new Error(`Unsupported or malformed Supabase CLI version. Supported: ${SUPPORTED_SUPABASE_VERSIONS} (stable releases only). Install supabase@3.1.0 or supabase@3.0.0; raw version output is withheld.`);
+  }
+}
+
 export interface ProcessResult {
   code: number | null;
   stdout: string;
@@ -81,10 +89,29 @@ export class SupabaseCli {
   }
   async checkVersion(): Promise<void> {
     const result = await this.call(['--version'], 'version check');
-    if (result.stdout.trim() !== '3.0.0') {
-      throw new Error(
-        'This CLI adapter requires Supabase CLI 3.0.0. Install the tested version before deploying.',
-      );
+    assertSupabaseVersion(result.stdout);
+  }
+  async checkCapabilities(): Promise<void> {
+    // Help is local and side-effect free. Inspect mutation flags BEFORE any
+    // hosted configuration write, rather than discovering a removed flag later.
+    const commands = [
+      { command: ['migration', 'list'], flags: [] },
+      { command: ['db', 'push'], flags: ['--dry-run', '--include-all', '--skip-vault', '--yes'] },
+      { command: ['functions', 'list'], flags: [] },
+      { command: ['functions', 'deploy'], flags: ['--yes'] },
+      { command: ['config', 'diff'], flags: [] },
+      { command: ['config', 'push'], flags: ['--yes'] },
+      { command: ['secrets', 'list'], flags: [] },
+      { command: ['secrets', 'set'], flags: ['--env-file', '--yes'] },
+      { command: ['db', 'query'], flags: ['--read-only', '--agent', '--output'] },
+    ];
+    for (const { command, flags } of commands) {
+      const { stdout } = await this.call([...command, '--help'], `${command.join(' ')} capability inspection`);
+      for (const flag of ['--remote', '--workdir', '--output-format', ...flags]) {
+        if (!new RegExp(`^\\s*${flag}(?:\\s|\\[|=|,|$)`, 'm').test(stdout)) {
+          throw new Error(`Supabase CLI ${command.join(' ')} is missing required flag ${flag}. Install an unmodified supported CLI (${SUPPORTED_SUPABASE_VERSIONS}); deployment was not started.`);
+        }
+      }
     }
   }
   private async call(args: string[], operation: string): Promise<ProcessResult> {

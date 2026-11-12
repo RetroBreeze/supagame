@@ -90,6 +90,38 @@ it("stages immutable quota changes without touching unrelated project configurat
 
 import { cleanupSaves } from "../../packages/cli/src/commands/saves-cleanup.ts";
 import { vi } from "vitest";
+it.each(["interactive", "allow-remote", "declined", "unattended", "preview"])("forwards hosted cleanup consent only after %s authorization", async (mode) => {
+  const root = project();
+  initialized(root);
+  cli(root, "add", "cloud-saves");
+  const path = "11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222";
+  const calls: string[][] = [];
+  const fetcher = vi.fn(async () => new Response(null, { status: 200 }));
+  const confirm = vi.fn(async () => mode === "interactive" ? `cleanup ${ref}` : "no");
+  vi.stubEnv("SUPAGAME_STORAGE_ADMIN_KEY", "synthetic-fixture-only");
+  try {
+    const operation = cleanupSaves({ workdir: root, remote: true, projectRef: ref, allowRemote: mode === "allow-remote", dryRun: mode === "preview" }, {
+      run: async (args) => {
+        calls.push([...args]);
+        if (args[0] === "--version") return { code: 0, stdout: "3.1.0", stderr: "" };
+        expect(args).toContain(`--remote=${ref}`);
+        if (args.includes("--read-only")) expect(args).not.toContain("--yes");
+        else {
+          expect(args).toContain("--yes");
+          if (mode === "interactive") expect(confirm).toHaveBeenCalledOnce();
+          else expect(mode).toBe("allow-remote");
+        }
+        return { code: 0, stdout: JSON.stringify([{ path }]), stderr: "" };
+      }, fetcher, log: () => {}, confirm, interactive: mode !== "unattended",
+    });
+    if (["declined", "unattended"].includes(mode)) await expect(operation).rejects.toThrow(/declined|confirmation/);
+    else await operation;
+    const authorized = ["interactive", "allow-remote"].includes(mode);
+    expect(calls.filter((args) => args[0] === "db" && !args.includes("--read-only"))).toHaveLength(authorized ? 2 : 0);
+    expect(fetcher).toHaveBeenCalledTimes(authorized ? 1 : 0);
+  } finally { vi.unstubAllEnvs(); rmSync(root, { recursive: true, force: true }); }
+});
+
 it("cleanup previews exact destination and never mutates a hosted project without confirmation", async () => {
   const root = project();
   initialized(root);

@@ -18,11 +18,17 @@ names on 2026-11-12. This is not a reservation; recheck before publishing.
 
 Use pnpm **12.18.0** and the repository's pinned Supabase CLI **3.0.0** and Deno
 **2.9.6**. Docker and Chromium are needed for the complete local verification.
-Run on both Node.js 24 and 26, selecting each runtime on PATH:
+Run all four combinations of Node.js 24/26 and Supabase CLI 3.0.0/3.1.0,
+selecting each Node runtime on PATH. Keep the dependency pinned; the Linux x64
+test selector verifies the official archive checksum and only replaces the
+generated ignored executable in `node_modules/.bin`:
 
 ```sh
 node --version
 pnpm install --frozen-lockfile
+# Run once with 3.0.0, then repeat with 3.1.0 on each Node runtime.
+node scripts/select-test-supabase.ts 3.0.0
+pnpm test:cli:compatibility
 pnpm build
 pnpm exec playwright install chromium
 pnpm test
@@ -46,8 +52,8 @@ Stop a test stack you started with `pnpm db:stop` when finished. E2E manages its
 own separate temporary stack. Do not stop a pre-existing stack owned by another
 session. These commands must never be pointed at a hosted project.
 
-`.github/workflows/ci.yml` runs both Node majors for unit/package validation and
-local integration, on pushes, pull requests and manual dispatch. A successful
+`.github/workflows/ci.yml` runs the Node 24/26 × Supabase CLI 3.0.0/3.1.0
+matrix for unit/package validation and local integration, on pushes, pull requests and manual dispatch. A successful
 local run does not assert that GitHub-hosted jobs have already run.
 
 `test:packages` clones clean source without `dist`, rebuilds at pack time, checks
@@ -80,7 +86,7 @@ tarball paths together (contracts must be supplied because it is not on npm):
 
 ```sh
 npm install /ABSOLUTE/PATH/retrobreeze-supagame-contracts-0.1.0.tgz /ABSOLUTE/PATH/retrobreeze-supagame-sdk-0.1.0.tgz @supabase/supabase-js@2.119.0
-npm install -D /ABSOLUTE/PATH/retrobreeze-supagame-cli-0.1.0.tgz supabase@3.0.0
+npm install -D /ABSOLUTE/PATH/retrobreeze-supagame-cli-0.1.0.tgz supabase@3.1.0
 npx supagame --help
 ```
 
@@ -170,7 +176,10 @@ Do not add a trusted publisher for this validation-only workflow. Configure the
 future publisher when its first authorized release is scheduled; npm publisher
 setup/expiry rules may change. No automated publisher is enabled by this task.
 
-## Verification record — 2026-11-12
+See [Supabase CLI compatibility](SUPABASE-COMPATIBILITY.md) for the subsequent
+3.0.0/3.1.0 verification, command inventory and unverified hosted boundary.
+
+## Initial npm-preparation verification record — 2026-11-12
 
 All commands below exited 0 on **Node 24.22.2** and **Node 26.13.0**, on Linux
 with Docker, Supabase CLI 3.0.0, Deno 2.9.6 and pnpm 12.18.0:

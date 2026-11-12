@@ -26,9 +26,9 @@ export function resolveAdminTarget(options: AdminTargetOptions) {
   if (!manifest?.value.modules.admin) {
     throw new Error("Install Admin with supagame add admin first.");
   }
-  if (readProjectFile(project.root, "supabase/config.json") !== null) {
+  if (["json", "jsonc"].some((extension) => readProjectFile(project.root, `supabase/config.${extension}`) !== null)) {
     throw new Error(
-      "Ambiguous supabase/config.json and config.toml configuration. Reconcile it before administration.",
+      "Ambiguous supabase/config.json or config.jsonc and config.toml configuration. Reconcile it before administration.",
     );
   }
   const ref = selectedRef(

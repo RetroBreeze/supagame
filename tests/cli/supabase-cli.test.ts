@@ -1,7 +1,7 @@
 import { chmodSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
-import { processEnvironment, runSupabase, SupabaseCli } from '../../packages/cli/src/lib/supabase-cli.ts';
+import { createSupabaseRunner, processEnvironment, runSupabase, SupabaseCli } from '../../packages/cli/src/lib/supabase-cli.ts';
 import { project, put } from './project-fixture.ts';
 const roots: string[] = [];
 afterEach(() => {
@@ -55,6 +55,19 @@ it('reports unavailable executables without hanging or throwing credential-beari
   vi.stubEnv('PATH', root);
   expect((await runSupabase(['--version'], root)).code).toBeNull();
 });
+it.each(['timeout', 'abort'])('treats actual subprocess %s as failure', async (mode) => {
+  const root = project();
+  roots.push(root);
+  put(root, 'bin/supabase', `#!${process.execPath}\nsetInterval(() => {}, 1000);\n`);
+  chmodSync(join(root, 'bin/supabase'), 0o700);
+  vi.stubEnv('PATH', join(root, 'bin'));
+  const controller = new AbortController();
+  const timer = mode === 'abort' ? setTimeout(() => controller.abort(), 50) : undefined;
+  try {
+    const run = createSupabaseRunner(mode === 'timeout' ? 50 : 1000, controller.signal);
+    expect((await run(['--version'], root)).code).toBeNull();
+  } finally { clearTimeout(timer); }
+});
 it('preserves Linux credential-store discovery while stripping deployment overrides', async () => {
   const root = project();
   roots.push(root);
@@ -97,4 +110,20 @@ it.each([
     expect(message).toContain('raw output is withheld');
     expect(message).not.toContain('SECRET');
   }
+});
+
+it.each(['3.0.0', '3.1.0', '3.1.0\r\n'])('accepts tested stable version %j for deployment and diagnostics', async (version) => {
+  const run = async () => ({ code: 0, stdout: version, stderr: 'update notice on stderr' });
+  await expect(new SupabaseCli(run, '/isolated', 'abcdefghijklmnopqrst').checkVersion()).resolves.toBeUndefined();
+  const { DoctorInspector } = await import('../../packages/cli/src/lib/doctor-inspect.ts');
+  await expect(new DoctorInspector(run, '/isolated', { projectId: 'test', port: 55432 }).version()).resolves.toBeUndefined();
+});
+
+it.each(['2.99.0', '4.0.0', '3.2.0', '3.0.1', '3.1.1', '3.1.0-beta.1', '3.1.0+custom', 'v3.1.0', '', '3.01.0', '3.1', '3.1.0\nextra', '{"version":"3.1.0"}'])('rejects unsupported or malformed version %j without echoing it', async (version) => {
+  const run = async () => ({ code: 0, stdout: version, stderr: '' });
+  const { DoctorInspector } = await import('../../packages/cli/src/lib/doctor-inspect.ts');
+  for (const check of [
+    () => new SupabaseCli(run, '/isolated', 'abcdefghijklmnopqrst').checkVersion(),
+    () => new DoctorInspector(run, '/isolated', { projectId: 'test', port: 55432 }).version(),
+  ]) await expect(check()).rejects.toThrow(/3\.0\.0 \|\| 3\.1\.0/);
 });

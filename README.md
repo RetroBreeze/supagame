@@ -7,15 +7,17 @@ and `@retrobreeze/supagame-contracts`, all version **0.1.0**. They remain privat
 until publication is explicitly authorized. Use **Node.js 24 or 26**. After publication:
 
 ```sh
-npm install -D @retrobreeze/supagame-cli supabase@3.0.0
+npm install -D @retrobreeze/supagame-cli supabase@3.1.0
 npm install @retrobreeze/supagame-sdk @supabase/supabase-js@2.119.0
 npx supagame init --project-ref YOUR_PROJECT_REF --origin http://localhost:5173
 ```
 
 Follow the [npm quickstart](packages/cli/README.md) for board creation, deployment,
 SDK initialization, score submission, reads and live subscriptions. The CLI
-requires Supabase CLI **3.0.0 exactly**. See [release preparation](RELEASING.md)
-for local tarballs, verification and the separately authorized publication steps.
+supports Supabase CLI **3.0.0 and 3.1.0** (`3.0.0 || 3.1.0`).
+See [CLI compatibility and verification limits](SUPABASE-COMPATIBILITY.md) and
+[release preparation](RELEASING.md) for local tarballs, verification and the
+separately authorized publication steps.
 
 An MIT-licensed toolkit for installing modular gaming services into your own
 Supabase project. The planned v0.1 provides anonymous player identities and
@@ -463,10 +465,11 @@ never edit an applied migration. Both creation and deployment require unique
 14-digit UTC-style `timestamp_name.sql` migration names; ambiguous or unsupported
 filenames fail instead of being silently omitted.
 
-Deployment uses **Supabase CLI 3.0.0** on `PATH`, the version whose flags and JSON
-protocol this adapter verifies. Other versions fail closed until their compatibility
-is tested. Supabase handles the developer's own authentication; this repository's
-tests require no hosted credentials. The deployment command always requires an
+Deployment supports **Supabase CLI 3.0.0 and 3.1.0** on `PATH`
+(`3.0.0 || 3.1.0`), with verified flags and JSON contracts. Other versions fail
+closed until their compatibility is tested. See
+[compatibility evidence](SUPABASE-COMPATIBILITY.md). Supabase handles the
+developer's own authentication; this repository's tests require no hosted credentials. The deployment command always requires an
 explicit reference matching the manifest and any local link metadata:
 
 ```sh
@@ -562,7 +565,7 @@ supagame upgrade                                 # Stage only; never deploy
 
 Doctor never repairs files, changes settings, applies migrations, modifies records
 or deploys functions. Default diagnostics work offline without hosted credentials.
-Live inspection requires the pinned **Supabase CLI 3.0.0** on `PATH`. Remote mode
+Live inspection supports **Supabase CLI 3.0.0 and 3.1.0** on `PATH`. Remote mode
 requires a reference matching the manifest and available local link metadata;
 `--local` and `--remote` cannot be combined. Environment variables never choose a
 hosted destination. Read failures and unknown response formats are reported as

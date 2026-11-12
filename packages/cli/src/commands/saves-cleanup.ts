@@ -131,7 +131,8 @@ export async function cleanupSaves(options: Options, deps = defaults()) {
           "db",
           "query",
           sql,
-          ...(options.remote ? [`--remote=${ref}`] : []),
+          // This closure is reached only after the hosted confirmation above.
+          ...(options.remote ? [`--remote=${ref}`, "--yes"] : []),
           "--workdir",
           scratch.root,
           "--agent=no",

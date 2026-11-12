@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { object } from './manifest.ts';
-import type { ProcessRunner } from './supabase-cli.ts';
+import { assertSupabaseVersion, type ProcessRunner } from './supabase-cli.ts';
 import type { MigrationFile } from './migration-generator.ts';
 
 export interface InspectionTarget {
@@ -46,13 +46,11 @@ export class DoctorInspector {
       if (result.code === 0) return result.stdout;
     } catch { /* Never print child diagnostics: they can contain credentials. */ }
     throw new Error(
-      'Inspection unavailable. Check Supabase CLI 3.0.0, local stack or hosted read permissions/network; raw process output is withheld.',
+      'Inspection unavailable. Check Supabase CLI 3.0.0 or 3.1.0, local stack or hosted read permissions/network; raw process output is withheld.',
     );
   }
   async version(): Promise<void> {
-    if ((await this.call(['--version'])).trim() !== '3.0.0') {
-      throw new Error('Install the supported Supabase CLI 3.0.0 to inspect this installation.');
-    }
+    assertSupabaseVersion(await this.call(['--version']));
   }
   async json(args: string[], rows = false): Promise<unknown> {
     const flags = this.target.ref ? [`--remote=${this.target.ref}`] : [];
