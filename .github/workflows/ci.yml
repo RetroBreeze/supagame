@@ -22,6 +22,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
+      - name: Install Chromium for browser helper tests
+        run: pnpm exec playwright install chromium
       - name: CLI, SDK, browser demo and API contract unit regressions
         run: pnpm test
       - run: pnpm test:edge
@@ -44,7 +46,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
-      - run: pnpm exec playwright install --with-deps chromium
+      - name: Install Chromium without optional font-package downloads
+        run: pnpm exec playwright install chromium
       - name: Create loopback-only regression network
         run: docker network create --driver bridge --opt com.docker.network.bridge.host_binding_ipv4=127.0.0.1 supagame-schema-tests-local
       - id: local
