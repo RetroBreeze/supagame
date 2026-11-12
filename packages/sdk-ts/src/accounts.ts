@@ -1,12 +1,15 @@
 import type { AuthChangeEvent, Provider, User } from "@supabase/supabase-js";
 import {
   readSession,
+  captureIdentity,
+  checkedResult,
+  sessionResult,
   requireSession,
   type SupabaseConnection,
 } from "./auth.js";
 import { createIndexedDbStore } from "./indexeddb.js";
 import type { LocalStore } from "./offline-saves.js";
-import { GameServicesError } from "./errors.js";
+import { AuthenticationError, GameServicesError } from "./errors.js";
 import { operationId } from "./save-values.js";
 
 export class AccountError extends GameServicesError {
@@ -114,9 +117,9 @@ function failure(code?: string): AccountError {
 }
 export async function verifiedAccount(client: SupabaseConnection) {
   const session = await requireSession(client);
-  const result = await client.auth.getUser(session.access_token).catch(() => {
+  const result = await sessionResult(client, session, () => client.auth.getUser(session.access_token).catch(() => {
     throw failure();
-  });
+  }));
   if (result.error || result.data.user?.id !== session.user.id)
     throw new AccountError(
       "IDENTITY_UNVERIFIED",
@@ -130,8 +133,9 @@ export function createAccountPlayers(
 ): AccountPlayers {
   const { store, key } = context;
   async function getAuthStatus() {
-    if (!(await readSession(client))) return status(null);
-    return status(await verifiedAccount(client));
+    const session = await readSession(client);
+    if (!session) return status(null);
+    return status(await sessionResult(client, session, () => verifiedAccount(client)));
   }
   async function begin(
     operation: AuthFlow["operation"],
@@ -164,7 +168,8 @@ export function createAccountPlayers(
         "INVALID_REDIRECT",
         "Use an HTTPS callback URL (HTTP only on localhost), without query, fragment or credentials.",
       );
-    const current = await getAuthStatus();
+    const check = await captureIdentity(client);
+    const current = await checkedResult(check, getAuthStatus);
     if (operation === "link" && !current.userId)
       throw new AccountError(
         "SESSION_REQUIRED",
@@ -181,9 +186,9 @@ export function createAccountPlayers(
       ...(options.transitionId ? { transitionId: options.transitionId } : {}),
     };
     if (options.transitionId) {
-      const transition = (await store.read(
-        key("transition", options.transitionId),
-      )) as { sourcePlayerId?: string; phase?: string } | null;
+      const transition = (await checkedResult(check, () => store.read(
+        key("transition", options.transitionId!),
+      ))) as { sourcePlayerId?: string; phase?: string } | null;
       if (
         operation !== "signIn" ||
         transition?.sourcePlayerId !== current.userId ||
@@ -194,24 +199,25 @@ export function createAccountPlayers(
           "Prepare a save transition for the current guest before sign-in.",
         );
     }
-    await store.update(key("flow", flow.id), () => flow);
+    await checkedResult(check, () => store.update(key("flow", flow.id), () => flow));
     redirect.searchParams.set("sg_flow", flow.id);
     const input = {
       provider,
       options: { redirectTo: redirect.href, skipBrowserRedirect: true },
     };
-    const result = await (
+    const result = await checkedResult(check, () => (
       operation === "link"
         ? client.auth.linkIdentity(input)
         : client.auth.signInWithOAuth(input)
     ).catch(() => {
       throw failure();
-    });
+    }));
     if (result.error || !result.data.url) throw failure(result.error?.code);
     return { url: result.data.url, flowId: flow.id };
   }
   let callback: Promise<AccountCallback> | undefined;
   async function complete(url: string): Promise<AccountCallback> {
+    const check = await captureIdentity(client);
     let parsed: URL;
     try {
       parsed = new URL(url);
@@ -223,7 +229,7 @@ export function createAccountPlayers(
     }
     const id = parsed.searchParams.get("sg_flow");
     const flow = id
-      ? ((await store.read(key("flow", id))) as AuthFlow | null)
+      ? ((await checkedResult(check, () => store.read(key("flow", id)))) as AuthFlow | null)
       : null;
     if (!flow || flow.version !== 1 || flow.id !== id)
       throw new AccountError(
@@ -256,6 +262,7 @@ export function createAccountPlayers(
       throw failure(
         code ?? hash.get("error_code") ?? hash.get("error") ?? undefined,
       );
+    let exchangedPlayer: string | undefined;
     if (!flow.targetPlayerId) {
       const authCode = parsed.searchParams.get("code");
       if (!authCode && !flow.exchanging)
@@ -267,14 +274,14 @@ export function createAccountPlayers(
       // verify that session before retrying a single-use authorization code.
       let recovered = false;
       if (flow.exchanging) {
-        const s = await getAuthStatus();
+        const s = await checkedResult(check, getAuthStatus);
         recovered =
           !s.isAnonymous &&
           s.providers.includes(flow.provider) &&
           (flow.operation !== "link" || s.userId === flow.sourcePlayerId);
       }
       if (!recovered) {
-        await store.update(key("flow", flow.id), (value) => {
+        await checkedResult(check, () => store.update(key("flow", flow.id), (value) => {
           const latest = value as AuthFlow | null;
           if (!latest || latest.cancelled)
             throw new AccountError(
@@ -282,7 +289,7 @@ export function createAccountPlayers(
               "Authentication was stopped. Staged saves are retained.",
             );
           return { ...latest, exchanging: true };
-        });
+        }));
         const result = await client.auth
           .exchangeCodeForSession(
             authCode!,
@@ -294,9 +301,15 @@ export function createAccountPlayers(
             throw failure();
           });
         if (result.error) throw failure(result.error.code);
+        if (!result.data.session || result.data.user?.id !== result.data.session.user.id) throw failure();
+        exchangedPlayer = result.data.session.user.id;
       }
     }
-    const user = await verifiedAccount(client);
+    // Code exchange intentionally changes Auth. Establish a fresh identity
+    // boundary for verification, receipt persistence and the returned result.
+    const targetSession = await requireSession(client);
+    if (exchangedPlayer && targetSession.user.id !== exchangedPlayer) throw new AuthenticationError("The account changed after code exchange.");
+    const user = await sessionResult(client, targetSession, () => verifiedAccount(client));
     if (flow.operation === "link" && user.id !== flow.sourcePlayerId)
       throw new AccountError(
         "ACCOUNT_CONFLICT",
@@ -311,10 +324,10 @@ export function createAccountPlayers(
         "IDENTITY_UNVERIFIED",
         "The expected provider identity could not be verified.",
       );
-    await store.update(key("flow", flow.id), () => ({
+    await sessionResult(client, targetSession, () => store.update(key("flow", flow.id), () => ({
       ...flow,
       targetPlayerId: user.id,
-    }));
+    })));
     return {
       flowId: flow.id,
       operation: flow.operation,
@@ -338,8 +351,9 @@ export function createAccountPlayers(
       return callback;
     },
     async cancelAuthFlow(flowId) {
-      const current = await getAuthStatus();
-      await store.update(key("flow", flowId), (value) => {
+      const check = await captureIdentity(client);
+      const current = await checkedResult(check, getAuthStatus);
+      await checkedResult(check, () => store.update(key("flow", flowId), (value) => {
         const flow = value as AuthFlow | null;
         if (!flow || flow.version !== 1 || flow.id !== flowId)
           throw new AccountError(
@@ -357,8 +371,8 @@ export function createAccountPlayers(
             "The callback has started. Verify the current account before choosing progress; cancellation cannot undo an exchange.",
           );
         return { ...flow, cancelled: true };
-      });
-      const after = await getAuthStatus();
+      }));
+      const after = await checkedResult(check, getAuthStatus);
       if (after.userId !== current.userId)
         throw new AccountError(
           "ACCOUNT_CHANGED",

@@ -9,7 +9,7 @@ import type {
   SaveRevisionList,
 } from "@supagame/contracts";
 import type { Session } from "@supabase/supabase-js";
-import { requireSession, type SupabaseConnection } from "./auth.js";
+import { requireSession, assertSession, sessionResult, type SupabaseConnection } from "./auth.js";
 import { matches, type Transport } from "./client.js";
 import {
   AuthenticationError,
@@ -83,11 +83,9 @@ export function createSaves(
 ): Omit<Saves, keyof importAccountSaves> {
   const revisions = new Map<string, number>();
   const key = (session: Session, slot: string) => `${session.user.id}:${slot}`;
-  async function same(session: Session) {
-    if ((await requireSession(client)).user.id !== session.user.id)
-      throw new AuthenticationError(
-        "The player changed during the save operation.",
-      );
+  const same = (session: Session) => assertSession(client, session);
+  function remember(session: Session, slot: string, revision: number) {
+    revisions.set(key(session, slot), Math.max(revision, revisions.get(key(session, slot)) ?? 0));
   }
   const storage = () => {
     if (!client.storage) throw new StorageError();
@@ -153,7 +151,7 @@ export function createSaves(
       );
       await same(session);
       if ("save" in result)
-        revisions.set(key(session, slot), result.save.revision);
+        remember(session, slot, result.save.revision);
       return result;
     } catch (error) {
       if (error instanceof GameServicesError) error.operationId = id;
@@ -200,10 +198,30 @@ export function createSaves(
     )
       throw new InvalidParameterError("slot", "This is not a binary save.");
     await same(session);
-    const result = await storage().download(save.objectPath);
+    const result = await sessionResult(client, session, () => storage().download(save.objectPath!));
     if (result.error) storageFailure(result.error);
     await same(session);
     return { save, data: result.data! };
+  }
+  async function cleanupFor(session: Session) {
+    await same(session);
+    const result = await transport.request<SaveObjects>(
+      "/saves/cleanup",
+      "POST",
+      "SaveObjects",
+      { session },
+    );
+    await same(session);
+    if (
+      result.objects.some((path) => !path.startsWith(`${session.user.id}/`))
+    )
+      throw new StorageError();
+    if (result.objects.length) {
+      const removed = await sessionResult(client, session, () => storage().remove(result.objects));
+      if (removed.error) storageFailure(removed.error);
+      await same(session);
+    }
+    return result.objects.length;
   }
   const api: Omit<Saves, keyof importAccountSaves> = {
     async save(slot, data, options = {}) {
@@ -227,7 +245,7 @@ export function createSaves(
         { session },
       );
       await same(session);
-      revisions.set(key(session, slot), result.save.revision);
+      remember(session, slot, result.save.revision);
       return result.save as Saved<T>;
     },
     async list() {
@@ -297,7 +315,7 @@ export function createSaves(
           },
           "SaveResult",
         );
-        revisions.set(key(session, slot), result.save.revision);
+        remember(session, slot, result.save.revision);
         return result.save;
       } catch (error) {
         if (error instanceof GameServicesError) error.operationId = id;
@@ -362,7 +380,7 @@ export function createSaves(
         );
         await same(session);
         if ("save" in prepared) {
-          revisions.set(key(session, slot), prepared.save.revision);
+          remember(session, slot, prepared.save.revision);
           return prepared.save;
         }
         const path = prepared.upload.path;
@@ -371,10 +389,11 @@ export function createSaves(
           path !== `${session.user.id}/${id}`
         )
           throw new StorageError();
-        const upload = await storage().upload(path, await data.arrayBuffer(), {
+        const bytes = await sessionResult(client, session, () => data.arrayBuffer());
+        const upload = await sessionResult(client, session, () => storage().upload(path, bytes, {
           upsert: false,
           contentType: "application/octet-stream",
-        });
+        }));
         // Duplicate object after a lost upload response is safe: it is immutable
         // and commit checks the reservation's exact size. No overwrite is used.
         if (
@@ -396,7 +415,7 @@ export function createSaves(
           { session, body: { action: "commit", operationId: id } },
         );
         await same(session);
-        revisions.set(key(session, slot), result.save.revision);
+        remember(session, slot, result.save.revision);
         return result.save;
       } catch (error) {
         if (error instanceof GameServicesError) error.operationId = id;
@@ -405,7 +424,7 @@ export function createSaves(
     },
     async loadBinary(slot, options = {}) {
       const session = await requireSession(client);
-      const save = await api.load(slot);
+      const save = await sessionResult(client, session, () => api.load(slot));
       if (
         options.maxBytes !== undefined &&
         (!Number.isSafeInteger(options.maxBytes) ||
@@ -433,28 +452,9 @@ export function createSaves(
         body: { action: "abort", operationId: id },
       });
       await same(session);
-      await api.cleanup();
+      await sessionResult(client, session, () => cleanupFor(session));
     },
-    async cleanup() {
-      const session = await requireSession(client);
-      const result = await transport.request<SaveObjects>(
-        "/saves/cleanup",
-        "POST",
-        "SaveObjects",
-        { session },
-      );
-      await same(session);
-      if (
-        result.objects.some((path) => !path.startsWith(`${session.user.id}/`))
-      )
-        throw new StorageError();
-      if (result.objects.length) {
-        const removed = await storage().remove(result.objects);
-        if (removed.error) storageFailure(removed.error);
-        await same(session);
-      }
-      return result.objects.length;
-    },
+    async cleanup() { return cleanupFor(await requireSession(client)); },
   };
   return api;
 }

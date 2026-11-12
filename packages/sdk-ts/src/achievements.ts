@@ -1,5 +1,5 @@
 import type { Achievement } from "@supagame/contracts";
-import { requireSession, type SupabaseConnection } from "./auth.js";
+import { requireSession, assertSession, assertSessionEpoch, type SupabaseConnection } from "./auth.js";
 import type { Transport } from "./client.js";
 export interface AchievementSubscription {
   ready: Promise<void>;
@@ -15,27 +15,36 @@ export interface Achievements {
   ): AchievementSubscription;
   dispose(): void;
 }
+const identityResets = new WeakMap<object, Set<() => void>>();
+/** Internal bridge for the optional notification queue; custom sources own their lifecycle. */
+export function onAchievementIdentityReset(source: object, callback: () => void): () => void {
+  const listeners = identityResets.get(source);
+  listeners?.add(callback);
+  return () => { listeners?.delete(callback); };
+}
 /** Reads are side-effect free. Each subscription hydrates silently and polls for new unlocks. */
 export function createAchievements(
   client: SupabaseConnection,
   transport: Transport,
 ): Achievements {
   const stops = new Set<() => void>();
-  let disposed = false;
+  let disposed = false, observedUser: string | undefined;
+  const resets = new Set<() => void>();
+  const reset = () => { for (const callback of resets) { try { callback(); } catch { /* Isolate renderers. */ } } };
   async function read() {
     const session = await requireSession(client);
+    if (observedUser !== undefined && observedUser !== session.user.id) reset();
+    observedUser = session.user.id;
     const rows = await transport.request<Achievement[]>(
       "/achievements",
       "GET",
       "AchievementList",
       { session },
     );
-    const current = await requireSession(client);
-    if (current.user.id !== session.user.id) {
-      throw new Error("Player changed during achievement retrieval.");
-    }
-    return { user: session.user.id, rows };
+    await assertSession(client, session);
+    return { user: session.user.id, rows, session };
   }
+
   const api: Achievements = {
     async listAchievements() {
       return (await read()).rows;
@@ -56,10 +65,13 @@ export function createAchievements(
         timer: ReturnType<typeof setTimeout> | undefined,
         user: string | undefined;
       const seen = new Set<string>();
+      const resetBaseline = () => { user = undefined; seen.clear(); };
+      resets.add(resetBaseline);
       const stop = () => {
         active = false;
         clearTimeout(timer);
         stops.delete(stop);
+        resets.delete(resetBaseline);
         seen.clear();
       };
       stops.add(stop);
@@ -73,6 +85,7 @@ export function createAchievements(
             seen.clear();
           }
           for (const a of result.rows) {
+            assertSessionEpoch(client, result.session);
             if (!a.unlocked || seen.has(a.id)) continue;
             seen.add(a.id);
             if (!hydrate && !a.historical && active) {
@@ -87,7 +100,7 @@ export function createAchievements(
           }
         } catch (error) {
           try {
-            options.onError?.(error);
+            if (active) options.onError?.(error);
           } catch { /* Keep polling after consumer errors. */ }
         } finally {
           if (active) {
@@ -101,8 +114,17 @@ export function createAchievements(
     },
     dispose() {
       disposed = true;
+      auth?.unsubscribe();
+      reset();
       for (const stop of stops) stop();
     },
   };
+  identityResets.set(api, resets);
+  const auth = client.auth.onAuthStateChange?.((event, session) => {
+    if (disposed || event === 'INITIAL_SESSION') return;
+    const next = session?.user.id;
+    if (event === 'SIGNED_OUT' || (observedUser !== undefined && observedUser !== next)) reset();
+    observedUser = next;
+  }).data.subscription;
   return api;
 }

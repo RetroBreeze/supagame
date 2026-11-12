@@ -33,9 +33,9 @@ function setup() {
   });
   const exchange = vi
     .spyOn(f.supabase.auth, "exchangeCodeForSession")
-    .mockResolvedValue({
-      data: { session: session(false), user: session(false).user },
-      error: null,
+    .mockImplementation(async () => {
+      const current = (await f.supabase.auth.getSession()).data.session!;
+      return { data: { session: current, user: current.user }, error: null };
     });
   const permanent = (id = userId) => {
     const s = session(false);
@@ -289,8 +289,9 @@ it("refuses cancellation while an OAuth exchange is in flight", async () => {
     await new Promise<void>((resolve) => {
       finish = resolve;
     });
+    const current = (await f.supabase.auth.getSession()).data.session!;
     return {
-      data: { session: session(false), user: session(false).user },
+      data: { session: current, user: current.user },
       error: null,
     };
   });

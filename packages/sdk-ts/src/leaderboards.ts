@@ -1,6 +1,6 @@
 import { subscribe, type LiveOptions, type LiveSubscription } from './live.js';
 import type { LeaderboardPage, MyScore, SubmitScoreResult } from '@supagame/contracts';
-import { requireSession, type SupabaseConnection } from './auth.js';
+import { requireSession, assertSession, type SupabaseConnection } from './auth.js';
 import { matches, type Transport } from './client.js';
 import { AuthenticationError, GameServicesError, InvalidParameterError, NetworkError } from './errors.js';
 
@@ -29,7 +29,7 @@ function submissionUuid(): string {
 export function createLeaderboards(client: SupabaseConnection, transport: Transport): Leaderboards {
   const api: Leaderboards = {
     subscribe(id, options) { return subscribe(client, api, id, options); },
-    async getTop(id, options = {}) {
+    async getTop(id, options = {}, signal?: AbortSignal) {
       const path = boardPath(id);
       const limit = options?.limit === undefined ? 50 : options.limit;
       if (!options || !Number.isInteger(limit) || limit < 1 || limit > 100) throw new InvalidParameterError('limit', 'Page limits must be integers from 1 to 100.');
@@ -38,11 +38,11 @@ export function createLeaderboards(client: SupabaseConnection, transport: Transp
         if (typeof options.cursor !== 'string' || !options.cursor.length) throw new InvalidParameterError('cursor', 'A cursor must be a nonempty opaque string returned by the API.');
         query.set('cursor', options.cursor);
       }
-      return transport.request(`${path}/entries?${query}`, 'GET', 'LeaderboardPage');
+      return transport.request(`${path}/entries?${query}`, 'GET', 'LeaderboardPage', { ...(signal ? { signal } : {}) });
     },
-    async getMine(id) {
+    async getMine(id, signal?: AbortSignal) {
       const path = boardPath(id);
-      return transport.request(`${path}/me`, 'GET', 'MyScore', { session: await requireSession(client), nullable: true });
+      return transport.request(`${path}/me`, 'GET', 'MyScore', { session: await requireSession(client), nullable: true, ...(signal ? { signal } : {}) });
     },
     async submit(id, score, submissionKey) {
       const path = boardPath(id);
@@ -57,7 +57,9 @@ export function createLeaderboards(client: SupabaseConnection, transport: Transp
         } catch (error) {
           if (!(error instanceof NetworkError)) throw error;
           // One retry for a lost response, using the same key and identity. SQL owns deduplication.
+          await assertSession(client, initial);
           const current = await requireSession(client);
+          await assertSession(client, initial);
           if (current.user.id !== initial.user.id) throw new AuthenticationError('The player changed during submission. Retry only with the original player session.');
           return await transport.request(`${path}/scores`, 'POST', 'SubmitScoreResult', { session: current, body });
         }

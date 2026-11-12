@@ -1,5 +1,5 @@
 import type { Achievement } from "@supagame/contracts";
-import type { Achievements } from "./achievements.js";
+import { onAchievementIdentityReset, type Achievements } from "./achievements.js";
 export interface AchievementQueue {
   readonly current: Achievement | null;
   readonly pending: number;
@@ -52,6 +52,13 @@ export function createAchievementQueue(
     if (queue.length + Number(!!current) < limit) queue.push(a);
     advance();
   });
+  const offIdentity = onAchievementIdentityReset(source, () => {
+    clearTimeout(timer);
+    current = null;
+    queue.length = 0;
+    seen.clear();
+    emit();
+  });
   const api: AchievementQueue = {
     get current() {
       return current;
@@ -86,6 +93,7 @@ export function createAchievementQueue(
     dispose() {
       disposed = true;
       subscription.unsubscribe();
+      offIdentity();
       clearTimeout(timer);
       current = null;
       queue.length = 0;

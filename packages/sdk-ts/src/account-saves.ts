@@ -5,7 +5,8 @@ import {
   type AccountContext,
   type AuthFlow,
 } from "./accounts.js";
-import type { SupabaseConnection } from "./auth.js";
+import type { Session } from '@supabase/supabase-js';
+import { requireSession, assertSession, assertSessionEpoch, sessionResult, type SupabaseConnection } from "./auth.js";
 import type { Saves, SaveOptions } from "./saves.js";
 import { ApiError, SaveConflictError } from "./errors.js";
 import { operationId, validateJson, type JsonValue } from "./save-values.js";
@@ -191,15 +192,26 @@ export function createAccountSaves(
   saves: Saves,
   context: AccountContext,
 ): AccountSaves {
-  const { store, key } = context;
-  async function current(expected: string) {
-    if ((await verifiedAccount(client)).id !== expected)
+  const { store: rawStore, key } = context;
+  function guardedStore(session: Session): typeof rawStore {
+    return {
+      read: k => sessionResult(client, session, () => rawStore.read(k)),
+      update: (k, change) => sessionResult(client, session, () => rawStore.update(k, old => {
+        assertSessionEpoch(client, session);
+        return change(old);
+      })),
+    };
+  }
+  async function current(expected: string, session: Session) {
+    await assertSession(client, session);
+    if ((await sessionResult(client, session, () => verifiedAccount(client))).id !== expected)
       throw new AccountError(
         "TRANSITION_MISMATCH",
         "The current account does not own this transition. Sign back into the intended account.",
       );
   }
-  async function read(t: AccountTransition): Promise<Journal> {
+  async function read(t: AccountTransition, session: Session): Promise<Journal> {
+    const store = guardedStore(session);
     const j = (await store.read(key("transition", t.id))) as Journal | null;
     if (
       !j ||
@@ -212,14 +224,15 @@ export function createAccountSaves(
     validate(j.slots);
     return j;
   }
-  async function persist(j: Journal) {
+  async function persist(j: Journal, session: Session) {
+    const store = guardedStore(session);
     validate(j.slots);
     await store.update(key("transition", j.id), () => j);
   }
-  async function load(slot: string): Promise<TransferSave | null> {
+  async function load(slot: string, session: Session): Promise<TransferSave | null> {
     let record: SaveRecord;
     try {
-      record = await saves.load(slot);
+      record = await sessionResult(client, session, () => saves.load(slot));
     } catch (e) {
       if (e instanceof ApiError && e.code === "SAVE_NOT_FOUND") return null;
       throw e;
@@ -230,10 +243,10 @@ export function createAccountSaves(
         "Save exceeds the 64 MiB transfer limit. Source data is unchanged.",
       );
     if (record.kind === "binary" && !record.deleted) {
-      const result = await saves.loadBinary(slot, {
+      const result = await sessionResult(client, session, () => saves.loadBinary(slot, {
         maxBytes: MAX_FILE,
         expectedRevision: record.revision,
-      });
+      }));
       if (result.save.revision !== record.revision)
         throw new AccountError(
           "SNAPSHOT_CHANGED",
@@ -246,7 +259,8 @@ export function createAccountSaves(
   const locks = new Map<string, Promise<SwitchResult>>();
   const api: AccountSaves = {
     async prepareAccountSwitch(options = {}) {
-      const user = await verifiedAccount(client);
+      const session = await requireSession(client), store = guardedStore(session);
+      const user = await sessionResult(client, session, () => verifiedAccount(client));
       if (!user.is_anonymous)
         throw new AccountError(
           "GUEST_REQUIRED",
@@ -254,12 +268,12 @@ export function createAccountSaves(
         );
       const local = structuredClone([
         ...(options.local ?? []),
-        ...((await options.beforeSnapshot?.()) ?? []),
+        ...((await sessionResult(client, session, async () => options.beforeSnapshot?.())) ?? []),
       ]);
       for (const v of local) size(v);
       if (new Set(local.map((v) => v.slot)).size !== local.length)
         throw invalid();
-      const records = await saves.list();
+      const records = await sessionResult(client, session, () => saves.list());
       // Check declared sizes before fetching any large object. No silent binary omission.
       if (
         records.some((r) => r.sizeBytes > MAX_FILE) ||
@@ -274,10 +288,10 @@ export function createAccountSaves(
         ...records.map((r) => r.slot),
         ...local.map((v) => v.slot),
       ])) {
-        const guest = local.find((v) => v.slot === slot) ?? (await load(slot));
+        const guest = local.find((v) => v.slot === slot) ?? (await load(slot, session));
         slots.push({ slot, guest, cloud: null });
         validate(slots);
-        await current(user.id);
+        await current(user.id, session);
       }
       const j: Journal = {
         version: 1,
@@ -286,8 +300,8 @@ export function createAccountSaves(
         phase: "prepared",
         slots,
       };
-      await persist(j);
-      await current(user.id);
+      await persist(j, session);
+      await current(user.id, session);
       await store.update(key("pending"), () => ({
         id: j.id,
         sourcePlayerId: j.sourcePlayerId,
@@ -295,11 +309,12 @@ export function createAccountSaves(
       return { id: j.id, sourcePlayerId: j.sourcePlayerId };
     },
     async pendingAccountSwitch() {
-      return (await store.read(key("pending"))) as AccountTransition | null;
+      return (await rawStore.read(key("pending"))) as AccountTransition | null;
     },
     async inspectAccountSwitch(t, { flowId, restart }) {
-      const j = await read(t),
-        user = await verifiedAccount(client);
+      const session = await requireSession(client), store = guardedStore(session);
+      const j = await read(t, session),
+        user = await sessionResult(client, session, () => verifiedAccount(client));
       const flow = (await store.read(key("flow", flowId))) as AuthFlow | null;
       if (
         !flow ||
@@ -328,14 +343,14 @@ export function createAccountSaves(
           );
         const slots: SwitchSlot[] = [];
         for (const s of j.slots) {
-          const cloud = await load(s.slot);
+          const cloud = await load(s.slot, session);
           const deleted = j.conflicts?.[s.slot];
           slots.push({
             ...s,
             cloud: cloud ?? (deleted?.deleted ? snapshot(deleted) : null),
           });
           validate(slots);
-          await current(user.id);
+          await current(user.id, session);
         }
         const generation = j.generation ?? 0;
         const next: Journal = {
@@ -366,11 +381,13 @@ export function createAccountSaves(
       }
       return { targetPlayerId: user.id, slots: structuredClone(j.slots) };
     },
-    resolveAccountSwitch(t, options) {
-      if (locks.has(t.id)) return locks.get(t.id)!;
+    async resolveAccountSwitch(t, options) {
+      const session = await requireSession(client), store = guardedStore(session);
+      const running = locks.get(t.id);
+      if (running) return sessionResult(client, session, () => running);
       const work = (async (): Promise<SwitchResult> => {
-        let j = await read(t);
-        await current(options.targetPlayerId);
+        let j = await read(t, session);
+        await current(options.targetPlayerId, session);
         if (
           j.targetPlayerId !== options.targetPlayerId ||
           j.phase === "prepared"
@@ -416,7 +433,7 @@ export function createAccountSaves(
                     "MERGE_REQUIRED",
                     "Supply a game-specific merge callback.",
                   );
-                value = await options.merge(structuredClone(s));
+                value = await sessionResult(client, session, async () => options.merge!(structuredClone(s)));
               }
               if (!value) continue;
               if (value.slot !== s.slot) throw invalid();
@@ -434,7 +451,7 @@ export function createAccountSaves(
               cloud: null,
             })),
           );
-          await current(options.targetPlayerId);
+          await current(options.targetPlayerId, session);
           // Atomic journal claim serializes cross-tab decisions. A losing tab uses the winner's payload/IDs.
           j = (await store.update(key("transition", t.id), (old) => {
             const previous = old as Journal;
@@ -464,7 +481,7 @@ export function createAccountSaves(
         }
         for (const w of j.writes ?? []) {
           if (w.done) continue;
-          await current(options.targetPlayerId);
+          await current(options.targetPlayerId, session);
           size(w.value);
           const settings: SaveOptions = {
             backupExisting: true,
@@ -485,15 +502,16 @@ export function createAccountSaves(
             ) {
               /* Already absent: no mutation needed. */
             } else if (w.value.kind === "delete")
-              await saves.delete(w.value.slot, settings);
+              await sessionResult(client, session, () => saves.delete(w.value.slot, settings));
             else if (w.value.kind === "binary")
-              await saves.saveBinary(w.value.slot, w.value.binary!, settings);
-            else await saves.save(w.value.slot, w.value.data, settings);
+              await sessionResult(client, session, () => saves.saveBinary(w.value.slot, w.value.binary!, settings));
+            else await sessionResult(client, session, () => saves.save(w.value.slot, w.value.data, settings));
           } catch (error) {
             if (error instanceof SaveConflictError)
               await store.update(key("transition", t.id), (old) => {
                 const p = old as Journal;
-                if ((p.generation ?? 0) !== (j.generation ?? 0)) return p;
+                if ((p.generation ?? 0) !== (j.generation ?? 0) ||
+                  !p.writes?.some(v => v.operationId === w.operationId && v.expectedRevision === w.expectedRevision && !v.done)) return p;
                 return {
                   ...p,
                   conflicts: { ...p.conflicts, [w.value.slot]: error.current },
@@ -501,7 +519,7 @@ export function createAccountSaves(
               });
             throw error;
           }
-          await current(options.targetPlayerId);
+          await current(options.targetPlayerId, session);
           w.done = true;
           // Keep receipts monotonic across retries/tabs rather than clobber another acknowledgement.
           j = (await store.update(key("transition", t.id), (old) => {
@@ -542,8 +560,9 @@ export function createAccountSaves(
       return work;
     },
     async getAccountSwitchRecovery(t) {
-      const j = await read(t),
-        u = await verifiedAccount(client);
+      const session = await requireSession(client);
+      const j = await read(t, session),
+        u = await sessionResult(client, session, () => verifiedAccount(client));
       if (u.id !== j.sourcePlayerId && u.id !== j.targetPlayerId)
         throw new AccountError(
           "TRANSITION_MISMATCH",
@@ -560,14 +579,20 @@ export function createAccountSaves(
       };
     },
     async discardAccountSwitch(t, options) {
-      const j = await read(t);
-      await current(j.targetPlayerId ?? j.sourcePlayerId);
+      const session = await requireSession(client), store = guardedStore(session);
+      const j = await read(t, session);
+      await current(j.targetPlayerId ?? j.sourcePlayerId, session);
       if (j.phase !== "complete" || options.acceptDataLoss !== true)
         throw new AccountError(
           "CONSENT_REQUIRED",
           "Complete the transition and explicitly accept backup loss first.",
         );
-      await store.update(key("transition", t.id), () => null);
+      await store.update(key("transition", t.id), old => {
+        const latest = old as Journal | null;
+        if (!latest || latest.phase !== 'complete' || latest.generation !== j.generation)
+          throw new AccountError('SNAPSHOT_CHANGED', 'Transition changed before discard. Review it again.');
+        return null;
+      });
       await store.update(key("pending"), (old) =>
         (old as AccountTransition | null)?.id === t.id ? null : old,
       );

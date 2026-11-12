@@ -1,6 +1,6 @@
 import type { ApiError as ApiErrorBody } from '@supagame/contracts';
 import type { Session } from '@supabase/supabase-js';
-import { requireSession } from './auth.js';
+import { assertSession, checkedResult } from './auth.js';
 import type { SupabaseConnection } from './auth.js';
 import { ApiError, SaveConflictError, AuthenticationError, InvalidParameterError, NetworkError, UnexpectedResponseError } from './errors.js';
 import * as validators from './validation.generated.js';
@@ -17,7 +17,7 @@ export type Schema = keyof typeof validators;
 export function matches(schema: Schema, value: unknown): boolean {
   return validators[schema](value) as boolean;
 }
-interface RequestOptions { session?: Session; body?: object; nullable?: boolean }
+interface RequestOptions { session?: Session; body?: object; nullable?: boolean; signal?: AbortSignal }
 export interface Transport {
   request<T>(path: string, method: 'GET' | 'POST' | 'PATCH', schema: Schema, options?: RequestOptions): Promise<T>;
 }
@@ -61,8 +61,10 @@ export function createTransport(options: GameServicesOptions): Transport {
   return {
     async request<T>(path: string, method: 'GET' | 'POST' | 'PATCH', schema: Schema, request: RequestOptions = {}): Promise<T> {
       const assertIdentity = async () => {
-        if (request.session && (await requireSession(options.supabase)).user.id !== request.session.user.id) throw new AuthenticationError('The player changed during the request. Original account data was not returned.');
+        if (request.session) await assertSession(options.supabase, request.session);
       };
+      await assertIdentity();
+      request.signal?.throwIfAborted();
       const headers: Record<string, string> = { Accept: 'application/json' };
       if (request.session) headers.Authorization = `Bearer ${request.session.access_token}`;
       let data: unknown;
@@ -72,20 +74,21 @@ export function createTransport(options: GameServicesOptions): Transport {
         let response: Response;
         try {
           response = await fetch(`${base}${path}`, {
-            method, headers, redirect: 'error', credentials: 'omit',
+            method, headers, redirect: 'error', credentials: 'omit', ...(request.signal ? { signal: request.signal } : {}),
             ...(request.body ? { body: JSON.stringify(request.body) } : {}),
           });
-        } catch { throw new NetworkError(); }
+        } catch { await assertIdentity(); throw new NetworkError(); }
+        await assertIdentity();
         if (!response.ok) return httpFailure(response, assertIdentity);
         if (response.status !== 200 || !jsonResponse(response)) throw new UnexpectedResponseError();
         try { data = await response.json(); }
-        catch { throw new UnexpectedResponseError(); }
+        catch { await assertIdentity(); throw new UnexpectedResponseError(); }
       } else {
         // Public API: preserves the host client's URL, publishable key and custom fetch.
         // Explicit per-request JWTs keep protected requests scoped to the selected player.
-        const result = await options.supabase.functions.invoke<unknown>(`supagame/v1${path}`, {
-          method, headers, ...(request.body ? { body: request.body } : {}),
-        });
+        const result = await checkedResult(assertIdentity, () => options.supabase.functions.invoke<unknown>(`supagame/v1${path}`, {
+          method, headers, ...(request.signal ? { signal: request.signal } : {}), ...(request.body ? { body: request.body } : {}),
+        }));
         if (result.response && !result.response.ok) return httpFailure(result.response, assertIdentity);
         if (result.error) {
           if (result.error instanceof Error && result.error.name === 'FunctionsFetchError') throw new NetworkError();

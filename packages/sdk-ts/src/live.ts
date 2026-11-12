@@ -2,7 +2,7 @@ import type { LeaderboardPage, MyScore } from '@supagame/contracts';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { requireSession, type SupabaseConnection } from './auth.js';
 import { InvalidParameterError } from './errors.js';
-import type { Leaderboards } from './leaderboards.js';
+import type { PageOptions } from './leaderboards.js';
 
 export type LiveStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
 export interface RankChange {
@@ -39,9 +39,16 @@ export function rankChanges(
 // Supabase reuses channel objects by topic. Share ownership across SDK instances.
 const active = new WeakMap<object, Set<string>>();
 const removals = new WeakMap<object, Map<string, Promise<void>>>();
+// Shared across replacement subscriptions and SDK wrappers using this client.
+// An aborted Promise is still counted until the transport actually settles.
+const snapshots = new WeakMap<object, Map<string, Promise<void>>>();
+interface SnapshotReads {
+  getTop(id: string, options?: PageOptions, signal?: AbortSignal): Promise<LeaderboardPage>;
+  getMine(id: string, signal?: AbortSignal): Promise<MyScore | null>;
+}
 export function subscribe(
   client: SupabaseConnection,
-  api: Leaderboards,
+  api: SnapshotReads,
   id: string,
   options: LiveOptions,
 ): LiveSubscription {
@@ -87,35 +94,59 @@ export function subscribe(
       options.onError?.(error);
     }
   };
+  const pendingSnapshots = snapshots.get(client) ?? new Map<string, Promise<void>>();
+  snapshots.set(client, pendingSnapshots);
+  let controller: AbortController | undefined;
   const refresh = async () => {
     if (disposed || busy) return;
     busy = true;
-    dirty = false;
-    const version = generation;
+    let settled: Promise<void> | undefined;
     try {
-      const [page, mine] = await Promise.race([
-        Promise.all([api.getTop(id, { limit: topN }), api.getMine(id)]),
-        new Promise<never>((_, reject) => {
-          timeout = setTimeout(
-            () => reject(new Error('Live Leaderboards snapshot timed out.')),
-            10000,
-          );
-        }),
-      ]);
-      if (disposed || version !== generation) return;
-      if (previous !== undefined)
-        for (const event of rankChanges(id, previous?.rank ?? null, mine?.rank ?? null, topN)) {
-          if (!disposed) options.onRankChange?.(event);
-        }
-      previous = mine;
-      if (!disposed) {
-        if (connected) options.onStatus?.('connected');
-        options.onUpdate(page);
+      // A disposed predecessor may still own uncancellable HTTP requests.
+      while (pendingSnapshots.has(id)) {
+        await pendingSnapshots.get(id);
+        if (disposed) return;
       }
-    } catch (error) {
-      if (version === generation) report(error);
+      if (disposed) return;
+      dirty = false;
+      const version = generation;
+      controller = new AbortController();
+      const signal = controller.signal;
+      const top = Promise.resolve().then(() => api.getTop(id, { limit: topN }, signal));
+      const personal = Promise.resolve().then(() => api.getMine(id, signal));
+      settled = Promise.allSettled([top, personal]).then(() => {});
+      pendingSnapshots.set(id, settled);
+      try {
+        const [page, mine] = await Promise.race([
+          Promise.all([top, personal]),
+          new Promise<never>((_, reject) => {
+            timeout = setTimeout(() => {
+              controller?.abort();
+              reject(new Error('Live Leaderboards snapshot timed out.'));
+            }, 10000);
+          }),
+        ]);
+        if (disposed || version !== generation) return;
+        if (previous !== undefined)
+          for (const event of rankChanges(id, previous?.rank ?? null, mine?.rank ?? null, topN)) {
+            if (!disposed) options.onRankChange?.(event);
+          }
+        previous = mine;
+        if (!disposed) {
+          if (connected) options.onStatus?.('connected');
+          options.onUpdate(page);
+        }
+      } catch (error) {
+        if (version === generation) report(error);
+      } finally {
+        clearTimeout(timeout);
+        controller.abort();
+        // Promise.all/race may finish while its sibling is still pending.
+        // Cancellation is advisory: neither case releases the underlying bound.
+        await settled;
+      }
     } finally {
-      clearTimeout(timeout);
+      if (settled && pendingSnapshots.get(id) === settled) pendingSnapshots.delete(id);
       busy = false;
       if (dirty && !disposed) schedule();
     }
@@ -150,6 +181,7 @@ export function subscribe(
     const attempt = ++connection;
     connected = false;
     generation++;
+    controller?.abort();
     previous = undefined;
     detach();
     options.onStatus?.('connecting');
@@ -173,6 +205,7 @@ export function subscribe(
           } else {
             connected = false;
             generation++;
+            controller?.abort();
             previous = undefined;
             options.onStatus?.(status === 'CLOSED' ? 'disconnected' : 'reconnecting');
             if (error) options.onError?.(error);
@@ -187,6 +220,7 @@ export function subscribe(
     // Never await Auth methods while its callback holds the Auth lock.
     if (disposed || event === 'INITIAL_SESSION') return;
     generation++;
+    controller?.abort();
     previous = undefined;
     if (session?.user.id !== userId || event === 'SIGNED_OUT') {
       connection++;
@@ -206,6 +240,7 @@ export function subscribe(
       if (disposed) return;
       disposed = true;
       generation++;
+      controller?.abort();
       connection++;
       clearTimeout(timer);
       clearTimeout(timeout);

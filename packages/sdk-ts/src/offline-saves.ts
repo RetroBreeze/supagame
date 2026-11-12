@@ -43,6 +43,28 @@ export function createOfflineSaves(options: {
     if ((await options.playerId()) !== player)
       throw new AuthenticationError("The player changed while synchronizing.");
   }
+  async function checked<T>(player: string, work: () => Promise<T>): Promise<T> {
+    await same(player);
+    let value: T;
+    try { value = await work(); }
+    catch (error) { await same(player); throw error; }
+    await same(player);
+    return value;
+  }
+  const read = (key: string, player: string) => checked(player, () => options.store.read(key));
+  const update = (key: string, player: string, change: (state: OfflineEntry | null) => OfflineEntry) =>
+    checked(player, () => options.store.update(key, change));
+  const matchesPending = (state: OfflineEntry, pending: PendingSave) =>
+    state.pending[0]?.options.operationId === pending.options.operationId &&
+    state.pending[0]?.options.expectedRevision === pending.options.expectedRevision;
+  function hydrate(previous: OfflineEntry | null, cloud: Saved, binary?: Blob): OfflineEntry {
+    const state = previous ?? empty();
+    if (cloud.revision < Math.max(state.cloud?.revision ?? 0, state.conflict?.revision ?? 0)) return state;
+    const next = { ...state, cloud };
+    if (binary) next.binary = binary;
+    else if (cloud.kind !== 'binary' || cloud.revision !== state.cloud?.revision) delete next.binary;
+    return next;
+  }
   const paused = new Set<string>();
   function writable(player: string) { if (paused.has(player)) throw new AccountError('TRANSITION_PENDING', 'Account transition prepared. Resume this identity explicitly before changing its offline saves.'); }
   const active = new Map<string, Promise<OfflineEntry | null>>();
@@ -55,7 +77,7 @@ export function createOfflineSaves(options: {
       await Promise.allSettled([...active.values()]);
       const local: TransferSave[] = [];
       for (const slot of new Set(slots)) {
-        const state = await api.local(slot), pending = state?.pending.at(-1);
+        const state = await read(JSON.stringify([options.namespace, player, slot]), player), pending = state?.pending.at(-1);
         if (!pending) continue;
         local.push({slot, kind: pending.kind ?? 'json',
           ...(pending.kind === 'binary' ? {binary: pending.data as Blob} : {data: pending.data}),
@@ -63,23 +85,20 @@ export function createOfflineSaves(options: {
           ...(pending.options.metadata ? {metadata:pending.options.metadata}:{})});
       }
       await same(player);
-      return options.saves.prepareAccountSwitch({local});
+      return checked(player, () => options.saves.prepareAccountSwitch({ local, beforeSnapshot: async () => { await same(player); return []; } }));
     },
     async resumeAfterAccountSwitch() { const player = await options.playerId(); if (player) paused.delete(player); },
     async local(slot: string): Promise<OfflineEntry | null> {
       const { key, player } = await scope(slot);
-      const value = await options.store.read(key);
+      const value = await read(key, player);
       await same(player);
       return value;
     },
     async load(slot: string): Promise<OfflineEntry> {
       const { key, player } = await scope(slot);
-      const cloud = await options.saves.load(slot);
+      const cloud = await checked(player, () => options.saves.load(slot));
       await same(player);
-      return options.store.update(key, (previous) => ({
-        ...(previous ?? empty()),
-        cloud,
-      }));
+      return update(key, player, previous => hydrate(previous, cloud));
     },
     /** Durable staging succeeds before any network request is attempted. */
     async stage(
@@ -92,7 +111,8 @@ export function createOfflineSaves(options: {
       const { key, player } = await scope(slot);
       writable(player);
       await same(player);
-      return options.store.update(key, (previous) => {
+      return update(key, player, (previous) => {
+        writable(player);
         const state = previous ?? empty();
         const last = state.pending.at(-1);
         const expectedRevision =
@@ -118,13 +138,9 @@ export function createOfflineSaves(options: {
     },
     async loadBinary(slot: string): Promise<OfflineEntry> {
       const { key, player } = await scope(slot);
-      const result = await options.saves.loadBinary(slot);
+      const result = await checked(player, () => options.saves.loadBinary(slot));
       await same(player);
-      return options.store.update(key, (previous) => ({
-        ...(previous ?? empty()),
-        cloud: result.save,
-        binary: result.data,
-      }));
+      return update(key, player, previous => hydrate(previous, result.save, result.data));
     },
     async stageBinary(
       slot: string,
@@ -134,7 +150,8 @@ export function createOfflineSaves(options: {
       const { key, player } = await scope(slot);
       writable(player);
       await same(player);
-      return options.store.update(key, (previous) => {
+      return update(key, player, (previous) => {
+        writable(player);
         const state = previous ?? empty(),
           last = state.pending.at(-1);
         return {
@@ -162,7 +179,8 @@ export function createOfflineSaves(options: {
       const { key, player } = await scope(slot);
       writable(player);
       await same(player);
-      return options.store.update(key, (previous) => {
+      return update(key, player, (previous) => {
+        writable(player);
         const state = previous ?? empty(),
           last = state.pending.at(-1);
         return {
@@ -192,8 +210,15 @@ export function createOfflineSaves(options: {
       const { key, player } = await scope(slot);
       writable(player);
       await same(player);
-      return options.store.update(key, (previous) => {
+      const observed = await read(key, player) ?? empty();
+      const queue = (s: OfflineEntry) => JSON.stringify(s.pending.map(p => [p.options.operationId, p.options.expectedRevision]));
+      return update(key, player, (previous) => {
+        writable(player);
         const state = previous ?? empty();
+        if (queue(state) !== queue(observed) || state.cloud?.revision !== observed.cloud?.revision ||
+          state.conflict?.revision !== observed.conflict?.revision ||
+          expectedRevision < Math.max(state.cloud?.revision ?? 0, state.conflict?.revision ?? 0))
+          throw new SaveConflictError(state.conflict ?? state.cloud, 'The local queue changed during resolution. Review it again.');
         return {
           cloud: state.cloud,
           pending: [
@@ -214,47 +239,38 @@ export function createOfflineSaves(options: {
       const { key, player } = await scope(slot);
       writable(player);
       const running = active.get(key);
-      if (running) return running;
+      if (running) return checked(player, () => running);
       const work = (async () => {
         for (;;) {
           await same(player);
-          const state = await options.store.read(key);
+          const state = await read(key, player);
           const pending = state?.pending[0];
           if (!pending) return state;
           if (state && Object.hasOwn(state, "conflict"))
             throw new SaveConflictError(state.conflict ?? null);
           try {
             const settings = { ...pending.options, expectedPlayerId: player };
-            const cloud = await (pending.kind === "delete"
+            const cloud = await checked(player, () => (pending.kind === "delete"
               ? options.saves.delete(slot, settings)
               : pending.kind === "binary"
                 ? options.saves.saveBinary(slot, pending.data as Blob, settings)
-                : options.saves.save(slot, pending.data, settings));
+                : options.saves.save(slot, pending.data, settings)));
             await same(player);
-            await options.store.update(key, (current) => {
+            await update(key, player, (current) => {
               const next = current ?? empty();
               // Another tab may have acknowledged this exact operation already.
-              if (
-                next.pending[0]?.options.operationId !==
-                pending.options.operationId
-              )
-                return next;
-              const updated = {
-                ...next,
-                cloud,
-                pending: next.pending.slice(1),
-              };
-              if (pending.kind === "binary")
-                updated.binary = pending.data as Blob;
-              else delete updated.binary;
-              return updated;
+              if (!matchesPending(next, pending)) return next;
+              const updated = hydrate(next, cloud, pending.kind === 'binary' ? pending.data as Blob : undefined);
+              return { ...updated, pending: next.pending.slice(1) };
             });
           } catch (error) {
             if (error instanceof SaveConflictError)
-              await options.store.update(key, (current) => ({
-                ...(current ?? empty()),
-                conflict: error.current,
-              }));
+              await update(key, player, (current) => {
+                const next = current ?? empty();
+                if (!matchesPending(next, pending) ||
+                  (error.current?.revision ?? 0) < Math.max(next.cloud?.revision ?? 0, next.conflict?.revision ?? 0)) return next;
+                return { ...next, conflict: error.current };
+              });
             throw error; // Auth/permission/server errors are never offline successes.
           }
         }
