@@ -164,17 +164,17 @@ MIT licensed, as specified in the repository's LICENSE.
 Live Leaderboards adds `game.leaderboards.subscribe(id, { onUpdate, onRankChange,
 onStatus, onError, topN: 10 })`, returning an idempotent `unsubscribe()` handle.
 Install the optional `live-leaderboards` module and establish a player session
-first. See the repository's `docs/live-leaderboards.md` for lifecycle, security,
+first. See [Live Leaderboards](https://github.com/RetroBreeze/supagame/wiki/Live-Leaderboards) for lifecycle, security,
 rank semantics and operational requirements.
 
 Achievements are available as `game.achievements`, with the framework-independent
 `createAchievementQueue` export. Optional DOM rendering is a separate
-`@retrobreeze/supagame-sdk/browser` entry point. See [Achievements](../../docs/achievements.md)
+`@retrobreeze/supagame-sdk/browser` entry point. See [Achievements](https://github.com/RetroBreeze/supagame/wiki/Achievements)
 for configuration, security, migration and complete examples.
 
 ## Accounts and recovery
 
-See [account linking, OAuth callbacks and save conflict resolution](../../docs/accounts.md).
+See [account linking, OAuth callbacks and save conflict resolution](https://github.com/RetroBreeze/supagame/wiki/Accounts).
 Configure `accounts.namespace` and a Supabase PKCE client. Use `players.linkProvider`
 to preserve the guest ID; use `players.signInWithProvider` explicitly for account
 recovery. Stage progress with `saves.prepareAccountSwitch`, inspect after authentication,
@@ -186,7 +186,7 @@ Use `saves.listRevisions(slot)`, `loadRevision(slot, revision)`,
 `loadBinaryRevision(slot, revision, {maxBytes})` and
 `restoreRevision(slot, revision, {expectedRevision, operationId, expectedPlayerId})`.
 Five backups per slot are retained for up to 30 days, within existing quotas. Restoration
-backs up the current valid save and checks its revision. See [recovery](../../docs/accounts.md#backups-and-recovery).
+backs up the current valid save and checks its revision. See [recovery](https://github.com/RetroBreeze/supagame/wiki/Accounts#backups-and-recovery).
 
 `strategy: 'defer'` returns `status: 'deferred'` and leaves the authenticated target signed
 in. The deprecated `cancel` alias has the same behavior. To stop authentication *before*

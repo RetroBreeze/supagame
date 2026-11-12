@@ -5,7 +5,7 @@ A small standalone browser application. It uses
 Supabase client for authentication. It is not a game and does not touch Vaccoin,
 Toy Tanks or any other project.
 
-Follow [quickstart](../../docs/quickstart.md) to stage the backend and create:
+Follow [quickstart](https://github.com/RetroBreeze/supagame/wiki/Quickstart) to stage the backend and create:
 
 - `level-1`: time, ascending, 0–1000000 (this demo treats values as milliseconds).
 - `arcade`: points, descending, 0–1000000.
@@ -48,4 +48,4 @@ toolchain. Chromium is the automated consumer; other browsers and hosted HTTPS
 configuration have not been independently verified here.
 
 OAuth/email linking belongs to the application's Auth flow. See
-[identity and linking](../../docs/security.md#anonymous-identity-and-linking).
+[identity and linking](https://github.com/RetroBreeze/supagame/wiki/Security#anonymous-identity-and-linking).
