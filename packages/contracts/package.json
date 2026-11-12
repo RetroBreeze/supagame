@@ -1,6 +1,6 @@
 {
-  "name": "@supagame/contracts",
-  "version": "0.1.4",
+  "name": "@retrobreeze/supagame-contracts",
+  "version": "0.1.0",
   "private": true,
   "description": "Versioned HTTP contract and shared game service DTOs",
   "type": "module",
@@ -14,7 +14,9 @@
   },
   "files": [
     "dist",
-    "openapi.yaml"
+    "openapi.yaml",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "prepack": "node ../../scripts/prepare-package.ts contracts",
@@ -22,5 +24,27 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src --max-warnings=0",
     "test": "vitest run --root ../.. tests/api/contract.test.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RetroBreeze/supagame.git",
+    "directory": "packages/contracts"
+  },
+  "homepage": "https://github.com/RetroBreeze/supagame#readme",
+  "bugs": {
+    "url": "https://github.com/RetroBreeze/supagame/issues"
+  },
+  "keywords": [
+    "supabase",
+    "games",
+    "leaderboards",
+    "openapi"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": "^24.0.0 || ^26.0.0"
   }
 }

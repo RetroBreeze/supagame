@@ -7,7 +7,7 @@ import type {
   SaveObjects,
   SaveRevision,
   SaveRevisionList,
-} from "@supagame/contracts";
+} from "@retrobreeze/supagame-contracts";
 import type { Session } from "@supabase/supabase-js";
 import { requireSession, assertSession, sessionResult, type SupabaseConnection } from "./auth.js";
 import { matches, type Transport } from "./client.js";

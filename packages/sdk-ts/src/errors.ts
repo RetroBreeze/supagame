@@ -1,4 +1,4 @@
-import type { SaveRecord } from '@supagame/contracts';
+import type { SaveRecord } from '@retrobreeze/supagame-contracts';
 export type ErrorKind = 'authentication' | 'api' | 'network' | 'invalid_parameter' | 'unexpected_response';
 
 /** Errors contain public metadata only, never underlying transport/auth causes or tokens. */

@@ -1,4 +1,4 @@
-import type { LeaderboardPage, MyScore } from '@supagame/contracts';
+import type { LeaderboardPage, MyScore } from '@retrobreeze/supagame-contracts';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { requireSession, type SupabaseConnection } from './auth.js';
 import { InvalidParameterError } from './errors.js';

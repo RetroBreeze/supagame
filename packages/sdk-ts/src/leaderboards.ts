@@ -1,5 +1,5 @@
 import { subscribe, type LiveOptions, type LiveSubscription } from './live.js';
-import type { LeaderboardPage, MyScore, SubmitScoreResult } from '@supagame/contracts';
+import type { LeaderboardPage, MyScore, SubmitScoreResult } from '@retrobreeze/supagame-contracts';
 import { requireSession, assertSession, type SupabaseConnection } from './auth.js';
 import { matches, type Transport } from './client.js';
 import { AuthenticationError, GameServicesError, InvalidParameterError, NetworkError } from './errors.js';

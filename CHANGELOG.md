@@ -1,5 +1,14 @@
 # Changelog
 
+## Proposed public npm release — 0.1.0
+
+- Rename CLI, SDK and contracts to the `@retrobreeze/supagame-*` namespace.
+- Align their first public npm versions at 0.1.0; earlier unreleased versions below
+  describe development history, not published npm releases.
+- Preserve schema/module upgrade versions and all existing runtime APIs.
+- Add non-publishing Node 24/26 CI validation and isolated transitive package tests.
+- Retain `private: true`; publication still requires separate authorization.
+
 ## Unreleased — CLI 0.1.6
 
 - Fixed hosted Admin Dashboard startup rejecting valid operators: the fixed

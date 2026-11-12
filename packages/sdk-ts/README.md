@@ -1,14 +1,24 @@
-# @supagame/sdk-ts
+# @retrobreeze/supagame-sdk
 
 Browser-compatible TypeScript wrappers for the Supagame v1 HTTP API. The caller
 supplies a Supabase client initialized with the project's **publishable** key.
 Never initialize a game client with a secret or service-role key.
 
 The package is currently private in this repository; no npm publication is part
-of this implementation. Build the workspace with `pnpm build`.
+of this implementation. Proposed first public version: **0.1.0**.
+Node.js consumers support **24 or 26**; the browser SDK still uses standard Web APIs.
+After publication, install the SDK and its peer dependency:
+
+```sh
+npm install @retrobreeze/supagame-sdk @supabase/supabase-js@2.119.0
+```
+
+For backend setup and a complete runnable integration, see the
+[npm quickstart](https://github.com/RetroBreeze/supagame/tree/main/packages/cli).
+For source development, build the workspace with `pnpm build`.
 
 ```ts
-import { createGameServices } from '@supagame/sdk-ts';
+import { createGameServices } from '@retrobreeze/supagame-sdk';
 
 // Reuse your application's existing Supabase client and storage adapter.
 const game = createGameServices({ supabase });
@@ -82,7 +92,7 @@ project: protected requests send the current user's JWT there. An override does
 not inherit the Supabase client's custom fetch transport. The default transport
 inherits the caller's redirect/network behavior.
 
-DTOs are re-exported from `@supagame/contracts`; response and body validators are
+DTOs are re-exported from `@retrobreeze/supagame-contracts`; response and body validators are
 generated from the same OpenAPI schemas. Validation rejects malformed responses,
 unsafe score/rank integers, private extra fields and invalid formats. The SDK
 leaves ordering, competition ranks, idempotency and all database business rules
@@ -125,9 +135,9 @@ idempotent retry, which may differ from a subsequently improved personal best.
 ## Development and verification
 
 ```sh
-pnpm --filter @supagame/sdk-ts test
-pnpm --filter @supagame/sdk-ts typecheck
-pnpm --filter @supagame/sdk-ts build
+pnpm --filter @retrobreeze/supagame-sdk test
+pnpm --filter @retrobreeze/supagame-sdk typecheck
+pnpm --filter @retrobreeze/supagame-sdk build
 pnpm contracts:check
 # Only the repository's isolated local Supabase fixture:
 pnpm api:start
@@ -136,7 +146,7 @@ pnpm db:stop
 ```
 
 After an approved OpenAPI change, run
-`pnpm --filter @supagame/sdk-ts validators:generate`. The committed standalone
+`pnpm --filter @retrobreeze/supagame-sdk validators:generate`. The committed standalone
 validators require no Ajv, dynamic code generation or Node modules at runtime.
 `pnpm contracts:check` checks their freshness along with generated DTOs. The
 browser test bundles the SDK for a browser and executes it without Node globals
@@ -159,7 +169,7 @@ rank semantics and operational requirements.
 
 Achievements are available as `game.achievements`, with the framework-independent
 `createAchievementQueue` export. Optional DOM rendering is a separate
-`@supagame/sdk-ts/browser` entry point. See [Achievements](../../docs/achievements.md)
+`@retrobreeze/supagame-sdk/browser` entry point. See [Achievements](../../docs/achievements.md)
 for configuration, security, migration and complete examples.
 
 ## Accounts and recovery

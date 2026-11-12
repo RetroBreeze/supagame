@@ -13,7 +13,7 @@
     "test": "vitest run --root ../.. tests/demo"
   },
   "dependencies": {
-    "@supagame/sdk-ts": "workspace:*",
+    "@retrobreeze/supagame-sdk": "workspace:*",
     "@supabase/supabase-js": "2.119.0"
   },
   "devDependencies": { "vite": "8.3.6" }

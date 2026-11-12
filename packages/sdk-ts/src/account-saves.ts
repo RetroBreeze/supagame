@@ -1,4 +1,4 @@
-import type { SaveRecord } from "@supagame/contracts";
+import type { SaveRecord } from "@retrobreeze/supagame-contracts";
 import {
   AccountError,
   verifiedAccount,

@@ -1,7 +1,7 @@
 # Minimal Supagame browser demo
 
 A small standalone browser application. It uses
-`@supagame/sdk-ts` for profile, score and leaderboard operations and the caller-owned
+`@retrobreeze/supagame-sdk` for profile, score and leaderboard operations and the caller-owned
 Supabase client for authentication. It is not a game and does not touch Vaccoin,
 Toy Tanks or any other project.
 

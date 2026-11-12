@@ -1,18 +1,20 @@
 {
-  "name": "@supagame/cli",
-  "version": "0.1.6",
+  "name": "@retrobreeze/supagame-cli",
+  "version": "0.1.0",
   "private": true,
   "description": "Provision Supabase Game Services in your own project",
   "type": "module",
   "license": "MIT",
   "engines": {
-    "node": ">=24.0.0 <25"
+    "node": "^24.0.0 || ^26.0.0"
   },
   "bin": {
     "supagame": "./dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "prepack": "node ../../scripts/prepare-package.ts cli",
@@ -25,5 +27,24 @@
   "dependencies": {
     "commander": "15.1.0",
     "smol-toml": "1.9.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RetroBreeze/supagame.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/RetroBreeze/supagame#readme",
+  "bugs": {
+    "url": "https://github.com/RetroBreeze/supagame/issues"
+  },
+  "keywords": [
+    "supabase",
+    "games",
+    "leaderboards",
+    "cli"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

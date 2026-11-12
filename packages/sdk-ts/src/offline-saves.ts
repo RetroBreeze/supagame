@@ -1,6 +1,6 @@
 import type { TransferSave } from './account-saves.js';
 import { AccountError } from './accounts.js';
-import type { SaveRecord } from "@supagame/contracts";
+import type { SaveRecord } from "@retrobreeze/supagame-contracts";
 import type { Saves, SaveOptions, Saved } from "./saves.js";
 import { AuthenticationError, SaveConflictError } from "./errors.js";
 import { operationId, validateJson } from "./save-values.js";

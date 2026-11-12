@@ -1,4 +1,4 @@
-import type { Achievement } from "@supagame/contracts";
+import type { Achievement } from "@retrobreeze/supagame-contracts";
 import { requireSession, assertSession, assertSessionEpoch, type SupabaseConnection } from "./auth.js";
 import type { Transport } from "./client.js";
 export interface AchievementSubscription {

@@ -6,7 +6,7 @@
   "license": "MIT",
   "packageManager": "pnpm@12.18.0",
   "engines": {
-    "node": ">=24.0.0 <25"
+    "node": "^24.0.0 || ^26.0.0"
   },
   "scripts": {
     "test": "vitest run",
@@ -21,7 +21,7 @@
     "lint": "eslint . --max-warnings=0 && pnpm lint:edge",
     "build": "pnpm -r build",
     "contracts:generate": "openapi-typescript packages/contracts/openapi.yaml -o packages/contracts/src/generated.ts",
-    "contracts:check": "openapi-typescript packages/contracts/openapi.yaml -o packages/contracts/src/generated.ts --check && pnpm --filter @supagame/sdk-ts validators:check",
+    "contracts:check": "openapi-typescript packages/contracts/openapi.yaml -o packages/contracts/src/generated.ts --check && pnpm --filter @retrobreeze/supagame-sdk validators:check",
     "api:start": "node tests/api/start-local.ts",
     "test:edge": "deno test --frozen --allow-env --allow-read=packages/contracts/openapi.yaml tests/api/http.test.ts",
     "test:edge:integration": "deno test --frozen --allow-env --allow-read=packages/contracts/openapi.yaml --allow-net=127.0.0.1:55431 --allow-run=./node_modules/.bin/supabase,docker tests/api/http.integration.test.ts",

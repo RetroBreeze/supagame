@@ -1,5 +1,22 @@
 # Supabase Game Services
 
+## Proposed npm release
+
+The initial packages are `@retrobreeze/supagame-cli`, `@retrobreeze/supagame-sdk`
+and `@retrobreeze/supagame-contracts`, all version **0.1.0**. They remain private
+until publication is explicitly authorized. Use **Node.js 24 or 26**. After publication:
+
+```sh
+npm install -D @retrobreeze/supagame-cli supabase@3.0.0
+npm install @retrobreeze/supagame-sdk @supabase/supabase-js@2.119.0
+npx supagame init --project-ref YOUR_PROJECT_REF --origin http://localhost:5173
+```
+
+Follow the [npm quickstart](packages/cli/README.md) for board creation, deployment,
+SDK initialization, score submission, reads and live subscriptions. The CLI
+requires Supabase CLI **3.0.0 exactly**. See [release preparation](RELEASING.md)
+for local tarballs, verification and the separately authorized publication steps.
+
 An MIT-licensed toolkit for installing modular gaming services into your own
 Supabase project. The planned v0.1 provides anonymous player identities and
 leaderboards through a versioned HTTP API, a provisioning CLI, and a thin
@@ -23,8 +40,9 @@ The packages are currently private: install local tarballs, not unpublished npm
 names. The example is a small score-entry UI, not a game; no other game project is
 modified. Chromium/local Supabase are tested; hosted deployment and provider OAuth
 require separate verification. No native platform or mobile toolchain is required.
-`@supagame/*` and the `supagame` executable are provisional names; all packages
-are private until publication is separately approved.
+The proposed npm names are `@retrobreeze/supagame-{cli,sdk,contracts}`;
+the executable remains `supagame`. All packages remain private until publication
+is separately approved.
 
 ## Install in your game
 
@@ -48,13 +66,13 @@ unreadable origin secrets have an explicit migration path; see the
 
 ## Local development
 
-Use Node.js **24 LTS** (`.node-version` pins 24.22.2) and pnpm **12.18.0**.
+Use Node.js **24 or 26 LTS** (`.node-version` pins 24.22.2) and pnpm **12.18.0**.
 Install that pnpm version using your preferred package-manager setup, for example
 `npm install --global pnpm@12.18.0`, then run from this repository:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm --filter @supagame/cli dev --help
+pnpm --filter @retrobreeze/supagame-cli dev --help
 pnpm test
 pnpm typecheck
 pnpm lint
@@ -65,9 +83,9 @@ node packages/cli/dist/cli.js --help
 
 `pnpm typecheck` checks tests and configuration as well as each package.
 `pnpm -r typecheck`, `pnpm -r lint` and `pnpm -r build` check the workspace
-packages individually. `pnpm --filter @supagame/cli test` and
-`pnpm --filter @supagame/contracts test` select their respective suites.
-`pnpm --filter @supagame/sdk-ts test` runs SDK unit/browser tests;
+packages individually. `pnpm --filter @retrobreeze/supagame-cli test` and
+`pnpm --filter @retrobreeze/supagame-contracts test` select their respective suites.
+`pnpm --filter @retrobreeze/supagame-sdk test` runs SDK unit/browser tests;
 `pnpm test:sdk:integration` uses the local stack started with `pnpm api:start`.
 The default TypeScript unit tests need no Supabase credentials or Docker stack. Database
 tests use the local fixture below. Deno HTTP tests and local Edge integration
@@ -319,7 +337,7 @@ known forward-only releases locally. Games call the HTTP API directly.
 
 ## Local CLI setup and module staging
 
-Build with `pnpm --filter @supagame/cli build`. From a developer's existing
+Build with `pnpm --filter @retrobreeze/supagame-cli build`. From a developer's existing
 Supabase project root, use the resulting executable (or its absolute Node path):
 
 ```sh
@@ -412,7 +430,7 @@ inspect `.supagame-stage`, remove only that temporary staging directory, then re
 Never commit staging backups. Multiple files are not a power-loss-atomic transaction;
 there is no deployment or database operation to undo.
 
-Run `pnpm --filter @supagame/cli test` for CLI, filesystem and built-asset tests.
+Run `pnpm --filter @retrobreeze/supagame-cli test` for CLI, filesystem and built-asset tests.
 The CLI tests use temporary directories; the copied Edge typecheck requires the
 locked Deno dependencies to be cached or available for download.
 
@@ -525,7 +543,7 @@ Deployment cannot be atomic across PostgreSQL and Edge hosting:
   race. Migration history establishes applied versions, not the contents of an
   already-applied file, so preserve migration immutability in Git.
 
-`pnpm --filter @supagame/cli test` covers deployment with mocked process execution,
+`pnpm --filter @retrobreeze/supagame-cli test` covers deployment with mocked process execution,
 including zero mutation calls on unapproved attempts. `pnpm test:cli:db` runs generated
 SQL, escaping and real CLI dry-run checks in the fixed local PostgreSQL fixture.
 No automated test performs a hosted deployment.
@@ -627,7 +645,7 @@ commit staged changes, then use the separate explicitly confirmed deployment wor
 when ready. No reset, deletion, downgrade, automatic remediation or deployment runs
 from a maintenance command.
 
-Maintenance coverage is included in `pnpm --filter @supagame/cli test`.
+Maintenance coverage is included in `pnpm --filter @retrobreeze/supagame-cli test`.
 `pnpm test:cli:db` additionally checks the actual local CLI protocol and catalog
 security diagnostics against synthetic, rolled-back drift in the fixed Supabase
 fixture. Remote inspection tests use mocked process execution only.
@@ -683,7 +701,7 @@ pnpm typecheck
 
 Commit the regenerated `packages/contracts/src/generated.ts` with the schema.
 Consumers use the named exports from `packages/contracts/src/types.ts` (or
-`@supagame/contracts` when linked as a workspace dependency). The generated
+`@retrobreeze/supagame-contracts` when linked as a workspace dependency). The generated
 types preserve nullability and enum values; TypeScript's `number` type cannot
 enforce safe-integer bounds, so runtime validation is still required.
 

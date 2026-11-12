@@ -1,4 +1,4 @@
-import type { ApiError as ApiErrorBody } from '@supagame/contracts';
+import type { ApiError as ApiErrorBody } from '@retrobreeze/supagame-contracts';
 import type { Session } from '@supabase/supabase-js';
 import { assertSession, checkedResult } from './auth.js';
 import type { SupabaseConnection } from './auth.js';

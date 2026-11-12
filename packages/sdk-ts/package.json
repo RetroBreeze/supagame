@@ -1,6 +1,6 @@
 {
-  "name": "@supagame/sdk-ts",
-  "version": "0.1.4",
+  "name": "@retrobreeze/supagame-sdk",
+  "version": "0.1.0",
   "private": true,
   "description": "Browser-compatible TypeScript client for the Supagame HTTP API",
   "type": "module",
@@ -27,13 +27,36 @@
   "files": [
     "dist",
     "README.md",
-    "THIRD_PARTY_NOTICES.md"
+    "THIRD_PARTY_NOTICES.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "dependencies": {
-    "@supagame/contracts": "workspace:*"
+    "@retrobreeze/supagame-contracts": "workspace:*"
   },
   "peerDependencies": {
     "@supabase/supabase-js": "^2.119.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RetroBreeze/supagame.git",
+    "directory": "packages/sdk-ts"
+  },
+  "homepage": "https://github.com/RetroBreeze/supagame#readme",
+  "bugs": {
+    "url": "https://github.com/RetroBreeze/supagame/issues"
+  },
+  "keywords": [
+    "supabase",
+    "games",
+    "leaderboards",
+    "typescript"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": "^24.0.0 || ^26.0.0"
   }
 }

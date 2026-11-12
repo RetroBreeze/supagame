@@ -1,4 +1,4 @@
-import type { Achievement } from "@supagame/contracts";
+import type { Achievement } from "@retrobreeze/supagame-contracts";
 import { onAchievementIdentityReset, type Achievements } from "./achievements.js";
 export interface AchievementQueue {
   readonly current: Achievement | null;

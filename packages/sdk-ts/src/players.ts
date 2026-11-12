@@ -1,5 +1,5 @@
 import { createAccountPlayers, type AccountPlayers, type AccountContext } from './accounts.js';
-import type { PlayerProfile, UpdatePlayerRequest } from '@supagame/contracts';
+import type { PlayerProfile, UpdatePlayerRequest } from '@retrobreeze/supagame-contracts';
 import { ensureSession, requireSession, type SupabaseConnection } from './auth.js';
 import { matches, type Transport } from './client.js';
 import { InvalidParameterError } from './errors.js';

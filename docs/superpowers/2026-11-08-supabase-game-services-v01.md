@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - There is **no existing software repository** in the supplied workspace. Start a new Git repository only when implementation is approved; never touch Toy Tanks or other projects directly.
-- Provisional npm namespace and CLI executable: `@supagame/cli` / `supagame`; confirm availability before publication, rename consistently if unavailable.
+- Provisional npm namespace and CLI executable: `@retrobreeze/supagame-cli` / `supagame`; confirm availability before publication, rename consistently if unavailable.
 - One Supabase project corresponds to one game; no central hosted service or multi-game tenancy in v0.1.
 - Default authentication is anonymous Supabase Auth, but existing authenticated sessions must be retained.
 - Database scores are `BIGINT`; the JSON API and JavaScript SDK accept only safe integer values, documented as `Number.isSafeInteger(score)`, to avoid precision loss.
@@ -130,7 +130,7 @@
 **Interfaces:** `supagame init` creates `supagame.config.json`; `supagame add leaderboards` copies known versions of migration/function templates into an existing Supabase project without overwriting user files. The manifest includes `formatVersion`, `projectRef`, `modules`, and `leaderboards`. Add separate `--dry-run` support for local preview.
 
 - [ ] **Step 1 — failing tests:** In temporary fixture directories, test empty project, existing Supabase project, repeat invocation (no changes), conflicting filenames (actionable error), unknown module (error), and preservation of unrelated files.
-- [ ] **Step 2 — red:** Run `pnpm --filter @supagame/cli test`; expect missing CLI commands.
+- [ ] **Step 2 — red:** Run `pnpm --filter @retrobreeze/supagame-cli test`; expect missing CLI commands.
 - [ ] **Step 3 — implement:** Add CLI parser, schema-validated manifest, safe staging, and template version inventory. Never modify or read another user's project outside the explicit working directory.
 - [ ] **Step 4 — green:** Run CLI unit tests and a filesystem snapshot comparison for idempotent repeated installs.
 - [ ] **Step 5 — commit:** Commit CLI bootstrap and module staging.
@@ -166,7 +166,7 @@
 **Interfaces:** `createGameServices({supabase, baseUrl?}): GameServices`; `players.ensureAnonymousSession(): Promise<{userId:string}>`; `players.getMe(): Promise<PlayerProfile>`; `players.updateMe({displayName}): Promise<PlayerProfile>`; `leaderboards.getTop(id, {limit?,cursor?}): Promise<LeaderboardPage>`; `leaderboards.getMine(id): Promise<MyScore|null>`; `leaderboards.submit(id, score, submissionKey?): Promise<SubmitScoreResult>`. A shared Supabase client owns session persistence/token refresh; SDK never embeds an admin key.
 
 - [ ] **Step 1 — failing tests:** Mock auth and fetch. Assert anonymous sign-in only when no session exists, existing permanent/anonymous session reused, failed/revoked session yields clear error, SDK sends current user JWT and publishable key, retries preserve submission key, and network/API errors map to typed errors.
-- [ ] **Step 2 — red:** Run `pnpm --filter @supagame/sdk-ts test`; expect missing exports.
+- [ ] **Step 2 — red:** Run `pnpm --filter @retrobreeze/supagame-sdk test`; expect missing exports.
 - [ ] **Step 3 — implement:** Add typed wrappers aligned with OpenAPI, token refresh through the supplied Supabase client, JSON safe-integer checks, and platform-independent session handling.
 - [ ] **Step 4 — green:** Run SDK tests, typecheck and package build; verify no server-only dependencies in client output.
 - [ ] **Step 5 — commit:** Commit TypeScript client and tests.

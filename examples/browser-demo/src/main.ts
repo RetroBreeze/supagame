@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { ApiError, GameServicesError, createGameServices } from '@supagame/sdk-ts';
+import { ApiError, GameServicesError, createGameServices } from '@retrobreeze/supagame-sdk';
 import { demoConfig } from './config.js';
 import './style.css';
 
