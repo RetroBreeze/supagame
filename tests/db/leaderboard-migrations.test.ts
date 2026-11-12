@@ -7,6 +7,29 @@ import {
   sqlLiteral,
 } from '../../packages/cli/src/lib/migration-generator.ts';
 import { query } from './local-sessions.ts';
+import { achievementSql } from '../../packages/cli/src/lib/achievements.ts';
+
+for (const text of [
+  'Collect $supagame$ tokens',
+  "Quotes' \\ newlines\n$supagame$ $supagame_1$ $supagame_2$; -- /* */",
+]) {
+  test(`generated achievement SQL round-trips delimiter-bearing text: ${JSON.stringify(text)}`, () => {
+    const a = {
+      id: 'review-achievement', title: text, description: text, icon: text,
+      category: text, metadata: { nested: { text } },
+      condition: { type: 'score_threshold', leaderboardId: 'review-achievements', threshold: 500 },
+    };
+    const board = leaderboardSql(definition('review-achievements', { type: 'points', order: 'desc', keepBest: true }));
+    const sql = achievementSql(a);
+    const output = query(`begin;\n${board}\n${sql}\n${sql}\nselect jsonb_build_object(
+      'count', count(*), 'definition', jsonb_agg(jsonb_build_object(
+        'id', id, 'title', title, 'description', description, 'icon', icon,
+        'category', category, 'metadata', metadata, 'condition', jsonb_build_object(
+          'type', condition_type, 'leaderboardId', leaderboard_id, 'threshold', threshold))) -> 0)
+      from public.game_achievements where id='review-achievement';\nrollback;`);
+    assert.deepEqual(JSON.parse(output), { count: 1, definition: a });
+  });
+}
 
 test('generated migration creates a board, repeats safely and preserves a conflicting definition', () => {
   const board = definition('task8-generated-board', {

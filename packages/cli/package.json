@@ -15,6 +15,7 @@
     "dist"
   ],
   "scripts": {
+    "prepack": "node ../../scripts/prepare-package.ts cli",
     "dev": "node src/cli.ts",
     "build": "tsc -p tsconfig.json && node scripts/copy-assets.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",

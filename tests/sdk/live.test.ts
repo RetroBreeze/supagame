@@ -1,6 +1,58 @@
 import { expect, it, vi } from 'vitest';
 import { createGameServices } from '../../packages/sdk-ts/src/index.ts';
-import { fixture, entry } from './fixtures.ts';
+import { fixture, entry, key } from './fixtures.ts';
+
+it.each(['functions', 'fetch'] as const)('publishes bounded snapshots during sustained broadcasts (%s)', async (transport) => {
+  vi.useFakeTimers();
+  const f = fixture();
+  let hint!: (message: { payload: { boardId: string } }) => void;
+  const channel = {
+    on: vi.fn((_type, _filter, callback) => { hint = callback; return channel; }),
+    subscribe: vi.fn(() => channel),
+  };
+  vi.spyOn(f.supabase, 'channel').mockReturnValue(channel as never);
+  vi.spyOn(f.supabase, 'removeChannel').mockResolvedValue('ok');
+  vi.spyOn(f.supabase.realtime, 'setAuth').mockResolvedValue();
+  let inFlight = 0, peak = 0;
+  f.fetcher.mockImplementation(async (url) => {
+    peak = Math.max(peak, ++inFlight);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    inFlight--;
+    return Response.json(String(url).includes('/entries') ? { entries: [entry], nextCursor: null } : entry);
+  });
+  if (transport === 'fetch') vi.stubGlobal('fetch', f.fetcher);
+  const game = createGameServices({ supabase: f.supabase,
+    ...(transport === 'fetch' ? { baseUrl: 'https://game.example/v1', publishableKey: key } : {}),
+  });
+  const update = vi.fn();
+  const sub = game.leaderboards.subscribe('vaccoin', { onUpdate: update });
+  let broadcasts: ReturnType<typeof setInterval> | undefined;
+  try {
+    await vi.advanceTimersByTimeAsync(10);
+    broadcasts = setInterval(() => hint({ payload: { boardId: 'vaccoin' } }), 100);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(update.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(update.mock.calls.every(([page]) => page.entries[0].score === 50)).toBe(true);
+    expect(peak).toBe(2); // One top/personal snapshot, never overlapping refreshes.
+    clearInterval(broadcasts);
+    await vi.advanceTimersByTimeAsync(700);
+    const settled = update.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(update).toHaveBeenCalledTimes(settled); // No idle polling loop.
+    hint({ payload: { boardId: 'vaccoin' } });
+    await vi.advanceTimersByTimeAsync(200);
+    sub.unsubscribe();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(update).toHaveBeenCalledTimes(settled); // Disposal still invalidates reads.
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    clearInterval(broadcasts);
+    sub.unsubscribe();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  }
+});
 it('subscribes privately, fetches initially, debounces hints, detects rank change and cleans up', async () => {
   vi.useFakeTimers();
   const f = fixture();
@@ -67,13 +119,9 @@ it.each([
 it('rejects duplicate ownership, suppresses late responses and reconnect baseline notifications', async () => {
   vi.useFakeTimers();
   const f = fixture();
-  let hint: (message: { payload: { boardId: string } }) => void = () => {};
   let status: (value: string) => void = () => {};
   const channel = {
-    on: vi.fn((_t, _f, fn) => {
-      hint = fn;
-      return channel;
-    }),
+    on: vi.fn(() => channel),
     subscribe: vi.fn((fn) => {
       status = fn;
       return channel;
@@ -99,7 +147,8 @@ it('rejects duplicate ownership, suppresses late responses and reconnect baselin
   const sub = game.leaderboards.subscribe('vaccoin', { onUpdate: update, onRankChange: rank });
   expect(() => game.leaderboards.subscribe('vaccoin', { onUpdate: update })).toThrow(/already/);
   await vi.advanceTimersByTimeAsync(200);
-  hint({ payload: { boardId: 'vaccoin' } });
+  status('CHANNEL_ERROR');
+  status('SUBSCRIBED');
   resolve({ entries: [entry], nextCursor: null });
   await vi.advanceTimersByTimeAsync(400);
   expect(update).toHaveBeenCalledTimes(1);

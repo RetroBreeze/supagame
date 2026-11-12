@@ -18,15 +18,17 @@ export function run(command: string, args: string[], cwd = repo, env = process.e
 export function files(root: string): string[] {
   return readdirSync(root, { recursive: true, withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => join(entry.parentPath, entry.name));
 }
-export async function packedConsumer() {
+export async function packedConsumer(source = repo) {
   const root = mkdtempSync(join(tmpdir(), 'supagame-packages-'));
   try {
-    const tarballs = ['contracts', 'sdk-ts', 'cli'].map((name) => {
-      run('pnpm', ['pack', '--pack-destination', root], join(repo, 'packages', name));
+    const tarballs = ['sdk-ts', 'contracts', 'cli'].map((name) => {
+      run('pnpm', ['pack', '--pack-destination', root], join(source, 'packages', name));
       const archive = join(root, `supagame-${name}-${name === 'cli' ? '0.1.6' : '0.1.4'}.tgz`);
       const entries = run('tar', ['-tzf', archive]).trim().split('\n');
       assert.ok(entries.includes('package/package.json'));
       assert.ok(entries.includes('package/LICENSE'), `${name} must distribute its MIT license`);
+      assert.ok(entries.includes(`package/dist/${name === 'cli' ? 'cli' : name === 'contracts' ? 'types' : 'index'}.js`), `${name} must build its runtime before packing`);
+      assert.ok(!entries.includes('package/dist/stale-review-artifact.js'), 'Packaging must discard stale build output');
       assert.ok(!entries.some((entry) => /(?:^|\/)(?:node_modules|tests|scripts|\.git|\.superpowers)\//.test(entry)));
       assert.ok(!entries.some((entry) => /\/(?:\.env(?:\.(?!example$).*)?|supagame\.config\.json|\.supagame-deploy.*)$/.test(entry)));
       assert.ok(!entries.some((entry) => entry.startsWith('package/src/')));
@@ -50,6 +52,8 @@ export async function packedConsumer() {
     assert.ok(readFileSync(join(installed('contracts'), 'openapi.yaml'), 'utf8').includes('openapi: 3.1.0'));
     writeFileSync(join(root, 'consumer.ts'), `import { createClient } from '@supabase/supabase-js';
 import { createGameServices, ApiError, type PlayerProfile, type LeaderboardPage } from '@supagame/sdk-ts';
+import { createIndexedDbStore, mountAchievementNotifications, watchSaveConnectivity } from '@supagame/sdk-ts/browser';
+void [createIndexedDbStore, mountAchievementNotifications, watchSaveConnectivity];
 const game = createGameServices({ supabase: createClient('https://example.supabase.co', 'sb_publishable_placeholder') });
 const saves = game.saves;
 void game.players.getAuthStatus; void game.players.linkProvider; void game.players.handleAuthCallback;

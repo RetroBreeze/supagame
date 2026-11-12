@@ -17,6 +17,7 @@
     "openapi.yaml"
   ],
   "scripts": {
+    "prepack": "node ../../scripts/prepare-package.ts contracts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src --max-warnings=0",

@@ -24,12 +24,16 @@ export interface Transport {
 function jsonResponse(response: Response): boolean {
   return response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() === 'application/json';
 }
-async function httpFailure(response: Response): Promise<never> {
+async function httpFailure(response: Response, assertIdentity: () => Promise<void>): Promise<never> {
+  await assertIdentity();
   // Gateways need not use our error envelope. Authentication rejection still has a stable type.
   if (response.status === 401) throw new AuthenticationError();
   let body: unknown;
   try { body = jsonResponse(response) ? await response.json() : undefined; }
   catch { throw new UnexpectedResponseError(); }
+  // Reading the body can yield while Auth switches users or signs out. Error
+  // envelopes (notably SAVE_CONFLICT.current) contain player-owned data too.
+  await assertIdentity();
   if (!matches('ApiError', body)) throw new UnexpectedResponseError();
   const error = body as ApiErrorBody;
   if (error.code === 'SAVE_CONFLICT' && Object.hasOwn(error, 'current')) throw new SaveConflictError(error.current ?? null, error.message);
@@ -56,6 +60,9 @@ export function createTransport(options: GameServicesOptions): Transport {
   const base = customBase(options);
   return {
     async request<T>(path: string, method: 'GET' | 'POST' | 'PATCH', schema: Schema, request: RequestOptions = {}): Promise<T> {
+      const assertIdentity = async () => {
+        if (request.session && (await requireSession(options.supabase)).user.id !== request.session.user.id) throw new AuthenticationError('The player changed during the request. Original account data was not returned.');
+      };
       const headers: Record<string, string> = { Accept: 'application/json' };
       if (request.session) headers.Authorization = `Bearer ${request.session.access_token}`;
       let data: unknown;
@@ -69,7 +76,7 @@ export function createTransport(options: GameServicesOptions): Transport {
             ...(request.body ? { body: JSON.stringify(request.body) } : {}),
           });
         } catch { throw new NetworkError(); }
-        if (!response.ok) return httpFailure(response);
+        if (!response.ok) return httpFailure(response, assertIdentity);
         if (response.status !== 200 || !jsonResponse(response)) throw new UnexpectedResponseError();
         try { data = await response.json(); }
         catch { throw new UnexpectedResponseError(); }
@@ -79,7 +86,7 @@ export function createTransport(options: GameServicesOptions): Transport {
         const result = await options.supabase.functions.invoke<unknown>(`supagame/v1${path}`, {
           method, headers, ...(request.body ? { body: request.body } : {}),
         });
-        if (result.response && !result.response.ok) return httpFailure(result.response);
+        if (result.response && !result.response.ok) return httpFailure(result.response, assertIdentity);
         if (result.error) {
           if (result.error instanceof Error && result.error.name === 'FunctionsFetchError') throw new NetworkError();
           throw new UnexpectedResponseError();
@@ -87,7 +94,7 @@ export function createTransport(options: GameServicesOptions): Transport {
         if (!result.response || result.response.status !== 200 || !jsonResponse(result.response)) throw new UnexpectedResponseError();
         data = result.data;
       }
-      if (request.session && (await requireSession(options.supabase)).user.id !== request.session.user.id) throw new AuthenticationError('The player changed during the request. Original account data was not returned.');
+      await assertIdentity();
       if (!(request.nullable && data === null) && !matches(schema, data)) throw new UnexpectedResponseError();
       return data as T;
     },

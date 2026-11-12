@@ -59,7 +59,12 @@ import {
   project,
   snapshot,
 } from "./project-fixture.ts";
-import { rmSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
+it('preserves previously generated safe migration bytes for installed consumers', () => {
+  // Captured before the quoting fix: doctor/upgrade compare installed SQL bytes.
+  const original = readFileSync(new URL('../fixtures/achievement-registration.sql', import.meta.url));
+  expect(achievementSql(achievement).equals(original)).toBe(true);
+});
 it("installs, registers, previews, diagnoses and repeats without mutations", () => {
   const root = project();
   initialized(root);

@@ -6,6 +6,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
+    "prepack": "node ../../scripts/prepare-package.ts sdk-ts",
     "test": "vitest run --root ../.. tests/sdk",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

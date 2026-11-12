@@ -123,7 +123,8 @@ export function subscribe(
   const schedule = () => {
     if (disposed) return;
     dirty = true;
-    generation++;
+    // Broadcasts request a trailing snapshot without invalidating the one in
+    // flight. Only lifecycle/auth changes invalidate otherwise usable reads.
     if (timer === undefined)
       timer = setTimeout(() => {
         timer = undefined;
