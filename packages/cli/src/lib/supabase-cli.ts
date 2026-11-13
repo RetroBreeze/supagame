@@ -1,3 +1,4 @@
+import { DeploymentDiagnostic, safeProcessOutput } from './deployment-diagnostic.ts';
 import { execFile } from 'node:child_process';
 import { object } from './manifest.ts';
 import type { MigrationFile } from './migration-generator.ts';
@@ -14,6 +15,7 @@ export interface ProcessResult {
   code: number | null;
   stdout: string;
   stderr: string;
+  termination?: string;
 }
 export type ProcessRunner = (
   args: readonly string[],
@@ -62,6 +64,7 @@ export const createSupabaseRunner = (timeout = 300_000, signal?: AbortSignal): P
         code: error ? (typeof error.code === 'number' ? error.code : null) : 0,
         stdout,
         stderr,
+        ...(error ? { termination: error.killed ? 'terminated (timeout or signal)' : typeof error.code === 'string' ? error.code : 'nonzero exit' } : {}),
       });
     });
     child.stdin?.end();
@@ -118,14 +121,14 @@ export class SupabaseCli {
     let result: ProcessResult;
     try {
       result = await this.run(args, this.cwd);
-    } catch {
-      throw new Error(
-        `Supabase CLI ${operation} could not complete. Inspect CLI availability, authentication and network access; raw output is withheld.`,
+    } catch (error) {
+      throw new DeploymentDiagnostic(
+        `Supabase CLI ${operation}: subprocess launch failed. Check executable availability and permissions. ${safeProcessOutput('', error instanceof Error ? error.message : '')}`,
       );
     }
     if (result.code !== 0) {
-      throw new Error(
-        `Supabase CLI ${operation} failed or was interrupted. Inspect CLI availability, authentication and network access; raw output is withheld.`,
+      throw new DeploymentDiagnostic(
+        `Supabase CLI ${operation}: subprocess failed or was interrupted; exit=${result.code ?? 'unknown'}. ${safeProcessOutput(result.stdout, result.stderr + ' ' + (result.termination ?? ''))}`,
       );
     }
     return result;
@@ -143,16 +146,16 @@ export class SupabaseCli {
     try {
       value = JSON.parse(result.stdout);
     } catch {
-      throw new Error(
-        'Cannot determine deployment changes: Supabase CLI returned invalid JSON.',
+      throw new DeploymentDiagnostic(
+        `Supabase CLI ${operation}: JSON parsing failed (exit=0). ${safeProcessOutput(result.stdout, result.stderr)}`,
       );
     }
     if (
       !object(value) || !object(value.target) ||
       value.target.kind !== 'linked' || value.target.project_ref !== this.ref
     ) {
-      throw new Error(
-        'Cannot verify Supabase CLI remote target; refusing deployment.',
+      throw new DeploymentDiagnostic(
+        `Supabase CLI ${operation}: target validation failed. Cannot verify Supabase CLI remote target; refusing deployment.`,
       );
     }
     return value;
@@ -206,13 +209,13 @@ export class SupabaseCli {
     if (
       !Array.isArray(value.functions) ||
       value.functions.some((f) => !object(f) || typeof f.slug !== 'string')
-    ) throw new Error('Cannot inspect deployed functions.');
+    ) throw new DeploymentDiagnostic('Supabase CLI function inspection: response validation failed. Cannot inspect deployed functions.');
     const matches = value.functions.filter((f) => f.slug === 'supagame') as Record<
       string,
       unknown
     >[];
     if (matches.length > 1) {
-      throw new Error('Ambiguous remote supagame function.');
+      throw new DeploymentDiagnostic('Supabase CLI function inspection: response validation failed. Ambiguous remote supagame function.');
     }
     const fn = matches[0];
     if (!fn) return null;
@@ -224,8 +227,8 @@ export class SupabaseCli {
         (typeof fn.ezbr_sha256 !== 'string' ||
           !/^[a-f0-9]{64}$/.test(fn.ezbr_sha256)))
     ) {
-      throw new Error(
-        'Cannot determine remote function version/configuration.',
+      throw new DeploymentDiagnostic(
+        'Supabase CLI function inspection: response validation failed. Cannot determine remote function version/configuration.',
       );
     }
     return {
@@ -248,6 +251,6 @@ export class SupabaseCli {
     if (
       result.project_ref !== this.ref || !Array.isArray(result.functions) ||
       result.functions.length !== 1 || result.functions[0] !== 'supagame'
-    ) throw new Error('Cannot verify the function deployment response.');
+    ) throw new DeploymentDiagnostic('Supabase CLI function deployment: response validation failed. Expected the selected project and exactly the supagame function.');
   }
 }

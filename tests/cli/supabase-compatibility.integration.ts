@@ -46,7 +46,7 @@ test('actual supported CLI capabilities, JSON serialization and unattended conse
   mkdirSync(join(root, 'supabase'));
   writeFileSync(join(root, 'supabase/config.toml'), 'project_id = "compatibility-fixture"\n');
   const run: ProcessRunner = (args, cwd) => new Promise((done) => {
-    const child = execFile(resolve('node_modules/.bin/supabase'), [...args, '--profile', profile], {
+    const child = execFile(resolve(process.env.SUPABASE_TEST_BINARY ?? 'node_modules/.bin/supabase'), [...args, '--profile', profile], {
       cwd, encoding: 'utf8', timeout: 20_000,
       // No ambient login, target, consent or database password can enter this fixture.
       env: { PATH: process.env.PATH, HOME: root, XDG_CONFIG_HOME: root, SUPABASE_ACCESS_TOKEN: `sbp_${'0'.repeat(40)}`, SUPABASE_YES: 'false' },

@@ -127,3 +127,21 @@ it.each(['2.99.0', '4.0.0', '3.2.0', '3.0.1', '3.1.1', '3.1.0-beta.1', '3.1.0+cu
     () => new DoctorInspector(run, '/isolated', { projectId: 'test', port: 55432 }).version(),
   ]) await expect(check()).rejects.toThrow(/3\.0\.0 \|\| 3\.1\.0/);
 });
+
+it('reports exit status and safe underlying diagnostics without echoing credentials', async () => {
+  const cli = new SupabaseCli(async () => ({ code: 1, stdout: JSON.stringify({ error: { code: 'FunctionsApiTransportError', message: 'fetch failed Authorization: Bearer PRIVATE' } }), stderr: 'connect ECONNREFUSED password=PRIVATE' }), '/isolated', 'abcdefghijklmnopqrst');
+  await expect(cli.deployFunction()).rejects.toThrow(/function deployment.*subprocess.*exit=1.*ECONNREFUSED/);
+  await expect(cli.deployFunction()).rejects.not.toThrow(/PRIVATE/);
+});
+it.each(['broken', '{}'])('identifies JSON versus target validation for %s', async (stdout) => {
+  const cli = new SupabaseCli(async () => ({ code: 0, stdout, stderr: '' }), '/isolated', 'abcdefghijklmnopqrst');
+  await expect(cli.deployFunction()).rejects.toThrow(stdout === 'broken' ? /function deployment.*JSON parsing/ : /function deployment.*target validation/);
+});
+
+it('withholds arbitrary credentials and emits only fixed diagnostic vocabulary', async () => {
+  const { safeProcessOutput } = await import('../../packages/cli/src/lib/deployment-diagnostic.ts');
+  const secrets = ['sbp_private', 'sb_secret_private', 'eyJhbGciOiJIUzI1NiJ9.payload.signature', 'Basic dXNlcjpwYXNz', 'postgres://user:private@host/db', 'password="private with spaces"', '\u001b[31mPRIVATE'];
+  const message = safeProcessOutput(JSON.stringify({error:{message:secrets.join('\n')}}), secrets.join('\n'));
+  for (const secret of secrets) expect(message).not.toContain(secret);
+  expect(message).toContain('unrecognized diagnostic');
+});

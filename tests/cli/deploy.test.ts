@@ -500,3 +500,34 @@ it.each(['migration list', 'db push', 'functions list', 'config diff', 'secrets 
   expect(f.mutations()).toHaveLength(0);
   expect(f.confirm).not.toHaveBeenCalled();
 });
+
+it.each(['subprocess', 'json', 'response', 'inspection', 'interrupted'])('retains %s diagnostics and reconciles only with fresh consent', async (stage) => {
+  const f = fixture(); const original = f.deps.run;
+  let deployed = false;
+  f.deps.run = async (args, cwd) => {
+    const result = await original(args, cwd);
+    if (args.includes('--help')) return result;
+    if (args[0] === 'functions' && args[1] === 'deploy') {
+      deployed = true;
+      if (stage === 'subprocess' || stage === 'interrupted') return { code: stage === 'interrupted' ? null : 1, stdout: '', stderr: 'connect ECONNREFUSED password=PRIVATE' };
+      if (stage === 'json') return { ...result, stdout: 'PRIVATE' };
+      if (stage === 'response') return { ...result, stdout: JSON.stringify({ target: {kind:'linked', project_ref:ref}, functions: [] }) };
+    }
+    if (stage === 'inspection' && deployed && args[0] === 'functions' && args[1] === 'list') return { code: 1, stdout: '', stderr: 'ECONNREFUSED PRIVATE' };
+    return result;
+  };
+  const expectedStage = stage === 'inspection' ? 'post-deployment function inspection' : 'function deployment';
+  await expect(deploy(f.options, f.deps)).rejects.toThrow(`Stage: ${expectedStage}`);
+  // Read the existing journal via its public reader (filename is implementation-owned).
+  const { readState } = await import('../../packages/cli/src/lib/deployment-state.ts');
+  expect(readState(f.root, ref)?.phase).toBe('function_started');
+  expect(f.logs.join('\n')).not.toContain('PRIVATE');
+  f.deps.run = original;
+  const before = f.mutations().length;
+  await deploy({...f.options, dryRun:true}, f.deps);
+  expect(f.mutations()).toHaveLength(before);
+  expect(readState(f.root, ref)?.phase).toBe('function_started');
+  await deploy(f.options, f.deps);
+  expect(f.confirm).toHaveBeenCalledTimes(2);
+  expect(readState(f.root, ref)?.phase).toBe('complete');
+});

@@ -1,3 +1,4 @@
+import { DeploymentDiagnostic } from '../lib/deployment-diagnostic.ts';
 import { inspectRealtime } from '../lib/realtime-inspection.ts';
 import { HostedConfiguration, planOrigins } from '../lib/hosted-config.ts';
 import { readOriginReceipt, writeOriginReceipt } from '../lib/origin-receipt.ts';
@@ -330,23 +331,27 @@ export async function deploy(
     if (!unchanged) {
       state.phase = 'function_started';
       writeState(root, state);
+      let stage = 'function deployment';
       try {
         await cli.deployFunction();
+        stage = 'post-deployment function inspection';
         state.remoteFunction = await cli.functionInfo();
         if (
           !state.remoteFunction || state.remoteFunction.status !== 'ACTIVE' ||
           state.remoteFunction.verifyJwt !== false
         ) {
-          throw new Error(
-            'Function status/authentication settings could not be verified.',
+          throw new DeploymentDiagnostic(
+            'Function status/authentication settings could not be verified: expected ACTIVE and verify_jwt=false.',
           );
         }
-      } catch {
+      } catch (error) {
         dependencies.log(
           'Database migrations are complete. Function outcome requires inspection; the next invocation will inspect remote state and require fresh authorization.',
         );
+        // Raw causes can contain credentials; only the sanitized diagnostic is rendered.
+        // eslint-disable-next-line preserve-caught-error
         throw new Error(
-          'Function deployment failed or is uncertain. No automatic retry was attempted.',
+          `Function deployment failed or is uncertain. No automatic retry was attempted. Stage: ${stage}. ${error instanceof DeploymentDiagnostic ? error.message : 'Unexpected internal failure; raw error is withheld.'} Journal retained at function_started. Inspect with doctor --remote and deploy --dry-run before authorizing another attempt.`,
         );
       }
       dependencies.log('Function supagame deployed and verified.');
