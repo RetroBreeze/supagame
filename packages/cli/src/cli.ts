@@ -80,6 +80,7 @@ local(
     '--allow-remote',
     'Explicitly authorize hosted changes without a prompt (CI opt-in)',
   )
+  .option('--diagnostic-log <file>', 'Opt in to raw subprocess logs (may contain credentials); exclusively create a local file with mode 0600')
   .option('--replace-origins', 'Explicitly replace unknown/non-additive SG_ALLOWED_ORIGINS with ALL manifest origins; deployment authorization still required')
   .action((options: DeployOptions) => deploy(options));
 program.command('doctor').description('Read-only installation, schema and security diagnostics')

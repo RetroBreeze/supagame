@@ -139,3 +139,65 @@ versions, using a localhost synthetic API. Select a test binary with
 These tests do not verify a hosted upload or reproduce the MiniBook failure.
 Node 26.9.0 specifically was not tested. Database/API/browser integration suites
 were not rerun: no SQL, service runtime, or browser code changed.
+
+### Explicit raw deployment log
+
+When the safe summary says `unrecognized diagnostic`, opt in with
+`deploy --diagnostic-log <file>`. The file must not already exist, and its parent
+directory must exist. Relative paths resolve from the invoking shell's current
+directory, independently of `--workdir`. The CLI warns that raw logs may contain
+credentials, exclusively creates the file with permissions 0600, and keeps its
+file descriptor open throughout the attempt. Existing files and symlinks are
+refused without overwriting them. No log is created without this option.
+
+Each subprocess writes a JSON Lines start record (timestamp, literal arguments,
+isolated cwd), then a result record with exit status and the original captured
+stdout/stderr strings. Newlines and control characters are JSON-escaped, not
+redacted. Output is never printed automatically. Environment values are not
+recorded. Logging covers Supabase CLI inspection, configuration, migration and
+function commands in this deployment, including dry runs. It does not cover
+in-process HTTP requests. Records are flushed after each command. A hard kill
+can leave a start record without a result; the existing five-minute timeout and
+8 MiB subprocess output limit still apply, so interrupted/oversized output may
+be incomplete. This option does not enable Supabase's `--debug` flag.
+
+The MiniBook's code-1 subprocess result places the failure before Supagame's
+successful-response JSON and target validation. It does not establish whether
+JSON mode itself affects the upstream command. The minimal isolated config and
+600-mode staged assets differ from the direct invocation's original project;
+the temporary root is private and removed after the attempt. Docker being
+reachable does not by itself verify bundling or access to bind-mounted files.
+HOME and Linux keyring discovery variables and explicitly set Supabase access
+token/database password are forwarded; original-project dotenv and other
+ambient overrides are excluded. Successful earlier configuration operations
+suggest some authentication worked but do not prove every function permission
+or credential lookup is identical. `--yes` is supplied only after authorization,
+while SUPABASE_YES remains false; no change to either is justified without the
+actual upstream error. No flag, environment, workdir, bundler or JSON behavior
+was changed by this diagnostic addition.
+
+Rebuild/reinstall using the commands above, from the commit containing this
+option. Verify `supagame deploy --help` lists `--diagnostic-log` (the package
+version is still 0.1.0). For a future deployment that you explicitly choose to
+authorize, run from the existing consumer project:
+
+```bash
+supagame deploy --project-ref hbizuovcawypckpkmkjj \
+  --diagnostic-log "$HOME/supagame-minibook-deploy-raw.jsonl"
+```
+
+This is a real deployment command: review its preview and confirm only if you
+intend the displayed hosted changes. The log option itself grants no consent.
+A read-only preview can instead add `--dry-run`, but will not exercise function
+deployment. Choose a fresh filename for each attempt. Inspect the raw log
+locally and redact credentials before sharing any excerpt; never commit it or
+upload it automatically. Retain the deployment journal regardless of the result.
+No new project is needed. No hosted operation was executed to implement this
+option.
+
+Raw-log change verification: `pnpm test` passed all 588 tests; CLI typecheck,
+focused ESLint with zero warnings, and prepack build/asset verification passed.
+The local synthetic-API compatibility test passed with installed Supabase CLI
+3.0.0. The 3.1.0/Node 24 matrix was not rerun for this logging-only addition;
+invocation and environment behavior remain unchanged. No database or browser
+runtime suites were rerun.

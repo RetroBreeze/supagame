@@ -531,3 +531,33 @@ it.each(['subprocess', 'json', 'response', 'inspection', 'interrupted'])('retain
   expect(f.confirm).toHaveBeenCalledTimes(2);
   expect(readState(f.root, ref)?.phase).toBe('complete');
 });
+
+it('captures raw output only in an explicitly requested private log without changing recovery', async () => {
+  const f = fixture(); f.fail('function');
+  const path = join(f.root, 'deployment-raw.jsonl');
+  const { statSync } = await import('node:fs');
+  await expect(deploy({...f.options, diagnosticLog:path}, f.deps)).rejects.toThrow(/Function deployment failed/);
+  expect(readFileSync(path, 'utf8')).toContain('SECRET token');
+  expect(statSync(path).mode & 0o777).toBe(0o600);
+  expect(f.logs.join('\n')).toMatch(/WARNING.*credentials/);
+  expect(f.logs.join('\n')).not.toContain('SECRET token');
+  const { readState } = await import('../../packages/cli/src/lib/deployment-state.ts');
+  expect(readState(f.root, ref)?.phase).toBe('function_started');
+  const before = f.mutations().length;
+  await expect(deploy({...f.options, diagnosticLog:path}, f.deps)).rejects.toThrow(/diagnostic log/i);
+  expect(f.mutations()).toHaveLength(before);
+});
+it('refuses diagnostic log symlinks without overwriting the target', async () => {
+  const f = fixture(); put(f.root, 'private.txt', 'original');
+  symlinkSync(join(f.root,'private.txt'), join(f.root,'raw.jsonl'));
+  await expect(deploy({...f.options, diagnosticLog:join(f.root,'raw.jsonl')}, f.deps)).rejects.toThrow(/diagnostic log/i);
+  expect(readFileSync(join(f.root,'private.txt'),'utf8')).toBe('original');
+  expect(f.mutations()).toHaveLength(0);
+});
+
+it('raw log opt-in never grants unattended deployment authorization', async () => {
+  const f = fixture(); const path = join(f.root,'unauthorized.jsonl');
+  await expect(deploy({...f.options, diagnosticLog:path}, {...f.deps, interactive:false})).rejects.toThrow(/Noninteractive deployment requires/);
+  expect(existsSync(path)).toBe(false);
+  expect(f.mutations()).toHaveLength(0);
+});

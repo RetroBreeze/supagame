@@ -1,3 +1,4 @@
+import { rawDeploymentLog } from '../lib/raw-deployment-log.ts';
 import { DeploymentDiagnostic } from '../lib/deployment-diagnostic.ts';
 import { inspectRealtime } from '../lib/realtime-inspection.ts';
 import { HostedConfiguration, planOrigins } from '../lib/hosted-config.ts';
@@ -20,6 +21,7 @@ import type { ProcessRunner } from '../lib/supabase-cli.ts';
 export interface DeployOptions extends LocalOptions {
   allowRemote?: boolean;
   replaceOrigins?: boolean;
+  diagnosticLog?: string;
 }
 export interface DeployDependencies {
   run: ProcessRunner;
@@ -79,14 +81,20 @@ export async function deploy(
   const release = deploymentLock(root);
   let hosted: HostedConfiguration | undefined;
   let isolated: ReturnType<typeof isolatedProject> | undefined;
+  let diagnostic: ReturnType<typeof rawDeploymentLog> | undefined;
   try {
+    if (options.diagnosticLog !== undefined) {
+      dependencies.log('WARNING: Raw diagnostic logs may contain credentials. Keep the selected local file private; never share it without review and redaction.');
+      diagnostic = rawDeploymentLog(options.diagnosticLog, dependencies.run);
+    }
+    const run = diagnostic?.run ?? dependencies.run;
     const previous = readState(root, ref);
     isolated = isolatedProject(files);
-    const cli = new SupabaseCli(dependencies.run, isolated.directory, ref);
+    const cli = new SupabaseCli(run, isolated.directory, ref);
     await cli.checkVersion();
     await cli.checkCapabilities();
     const plan = await cli.inspect(files.sql);
-    hosted = new HostedConfiguration(dependencies.run, ref);
+    hosted = new HostedConfiguration(run, ref);
     const configuration = await hosted.inspect();
     const realtimeIssues = manifest.modules['live-leaderboards']
       ? await hosted.realtimePrerequisites()
@@ -366,6 +374,6 @@ export async function deploy(
   } finally {
     hosted?.remove();
     isolated?.remove();
-    release();
+    try { diagnostic?.close(); } finally { release(); }
   }
 }

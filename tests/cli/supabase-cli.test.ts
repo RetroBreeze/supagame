@@ -145,3 +145,16 @@ it('withholds arbitrary credentials and emits only fixed diagnostic vocabulary',
   for (const secret of secrets) expect(message).not.toContain(secret);
   expect(message).toContain('unrecognized diagnostic');
 });
+
+it('raw opt-in logging preserves both streams exactly without changing subprocess results', async () => {
+  const { rawDeploymentLog } = await import('../../packages/cli/src/lib/raw-deployment-log.ts');
+  const { readFileSync } = await import('node:fs');
+  const root = project(); roots.push(root);
+  const result = {code:null, stdout:'original\nstdout\u001b[31m', stderr:'original\nstderr SECRET', termination:'ABORT_ERR'};
+  const log = rawDeploymentLog(join(root,'raw.jsonl'), async () => result);
+  try { expect(await log.run(['functions','deploy','supagame'],root)).toBe(result); }
+  finally { log.close(); }
+  const records = readFileSync(join(root,'raw.jsonl'),'utf8').trim().split('\n').map(line => JSON.parse(line));
+  expect(records[0]).toMatchObject({event:'start',args:['functions','deploy','supagame'],cwd:root});
+  expect(records[1]).toMatchObject({event:'result',...result});
+});
