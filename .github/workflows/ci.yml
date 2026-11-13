@@ -82,6 +82,8 @@ jobs:
       - run: pnpm test:cli:db
       - run: pnpm test:edge:integration
       - run: pnpm test:sdk:integration
+      - name: Verify SDK teardown leaves a healthy database fixture
+        run: pnpm test:cli:db
       - name: Stop only the regression fixture
         if: always() && steps.local.outcome != 'skipped'
         run: pnpm db:stop

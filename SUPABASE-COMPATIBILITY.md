@@ -198,8 +198,10 @@ requirements need a compatibility review; no Docker fallback is introduced.
 Local development, pgTAP and full integration tests still use containers.
 The loopback upload test proves client-side source collection/upload without
 Docker, **not** server-side compilation or a successful hosted deployment.
-The MiniBook's authorized operator must perform that final hosted verification;
-this change performs no hosted writes.
+The operator has since reported successful clean-room hosted verification of
+`c0473da`: migrations, anonymous Auth, API deployment, receipt verification,
+profiles, scores, reads, Realtime and deployment idempotency. This is the user's
+reported hosted result; the database investigation below performs no hosted writes.
 
 ### Verification for this change
 
@@ -240,7 +242,7 @@ verifies migration ledger and catalog queries`. Both report
 Node 24 / CLI 3.0.0 run passed 30/30. A local operator cleanup attempt could not
 complete its read-only inspection; no schema changes or direct Storage metadata
 deletions were made to conceal this fixture issue. This is a remaining local
-suite limitation, not a passing full-suite claim.
+suite limitation at the time of that run, resolved by the investigation below.
 
 Final results in **all four combinations**: build, typecheck, lint,
 contracts check, 591 unit tests (including CLI regressions), 2 real-binary
@@ -250,5 +252,99 @@ compatibility tests, 84 Edge unit tests, 2 packaging tests, migration staging,
 passed. Node 24 / CLI 3.0.0 unit and Edge/SDK integration commands were rerun
 successfully after the fixture restart and final regression addition.
 `test:cli:db` retains the exception described above. `git diff --check` passed.
-The generated local binary link was restored to 3.0.0 afterward. No hosted
-bundling success is claimed, and no npm publication was attempted.
+The generated local binary link was restored to 3.0.0 afterward. That run did not
+verify hosted bundling, and no npm publication was attempted.
+
+## Final database assertion investigation — 2026-11-13
+
+The two failing assertions were both in `tests/db/maintenance.test.ts`:
+
+1. **`catalog diagnostics accept the actual installed schema, policies, column
+   grants and RPC grants`** expected no failed checks, but received
+   `[{check: 'saves:orphan-objects', ok: false}]`.
+2. **`actual local CLI doctor is read-only and verifies migration ledger and
+   catalog queries`** expected `doctorExitCode(findings, true) === 0`, but got
+   `1` because of the same orphan-object finding. The unrelated unmanaged-origin
+   warning was not the cause.
+
+**Confirmed cause: incomplete SDK integration teardown contaminating the shared
+local fixture.** The first Node 24 / CLI 3.0.0 database run passed all 30 tests.
+Its later SDK run encountered the stopped Edge Runtime. The interrupted-upload
+test could still prepare through PostgREST and upload through Storage, then
+failed at the Edge-backed metadata commit. Its `afterAll` deleted the Auth user
+without cleaning up the pending object. The retained `interrupted-*` reservation
+was timestamped 14:29:28 UTC, matching that failed SDK run. Both the registry row
+and its Storage object remained. Subsequent matrix entries inherited that data;
+the CLI version was not the cause.
+
+Two consecutive unmodified `pnpm test:cli:db` runs reproduced exactly 28 passes
+and these two failures. New regressions reproduced the teardown leak both before
+and after uploading bytes: after Auth deletion, the registry count was still 1
+instead of 0. These regressions failed with the old teardown and passed with the
+fix. Removing only the identified original test orphan and the red-test fixtures
+through the cleanup functions and local Storage API restored the doctor checks.
+No database reset or direct deletion from `storage.objects` was used.
+
+`tests/sdk/cleanup-local-users.ts` now performs teardown scoped to the calling
+test's synthetic user IDs, including failed/interrupted uploads. It checks the
+fixed loopback fixture, deletes the synthetic Auth users, prepares batches with
+`sg_private.prepare_save_cleanup`, removes bytes via the Storage API, then calls
+`sg_private.finish_save_cleanup`. Failed removal leaves the registry available
+for retry. The local operator credential remains in memory. Cleanup does not
+depend on Edge availability and never sweeps unrelated users.
+
+The regression suite verifies interrupted preparation/upload, repeated cleanup,
+and preservation of another user's reservation and bytes. A transactional CLI
+database regression ensures doctor still detects actual orphan records and that
+rollback restores health. CI repeats `test:cli:db` after SDK integration, so it
+also checks the fixture left by that suite.
+
+There is no confirmed Supagame runtime, migration, doctor or CLI-version defect
+behind these assertions. Retaining object records after Auth deletion is the
+intentional recovery behavior; production code and migrations are unchanged.
+
+### Final verification results
+
+Linux x64, Node **24.22.2 / 26.13.0**, pnpm **12.18.0**, Deno **2.9.6**,
+official checksum-verified Supabase CLI **3.0.0 / 3.1.0**. All four combinations
+completed successfully against the existing local fixture, without resetting it
+between entries. End-to-end tests create and remove their own isolated projects.
+
+| Node | Supabase CLI | Full matrix entry | CLI database checks, before / after SDK | SDK integration |
+| --- | --- | --- | --- | --- |
+| 24.22.2 | 3.0.0 | PASS | 31 / 31 | 13 passed |
+| 24.22.2 | 3.1.0 | PASS | 31 / 31 | 13 passed |
+| 26.13.0 | 3.0.0 | PASS | 31 / 31 | 13 passed |
+| 26.13.0 | 3.1.0 | PASS | 31 / 31 | 13 passed |
+
+For each Node version, select each CLI with
+`node scripts/select-test-supabase.ts "$version"`, export
+`SUPABASE_TEST_VERSION="$version"`, then run:
+
+```sh
+pnpm build
+pnpm typecheck
+pnpm lint
+pnpm contracts:check
+pnpm test
+pnpm test:cli:compatibility
+pnpm test:edge
+pnpm test:packages
+pnpm db:migrate
+pnpm test:db
+pnpm test:cli:db
+pnpm test:edge:integration
+pnpm test:sdk:integration
+pnpm test:cli:db
+pnpm test:e2e
+```
+
+All **60 command runs exited 0**. Per combination: 591 unit tests, 2 real-CLI
+compatibility tests, 84 Edge unit tests, 2 package tests, 809 pgTAP assertions,
+2 database admin tests, 21 concurrency tests, 31 CLI database tests (twice),
+13 Edge integration steps, 13 SDK integration tests and 15 end-to-end tests
+passed. Build, typecheck, lint, contract validation and migration staging also
+passed. `git diff --check` passed; the generated CLI link was restored to 3.0.0.
+These are local executions, not claims about GitHub-hosted CI. No checks were
+skipped or blocked, no hosted writes or npm publishing occurred, and the two
+outstanding database assertion failures are resolved.

@@ -20,6 +20,7 @@ test('catalog diagnostics accept the actual installed schema, policies, column g
 });
 for (
   const [sql, id] of [
+    ["insert into sg_private.save_objects(path,user_id,operation_id,slot,request,state,size_bytes) values ('00000000-0000-4000-8000-000000000091/00000000-0000-4000-8000-000000000092','00000000-0000-4000-8000-000000000091','00000000-0000-4000-8000-000000000092','orphan-regression','{}','pending',10);", 'saves:orphan-objects'],
     ["alter policy achievements_own on public.game_player_achievements using (true);", 'policies:achievements'],
     ["grant update(threshold) on public.game_achievements to authenticated;", 'writes:authenticated:game_achievements'],
     ["alter policy supagame_saves_read_guard on storage.objects using (true);", 'saves:storage-guards'],

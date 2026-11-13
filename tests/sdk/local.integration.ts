@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { createGameServices, ApiError, AuthenticationError } from '../../packages/sdk-ts/src/index.js';
 import { query } from '../db/local-sessions.ts';
+import { cleanupLocalUsers } from './cleanup-local-users.ts';
 
 // Fixed local fixture only. Status secrets stay in memory; only the publishable key is used.
 const status = JSON.parse(execFileSync('node_modules/.bin/supabase', ['status', '--workdir', 'tests/fixtures/local', '--output', 'json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })) as { API_URL: string; PUBLISHABLE_KEY: string };
@@ -15,12 +16,9 @@ const users: string[] = [];
 beforeAll(() => {
   query(`insert into public.game_leaderboards(id,kind,sort_direction,min_value,max_value,enabled) values ('${boards[0]}','time','asc',0,100,true),('${boards[1]}','points','desc',0,100,true)`);
 });
-afterAll(() => {
+afterAll(async () => {
   query(`delete from public.game_leaderboards where id in ('${boards[0]}','${boards[1]}')`);
-  for (const id of users) {
-    if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error('Invalid test user ID');
-    query(`delete from auth.users where id='${id}'`);
-  }
+  await cleanupLocalUsers(users);
 });
 it('reads public boards without signing in and rejects protected calls without a session', async () => {
   expect(await game.leaderboards.getTop(boards[0]!)).toEqual({ entries: [], nextCursor: null });
