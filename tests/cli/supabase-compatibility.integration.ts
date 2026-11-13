@@ -78,3 +78,45 @@ test('actual supported CLI capabilities, JSON serialization and unattended conse
   assert.ok(requests.some((r) => r.endsWith('/secrets')));
   assert.ok(requests.every((r) => r.startsWith('GET ')), 'No Management API mutation may be attempted.');
 });
+
+test('API upload uses isolated Supagame assets without Docker (simulated server)', { timeout: 60_000 }, async (t) => {
+  const { deploymentFiles, isolatedProject } = await import('../../packages/cli/src/lib/deployment-files.ts');
+  const { project, initialized, cli, put, ref } = await import('./project-fixture.ts');
+  const root = project();
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  initialized(root);
+  assert.equal(cli(root, 'add', 'leaderboards').status, 0);
+  put(root, 'supabase/functions/unrelated/index.ts', 'UNRELATED_PRIVATE_SOURCE');
+  const stage = isolatedProject(deploymentFiles(root, ref));
+  t.after(stage.remove);
+  assert.notEqual(stage.directory, root);
+  const uploads: { url: string; body: string }[] = [];
+  const server = createServer(async (req, res) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) chunks.push(Buffer.from(chunk));
+    if (req.method === 'POST' && req.url === `/v1/projects/${ref}/functions/deploy?slug=supagame`) {
+      uploads.push({ url: req.url, body: Buffer.concat(chunks).toString() });
+      res.writeHead(201, { 'Content-Type': 'application/json' }).end(JSON.stringify({ id: '11111111-1111-4111-8111-111111111111', slug: 'supagame', name: 'supagame', status: 'ACTIVE', version: 2, verify_jwt: false, created_at: 1687423025152, updated_at: 1687423025152 }));
+    } else res.writeHead(404).end('{}');
+  });
+  await new Promise<void>(done => server.listen(0, '127.0.0.1', done));
+  t.after(() => new Promise<void>(done => server.close(() => done())));
+  const address = server.address();
+  assert.ok(address && typeof address !== 'string');
+  const profile = join(root, 'profile.yaml');
+  writeFileSync(profile, `name: upload-fixture\napi_url: http://127.0.0.1:${address.port}\ndashboard_url: http://127.0.0.1:${address.port}\nproject_host: localhost\npooler_host: localhost\n`);
+  const run: ProcessRunner = (args, cwd) => new Promise(done => {
+    const child = execFile(resolve(process.env.SUPABASE_TEST_BINARY ?? 'node_modules/.bin/supabase'), [...args, '--profile', profile], {
+      cwd, encoding: 'utf8', timeout: 20_000,
+      // Empty PATH plus an unreachable socket: neither Docker executable nor daemon is usable.
+      env: { PATH: root, HOME: root, XDG_CONFIG_HOME: root, DOCKER_HOST: `unix://${root}/missing.sock`, SUPABASE_ACCESS_TOKEN: `sbp_${'0'.repeat(40)}`, SUPABASE_YES: 'false' },
+    }, (error, stdout, stderr) => done({ code: error ? 1 : 0, stdout, stderr }));
+    child.stdin?.end();
+  });
+  await new SupabaseCli(run, stage.directory, ref).deployFunction();
+  assert.equal(uploads.length, 1);
+  assert.match(uploads[0]!.body, /index.ts/);
+  assert.match(uploads[0]!.body, /contracts.generated.ts/);
+  assert.match(uploads[0]!.body, /verify_jwt/);
+  assert.doesNotMatch(uploads[0]!.body, /UNRELATED_PRIVATE_SOURCE|static_files/);
+});

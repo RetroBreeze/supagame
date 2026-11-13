@@ -72,3 +72,12 @@ source of truth for the public HTTP interface.
 ## Licence
 
 [MIT](LICENSE), copyright 2026 Supabase Game Services contributors.
+
+Hosted `supagame deploy` does not require Docker: Edge Functions use Supabase's
+API bundling (`--use-api`) from the existing isolated staging directory.
+Local Supabase development and database/integration tests ordinarily require
+Docker or another supported container runtime. Deployment authorization,
+explicit project selection, previews, journals and recovery are unchanged.
+API bundling cannot deploy `static_files`; current Supagame templates need no
+static assets, and configured static files are rejected before deployment.
+See [Supabase's asset limitation](https://supabase.com/docs/guides/functions/wasm).

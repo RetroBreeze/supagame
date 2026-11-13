@@ -15,6 +15,10 @@ export function digest(bytes: Buffer | string): string {
 }
 export function deploymentFiles(root: string, ref: string) {
   const project = readProject({ workdir: root });
+  const fn = (project.config.functions as Record<string, Record<string, unknown>> | undefined)?.supagame;
+  if (fn?.static_files !== undefined && (!Array.isArray(fn.static_files) || fn.static_files.length > 0)) {
+    throw new Error('Supagame static_files are unsupported by API bundling. Remove the asset configuration or review its requirements before deploying.');
+  }
   const manifest = readManifest(root);
   if (
     !manifest || manifest.value.modules.core !== MODULE_VERSION ||

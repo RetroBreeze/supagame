@@ -42,10 +42,10 @@ previous content is preserved in the Wiki's implementation reference.
 
 ## Hosted function deployment diagnostics (13 November 2026)
 
-The reported Arch Linux / Node 26.9.0 / Supabase CLI 3.1.0 failure has no
-established root cause. Successful direct deployment and browser testing prove
-that the deployed service works, but do not recover the discarded error from
-Supagame's earlier attempt. No deployment behavior was changed speculatively.
+The Arch Linux / Node 26.9.0 / Supabase CLI 3.1.0 diagnostics established
+that Docker Desktop could not mount the isolated temporary function directory.
+Hosted deployment now explicitly uses server-side API bundling (`--use-api`),
+which does not require Docker. Isolated staging remains intact.
 
 The traced path is `deploy.ts` → `isolatedProject` → `SupabaseCli.deployFunction`
 → `createSupabaseRunner` → JSON/target/response validation → `functionInfo`.
@@ -53,7 +53,7 @@ Before the function step, configuration and migrations are verified, and the
 journal is written as `function_started`. The subprocess uses literal arguments:
 
 ```text
-supabase functions deploy supagame --yes --remote=<explicit-ref> --workdir <isolated-directory> --output-format json
+supabase functions deploy supagame --use-api --yes --remote=<explicit-ref> --workdir <isolated-directory> --output-format json
 ```
 
 `--yes` is passed only after Supagame's existing authorization and state recheck.
@@ -68,8 +68,8 @@ DBUS_SESSION_BUS_ADDRESS, XDG_RUNTIME_DIR, SUPABASE_ACCESS_TOKEN and
 SUPABASE_DB_PASSWORD are forwarded. SUPABASE_YES is explicitly false. Shell
 proxy, custom CA, Docker and Node overrides are not forwarded. A direct command
 can use the original workdir/configuration, ambient environment, text output,
-interactive stdin and no wrapper timeout. These are investigation candidates,
-not demonstrated causes; the allowlist and deployment arguments are unchanged.
+interactive stdin and no wrapper timeout. The environment allowlist is unchanged; API bundling removes the Docker
+mount dependency.
 
 Diagnostics now identify subprocess execution, JSON parsing, target validation,
 deployment response validation, or post-deployment inspection. A successful
@@ -99,14 +99,14 @@ removing that lock. Do not remove the journal to bypass reconciliation.
 
 ### Rebuild and reinstall on the MiniBook
 
-From a checkout containing the diagnostic commit, with supported Node 24 or 26
+From a checkout containing the API-bundling fix commit, with supported Node 24 or 26
 and the repository's pnpm version, run:
 
 ```bash
 pnpm install --frozen-lockfile
-mkdir -p /tmp/supagame-diagnostic-package
-pnpm --filter @retrobreeze/supagame-cli pack --pack-destination /tmp/supagame-diagnostic-package
-npm install --global /tmp/supagame-diagnostic-package/retrobreeze-supagame-cli-0.1.0.tgz
+mkdir -p /tmp/supagame-api-package
+pnpm --filter @retrobreeze/supagame-cli pack --pack-destination /tmp/supagame-api-package
+npm install --global /tmp/supagame-api-package/retrobreeze-supagame-cli-0.1.0.tgz
 hash -r
 command -v supagame
 supagame --version
@@ -161,20 +161,14 @@ can leave a start record without a result; the existing five-minute timeout and
 8 MiB subprocess output limit still apply, so interrupted/oversized output may
 be incomplete. This option does not enable Supabase's `--debug` flag.
 
-The MiniBook's code-1 subprocess result places the failure before Supagame's
-successful-response JSON and target validation. It does not establish whether
-JSON mode itself affects the upstream command. The minimal isolated config and
-600-mode staged assets differ from the direct invocation's original project;
-the temporary root is private and removed after the attempt. Docker being
-reachable does not by itself verify bundling or access to bind-mounted files.
-HOME and Linux keyring discovery variables and explicitly set Supabase access
-token/database password are forwarded; original-project dotenv and other
-ambient overrides are excluded. Successful earlier configuration operations
-suggest some authentication worked but do not prove every function permission
-or credential lookup is identical. `--yes` is supplied only after authorization,
-while SUPABASE_YES remains false; no change to either is justified without the
-actual upstream error. No flag, environment, workdir, bundler or JSON behavior
-was changed by this diagnostic addition.
+The MiniBook's raw diagnostic subsequently established a Docker Desktop mount
+failure for the temporary function directory. The API-bundling fix now adds
+`--use-api`; the staging, environment allowlist, JSON validation and logging
+remain unchanged. This supersedes the earlier diagnostic-only investigation.
+Current templates need no static assets. Nonempty `static_files` configuration
+is rejected before hosted calls because API bundling does not support it.
+Local Supabase development ordinarily still needs Docker or another supported
+container runtime.
 
 Rebuild/reinstall using the commands above, from the commit containing this
 option. Verify `supagame deploy --help` lists `--diagnostic-log` (the package

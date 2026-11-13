@@ -37,7 +37,7 @@ function fixture() {
     if (args[0] === '--version') {
       return { code: 0, stdout: badVersion ? '2.0.0' : '3.0.0\n', stderr: '' };
     }
-    if (args.at(-1) === '--help') return { code: 0, stdout: '--remote[=<ref>] --workdir string --output-format choice --include-all --skip-vault --dry-run --yes --env-file string --read-only --agent choice --output choice'.replaceAll(' --', '\n--'), stderr: '' };
+    if (args.at(-1) === '--help') return { code: 0, stdout: '--remote[=<ref>] --workdir string --output-format choice --include-all --skip-vault --dry-run --yes --use-api --env-file string --read-only --agent choice --output choice'.replaceAll(' --', '\n--'), stderr: '' };
     expect(args).toContain(`--remote=${ref}`);
     const target = {
       kind: 'linked',
@@ -99,6 +99,7 @@ function fixture() {
     }
     if (args[0] === 'functions' && args[1] === 'deploy') {
       expect(args[2]).toBe('supagame');
+      expect(args).toContain('--use-api');
       expect(args).toContain('--yes');
       if (failure === 'function') {
         return { code: 1, stdout: '', stderr: 'SECRET token' };
@@ -458,7 +459,7 @@ it('explains initialization when an explicit target has no manifest', async () =
   expect(run).not.toHaveBeenCalled();
 });
 
-it.each(['--remote', '--workdir', '--output-format', '--yes', '--dry-run', '--include-all', '--skip-vault', '--env-file'])('refuses deployment before any mutation if required flag %s is missing or renamed', async (flag) => {
+it.each(['--remote', '--workdir', '--output-format', '--use-api', '--yes', '--dry-run', '--include-all', '--skip-vault', '--env-file'])('refuses deployment before any mutation if required flag %s is missing or renamed', async (flag) => {
   const f = fixture();
   const original = f.deps.run;
   f.deps.run = async (args, cwd) => {
@@ -501,7 +502,7 @@ it.each(['migration list', 'db push', 'functions list', 'config diff', 'secrets 
   expect(f.confirm).not.toHaveBeenCalled();
 });
 
-it.each(['subprocess', 'json', 'response', 'inspection', 'interrupted'])('retains %s diagnostics and reconciles only with fresh consent', async (stage) => {
+it.each(['subprocess', 'json', 'response', 'wrong-target', 'inspection', 'interrupted'])('retains %s diagnostics and reconciles only with fresh consent', async (stage) => {
   const f = fixture(); const original = f.deps.run;
   let deployed = false;
   f.deps.run = async (args, cwd) => {
@@ -510,6 +511,7 @@ it.each(['subprocess', 'json', 'response', 'inspection', 'interrupted'])('retain
     if (args[0] === 'functions' && args[1] === 'deploy') {
       deployed = true;
       if (stage === 'subprocess' || stage === 'interrupted') return { code: stage === 'interrupted' ? null : 1, stdout: '', stderr: 'connect ECONNREFUSED password=PRIVATE' };
+      if (stage === 'wrong-target') return { ...result, stdout: JSON.stringify({ ...JSON.parse(result.stdout), target: { kind: 'linked', project_ref: 'zzzzzzzzzzzzzzzzzzzz' } }) };
       if (stage === 'json') return { ...result, stdout: 'PRIVATE' };
       if (stage === 'response') return { ...result, stdout: JSON.stringify({ target: {kind:'linked', project_ref:ref}, functions: [] }) };
     }
@@ -560,4 +562,11 @@ it('raw log opt-in never grants unattended deployment authorization', async () =
   await expect(deploy({...f.options, diagnosticLog:path}, {...f.deps, interactive:false})).rejects.toThrow(/Noninteractive deployment requires/);
   expect(existsSync(path)).toBe(false);
   expect(f.mutations()).toHaveLength(0);
+});
+
+it('rejects configured static assets before staging or hosted calls', async () => {
+  const f = fixture();
+  put(f.root, 'supabase/config.toml', readFileSync(join(f.root, 'supabase/config.toml'), 'utf8') + 'static_files = ["./functions/supagame/*.wasm"]\n');
+  await expect(deploy(f.options, f.deps)).rejects.toThrow(/static_files.*API bundling/);
+  expect(f.calls).toHaveLength(0);
 });

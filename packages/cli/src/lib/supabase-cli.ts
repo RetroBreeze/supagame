@@ -101,7 +101,7 @@ export class SupabaseCli {
       { command: ['migration', 'list'], flags: [] },
       { command: ['db', 'push'], flags: ['--dry-run', '--include-all', '--skip-vault', '--yes'] },
       { command: ['functions', 'list'], flags: [] },
-      { command: ['functions', 'deploy'], flags: ['--yes'] },
+      { command: ['functions', 'deploy'], flags: ['--yes', '--use-api'] },
       { command: ['config', 'diff'], flags: [] },
       { command: ['config', 'push'], flags: ['--yes'] },
       { command: ['secrets', 'list'], flags: [] },
@@ -246,6 +246,7 @@ export class SupabaseCli {
       'functions',
       'deploy',
       'supagame',
+      '--use-api',
       '--yes',
     ], 'function deployment');
     if (

@@ -45,7 +45,7 @@ use `--agent=no --output json`. Raw subprocess errors are not printed.
 | `db push --dry-run --include-all --skip-vault` | Verified target, `dryRun=true`, exact ordered migration filenames, empty `roles` and `seeds`. No mutation consent is passed. |
 | `db push --include-all --skip-vault --yes` | Runs only after the verified preview and explicit Supagame confirmation/`--allow-remote`; response target checked and installation inspected afterward. |
 | `functions list` | Verified target and `functions[]`; unique `supagame` slug, positive integer version, status, optional JWT flag and SHA256 validated. |
-| `functions deploy supagame --yes` | Same consent boundary; response target, `project_ref` and single `functions=['supagame']` checked, followed by remote inspection. |
+| `functions deploy supagame --use-api --yes` | Same consent boundary; response target, `project_ref` and single `functions=['supagame']` checked, followed by remote inspection. |
 | `config diff` | Verified target, `schema_version=1`, scope/changes/masked/unmanaged arrays. Only the declared anonymous-auth change is permitted; unrelated config changes fail closed. |
 | `config push --yes` | Pushes only the deliberately minimal Auth configuration after explicit consent, then re-inspects. |
 | `secrets list` | Verified target and validated secret names/digests; never reads secret plaintext. |
@@ -112,7 +112,10 @@ introduced. The test selector is not a production binary-override mechanism.
 remote selection despite a conflicting link, function/secret JSON serialization,
 scoped Auth diff parsing and closed-stdin function deployment/write-query refusal. It uses a loopback
 Management API fixture with a synthetic token, an empty home/config directory,
-and a server that rejects writes. All recorded API requests must be GETs.
+and a server that rejects writes. This read/consent test requires every request
+to be GET. A separate simulated upload test accepts only the selected function
+POST on loopback, using real staged templates, an empty executable PATH and an
+unreachable Docker socket. It verifies upload selection and source isolation.
 These responses are simulated; they do **not** prove hosted API compatibility.
 
 `test:cli:db` exercises actual local migration inventory, push dry-run (including
@@ -124,7 +127,7 @@ missing/changed flags, failed commands, timeouts and aborts; malformed preflight
 responses must produce zero mutation calls even with `--allow-remote`.
 
 No hosted login/OAuth, database certificate exchange, hosted migration push,
-function bundling/upload, config push or secret write was executed. Those remain
+hosted function bundling/upload, config push or secret write was executed. Those remain
 an explicitly unverified boundary requiring a separately authorized disposable
 hosted project. Non-Linux operating systems were not tested. No API/SQL changes,
 npm publication, private-flag removal, Vaccoin modification or Target Rush work
@@ -173,3 +176,79 @@ GitHub Actions is configured for the same four combinations; these results are
 local executions, not a claim that GitHub-hosted jobs have already run. All
 package `private: true` safeguards and the root Supabase 3.0.0 development pin
 remain in place. The existing Wiki migration was preserved outside this commit.
+
+
+## Docker-independent hosted deployment — 2026-11-13
+
+Hosted deployment explicitly requires and passes `--use-api` on both supported
+CLI versions. No Docker mode or automatic retry was added. `--remote=<ref>`
+remains the explicit v3 destination flag (the Supagame command requires
+`--project-ref`). All consent, integrity, response validation, diagnostic and
+journal/recovery checks remain in place.
+
+The current template inventory contains TypeScript (including generated DTOs),
+`deno.json` and `deno.lock`. Runtime imports are relative TypeScript and pinned
+`npm:@supabase/server` imports; no WASM, filesystem-loaded assets or `static_files`
+are required. `.env.example` is deliberately excluded as before. Supabase
+[documents that static files cannot use API bundling](https://supabase.com/docs/guides/functions/wasm).
+Nonempty or malformed `static_files` configuration now fails before hosted calls
+rather than being discarded by the minimal staging configuration. Future asset
+requirements need a compatibility review; no Docker fallback is introduced.
+
+Local development, pgTAP and full integration tests still use containers.
+The loopback upload test proves client-side source collection/upload without
+Docker, **not** server-side compilation or a successful hosted deployment.
+The MiniBook's authorized operator must perform that final hosted verification;
+this change performs no hosted writes.
+
+### Verification for this change
+
+Linux x64, Node **24.22.2 / 26.13.0**, pnpm **12.18.0**, Deno **2.9.6**,
+and official checksum-verified Supabase **3.0.0 / 3.1.0** were exercised in all
+four combinations. The repository dependency stays pinned to 3.0.0.
+
+Commands run for each combination:
+
+```sh
+node scripts/select-test-supabase.ts "$version"
+SUPABASE_TEST_VERSION="$version" pnpm test:cli:compatibility
+pnpm build
+pnpm typecheck
+pnpm lint
+pnpm contracts:check
+pnpm test
+pnpm test:edge
+pnpm test:packages
+pnpm db:migrate
+pnpm test:db
+pnpm test:cli:db
+pnpm test:edge:integration
+pnpm test:sdk:integration
+pnpm test:e2e
+```
+
+`pnpm api:start` prepared the existing local fixture. Initial Node 24 / CLI 3.0.0
+Edge integration (12 steps) and SDK integration (11 tests) failed because its
+Edge Runtime container was stopped, returning HTTP 503. Restarting that existing
+local container restored the service. No production configuration was changed.
+
+The full-suite run also exposed two local `test:cli:db` failures on subsequent
+combinations: `catalog diagnostics accept the actual installed schema, policies,
+column grants and RPC grants` and `actual local CLI doctor is read-only and
+verifies migration ledger and catalog queries`. Both report
+`saves:orphan-objects` in the shared fixture; 28/30 tests pass. The initial
+Node 24 / CLI 3.0.0 run passed 30/30. A local operator cleanup attempt could not
+complete its read-only inspection; no schema changes or direct Storage metadata
+deletions were made to conceal this fixture issue. This is a remaining local
+suite limitation, not a passing full-suite claim.
+
+Final results in **all four combinations**: build, typecheck, lint,
+contracts check, 591 unit tests (including CLI regressions), 2 real-binary
+compatibility tests, 84 Edge unit tests, 2 packaging tests, migration staging,
+809 pgTAP assertions, 2 database admin tests, 21 concurrency tests,
+13 Edge integration steps, 11 SDK integration tests and 15 end-to-end tests
+passed. Node 24 / CLI 3.0.0 unit and Edge/SDK integration commands were rerun
+successfully after the fixture restart and final regression addition.
+`test:cli:db` retains the exception described above. `git diff --check` passed.
+The generated local binary link was restored to 3.0.0 afterward. No hosted
+bundling success is claimed, and no npm publication was attempted.
