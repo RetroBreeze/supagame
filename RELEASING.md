@@ -45,6 +45,7 @@ pnpm test:db
 pnpm test:cli:db
 pnpm test:edge:integration
 pnpm test:sdk:integration
+pnpm test:cli:db # verify SDK teardown leaves a healthy fixture
 pnpm test:e2e
 ```
 
@@ -86,7 +87,10 @@ tarball paths together (contracts must be supplied because it is not on npm):
 
 ```sh
 npm install /ABSOLUTE/PATH/retrobreeze-supagame-contracts-0.1.0.tgz /ABSOLUTE/PATH/retrobreeze-supagame-sdk-0.1.0.tgz @supabase/supabase-js@2.119.0
-npm install -D /ABSOLUTE/PATH/retrobreeze-supagame-cli-0.1.0.tgz supabase@3.1.0
+npm install -D /ABSOLUTE/PATH/retrobreeze-supagame-cli-0.1.0.tgz
+npm install -D --save-exact supabase@3.1.0
+# TypeScript consumers, including browser applications:
+npm install -D @types/node@24.19.2
 npx supagame --help
 ```
 
@@ -177,7 +181,9 @@ future publisher when its first authorized release is scheduled; npm publisher
 setup/expiry rules may change. No automated publisher is enabled by this task.
 
 See [Supabase CLI compatibility](SUPABASE-COMPATIBILITY.md) for the subsequent
-3.0.0/3.1.0 verification, command inventory and unverified hosted boundary.
+3.0.0/3.1.0 verification, command inventory and operator-reported hosted results.
+Its dated sections preserve earlier verification limits; consult the final records
+for the resolved SDK fixture issue and completed local matrix.
 
 ## Initial npm-preparation verification record — 2026-11-12
 

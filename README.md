@@ -7,7 +7,8 @@ and `@retrobreeze/supagame-contracts`, all version **0.1.0**. They remain privat
 until publication is explicitly authorized. Use **Node.js 24 or 26**. After publication:
 
 ```sh
-npm install -D @retrobreeze/supagame-cli supabase@3.1.0
+npm install -D @retrobreeze/supagame-cli
+npm install -D --save-exact supabase@3.1.0
 npm install @retrobreeze/supagame-sdk @supabase/supabase-js@2.119.0
 # TypeScript projects, including browser applications:
 npm install --save-dev @types/node@24.19.2

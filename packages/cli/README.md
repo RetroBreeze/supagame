@@ -16,7 +16,7 @@ From the root of your existing game project:
 
 ```sh
 npm install -D @retrobreeze/supagame-cli
-npm install -D supabase@3.1.0
+npm install -D --save-exact supabase@3.1.0
 npm install @retrobreeze/supagame-sdk @supabase/supabase-js@2.119.0
 # TypeScript projects, including browser applications:
 npm install --save-dev @types/node@24.19.2

@@ -50,10 +50,23 @@ if (page.nextCursor !== null) {
 
 ## Sessions and identity
 
-Supabase owns storage, persistence, token refresh and account linking. The SDK
-adds no storage, timers or auth-state subscriptions. Configure your caller-owned
-client's storage for your application's environment as usual. The tested
-peer dependency is `@supabase/supabase-js` 2.119.0; the peer range is `^2.119.0`.
+Supabase owns session persistence, token refresh and provider authentication.
+Configure your caller-owned client's session storage for your application's
+environment as usual. The SDK observes Auth changes to protect in-flight
+operations from account switches; session operations share one observer per Auth
+client, and achievements also observe identity changes. It does not persist a
+separate session-credential store.
+
+Optional features have their own lifecycle and storage: live leaderboards use
+Auth/Realtime subscriptions and debounce/request timers; achievement subscriptions
+poll, and notification queues use timers. Call their `unsubscribe()` or `dispose()`
+handles when finished. Offline saves use the supplied persistence adapter, and
+account-transition journals use `accounts.store` or the default IndexedDB adapter.
+The browser adapters access IndexedDB when used; they do not replace Supabase's
+session store. Configure `accounts.namespace` before using account flows.
+
+The tested peer dependency is `@supabase/supabase-js` 2.119.0; the peer range is
+`^2.119.0`.
 
 `ensureAnonymousSession()` reuses both anonymous and permanent sessions, checks
 an existing user with Supabase Auth, and signs in anonymously only when the
