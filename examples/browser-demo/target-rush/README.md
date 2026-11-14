@@ -1,6 +1,6 @@
 # Target Rush
 
-A small standalone Canvas2D arcade game. Hit targets for 30 seconds, chain hits for a multiplier, then play again. No Supagame, Supabase, accounts, storage, remote assets or runtime dependencies.
+A compact standalone Canvas2D target game intended as a future Supagame integration harness. Hit targets for 30 seconds, then review the score and play again. The interface contains only round statistics, sound control, and start/results screens. No Supagame, Supabase, accounts, storage, remote assets or runtime dependencies are connected yet.
 
 ## Run
 
@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite. For a phone on your local network, use `npm run dev -- --host 0.0.0.0` and open your computer's LAN address. Mouse and touch use the same Pointer Events handler; right clicks are ignored. Sound starts after a user gesture and can be muted. Reduced motion preferences suppress particles and target pop-in.
+Open the local URL printed by Vite. For a phone on your local network, use `npm run dev -- --host 0.0.0.0` and open your computer's LAN address. Mouse and touch use the same Pointer Events handler; right clicks are ignored. Sound starts after a user gesture and can be muted. Reduced motion preferences suppress target pop-in and moving score feedback.
 
 ```sh
 npm test                # deterministic rules and coordinate mapping
@@ -23,7 +23,7 @@ npx playwright install chromium
 npm run test:browser   # real Chromium mouse and emulated mobile touch
 ```
 
-Browser tests write title, play and results screenshots to `/tmp/target-rush-*.png`. Mobile verification is Chromium touch emulation, not a physical device test. The game is deliberately independent of the parent's workspace: run commands from this directory. In an already installed Supagame checkout, the tools resolve from the parent dependencies without another install.
+The playfield is at most 560 × 420 CSS pixels and scales down with both viewport width and height. Browser tests check start, play and results at 1280 × 960, 390 × 844, 320 × 480 and 568 × 320, and write screenshots to `/tmp/target-rush-*.png`. Mobile verification is Chromium touch emulation, not a physical device test. The game is deliberately independent of the parent's workspace: run commands from this directory. In an already installed Supagame checkout, the tools resolve from the parent dependencies without another install.
 
 ## Rules
 

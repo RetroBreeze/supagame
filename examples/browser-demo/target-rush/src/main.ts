@@ -14,10 +14,8 @@ function onRoundEnd(result: Readonly<RoundResult>): void {
   element('hits').textContent = String(result.hits);
   element('accuracy').textContent = `${result.shots ? Math.round(result.hits/result.shots*100) : 0}%`;
   element('best-combo').textContent = String(result.bestCombo);
-  element('result-note').textContent = result.hits ? 'Found your flow? Go again.' : 'Your next rush is one tap away.';
   results.hidden = false;
   element('restart').focus({preventScroll:true});
-  element('arena-label').textContent = 'THAT’S A WRAP';
   sound.play('end');
   window.dispatchEvent(new CustomEvent<Readonly<RoundResult>>('targetrush:roundend', { detail: result }));
 }
@@ -28,7 +26,6 @@ function start(): void {
   renderer.clear();
   intro.hidden=true;results.hidden=true;
   game.start(performance.now());
-  element('arena-label').textContent = 'ROUND IN PROGRESS';
   sound.play('start');
   // The hidden start button must not retain keyboard focus during play.
   canvas.tabIndex=-1;canvas.focus({preventScroll:true});
@@ -40,7 +37,7 @@ element('mute').addEventListener('click',() => {
   const button=element('mute');
   button.setAttribute('aria-pressed',String(sound.muted));
   button.setAttribute('aria-label',sound.muted?'Unmute sound':'Mute sound');
-  button.innerHTML=sound.muted?'♪ <span>SOUND OFF</span>':'♪ <span>SOUND ON</span>';
+  button.textContent=sound.muted?'Sound off':'Sound on';
 });
 canvas.addEventListener('pointerdown',event => {
   if(game.phase!=='playing' || (event.pointerType==='mouse' && event.button!==0))return;
@@ -54,13 +51,9 @@ let previous=performance.now();
 function frame(now:number):void {
   game.update(now);
   const remaining=game.phase==='ready'?ROUND_MS:game.remaining(now);
-  element('score').textContent=String(game.score).padStart(4,'0');
-  const seconds=(remaining/1000).toFixed(1).split('.');
-  element('timer').innerHTML=`${seconds[0]}<span>.${seconds[1]}</span>`;
+  element('score').textContent=String(game.score);
+  element('timer').textContent=(remaining/1000).toFixed(1);
   element('combo').textContent=`×${scoreForCombo(Math.max(1,game.combo))/10}`;
-  element('combo-label').textContent=game.combo?`${game.combo} HIT STREAK`:'BUILD YOUR STREAK';
-  element('time-fill').style.width=`${remaining/ROUND_MS*100}%`;
-  document.body.classList.toggle('urgent',game.phase==='playing' && remaining<10000);
   renderer.draw(now,Math.min(.05,(now-previous)/1000));previous=now;
   requestAnimationFrame(frame);
 }
