@@ -11,8 +11,16 @@ import { promisify } from 'node:util';
 export async function installFromRegistry(root: string, tarballs: string[]): Promise<void> {
   const packages = tarballs.map((archive) => ({
     manifest: JSON.parse(execFileSync('tar', ['-xOzf', archive, 'package/package.json'], { encoding: 'utf8' })),
+    readme: execFileSync('tar', ['-xOzf', archive, 'package/README.md'], { encoding: 'utf8' }),
     bytes: readFileSync(archive),
   }));
+  const sdk = packages.find(({ manifest }) => manifest.name === '@retrobreeze/supagame-sdk');
+  assert.ok(sdk);
+  // Follow the shipped installation instructions. Supplying undeclared type
+  // prerequisites here would hide a broken clean TypeScript installation.
+  const documentedDependencies = [...sdk.readme.matchAll(/^npm install (.+)$/gm)]
+    .flatMap((match) => match[1]!.split(/\s+/).filter((argument) => !argument.startsWith('-')));
+  assert.ok(documentedDependencies.includes('@retrobreeze/supagame-sdk'));
   const fetched = new Set<string>();
   const server = createServer((request, response) => {
     if (request.method !== 'GET') { response.writeHead(405).end(); return; }
@@ -45,8 +53,7 @@ export async function installFromRegistry(root: string, tarballs: string[]): Pro
   try {
     await promisify(execFile)('npm', ['install', '--engine-strict', '--no-audit', '--no-fund',
       '--cache', join(root, 'npm-cache'), '--userconfig', join(root, 'empty-npmrc'),
-      '@retrobreeze/supagame-cli@0.1.0', '@retrobreeze/supagame-sdk@0.1.0',
-      '@supabase/supabase-js@2.119.0', 'typescript@5.9.3', '@types/node@24.19.2'], {
+      '@retrobreeze/supagame-cli@0.1.0', ...documentedDependencies, 'typescript@5.9.3'], {
       cwd: root, timeout: 120_000, maxBuffer: 8 * 1024 * 1024,
       // Do not inherit registry overrides, auth tokens or NODE_PATH from the host.
       env: { PATH: process.env.PATH, HOME: root, SystemRoot: process.env.SystemRoot },

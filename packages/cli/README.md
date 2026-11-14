@@ -18,6 +18,8 @@ From the root of your existing game project:
 npm install -D @retrobreeze/supagame-cli
 npm install -D supabase@3.1.0
 npm install @retrobreeze/supagame-sdk @supabase/supabase-js@2.119.0
+# TypeScript projects, including browser applications:
+npm install --save-dev @types/node@24.19.2
 npx supabase --version
 npx supabase login
 npx supagame init --project-ref YOUR_PROJECT_REF --origin http://localhost:5173
@@ -28,6 +30,10 @@ npx supagame add live-leaderboards
 npx supagame deploy --project-ref YOUR_PROJECT_REF
 npx supagame doctor --remote --project-ref YOUR_PROJECT_REF
 ```
+
+Supabase's TypeScript declarations reference Node types. If your `tsconfig.json`
+restricts `compilerOptions.types`, include `node` in that list. The declarations
+are development-only and do not add Node polyfills to the browser runtime.
 
 Replace `YOUR_PROJECT_REF` with the reference of your existing Supabase project
 and the origin with your game's exact browser origin. `init` records the reference

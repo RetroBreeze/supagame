@@ -96,6 +96,10 @@ const subscription = game.leaderboards.subscribe('level-1', {onUpdate(page) { vo
 subscription.unsubscribe();
 void [profile, page, ApiError];\n`);
     run(join(root, 'node_modules/.bin/tsc'), ['--noEmit', '--strict', '--target', 'ES2022', '--module', 'NodeNext', '--lib', 'ES2022,DOM', 'consumer.ts'], root);
+    const quickstart = readFileSync(join(installed('cli'), 'README.md'), 'utf8').match(/```ts\n([\s\S]*?)```/);
+    assert.ok(quickstart, 'The shipped CLI quickstart must include its TypeScript example');
+    writeFileSync(join(root, 'quickstart.ts'), quickstart[1]!);
+    run(join(root, 'node_modules/.bin/tsc'), ['--noEmit', '--strict', '--target', 'ES2022', '--module', 'NodeNext', '--lib', 'ES2022,DOM', 'quickstart.ts'], root);
     const bundle = await build({ entryPoints: [join(root, 'consumer.ts')], bundle: true, platform: 'browser', format: 'esm', write: false, metafile: true });
     assert.ok(Object.values(bundle.metafile!.outputs).every((output) => output.imports.length === 0));
     // Supabase's realtime package has an optional Node ws adapter; the browser build must exclude it.

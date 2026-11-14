@@ -13,6 +13,16 @@ After publication, install the SDK and its peer dependency:
 npm install @retrobreeze/supagame-sdk @supabase/supabase-js@2.119.0
 ```
 
+For TypeScript projects, also install the Node declarations referenced by the
+Supabase client's types, including when targeting browsers:
+
+```sh
+npm install --save-dev @types/node@24.19.2
+```
+
+If `tsconfig.json` restricts `compilerOptions.types`, include `node` in that list.
+These are development-only declarations; the browser runtime needs no Node polyfills.
+
 For backend setup and a complete runnable integration, see the
 [npm quickstart](https://github.com/RetroBreeze/supagame/tree/main/packages/cli).
 For source development, build the workspace with `pnpm build`.
