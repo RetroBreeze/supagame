@@ -1,5 +1,25 @@
 # Supabase Game Services
 
+## Guided, engine-neutral setup
+
+Run `npx supagame init` in a terminal to select your Supabase project and services,
+skip browser origins for native engines, preview files and optionally export public
+connection information. Setup never deploys or generates framework/client code.
+Unity, Godot, Unreal and custom engines can use the HTTP API directly; the
+TypeScript SDK is optional.
+
+```sh
+npx supagame init
+npx supagame leaderboard create target-rush
+npx supagame connection --output supagame.connection.json
+# Explicit automation remains supported:
+npx supagame init --project-ref YOUR_PROJECT_REF --module leaderboards --no-interactive --json
+```
+
+See the [CLI guide](packages/cli/README.md) for guided achievements, JSON contracts,
+connection exports and deployment safeguards. These commands use the installed
+CLI; before npm publication, install the local tarballs described in the release guide.
+
 ## Proposed npm release
 
 The initial packages are `@retrobreeze/supagame-cli`, `@retrobreeze/supagame-sdk`
@@ -9,6 +29,7 @@ until publication is explicitly authorized. Use **Node.js 24 or 26**. After publ
 ```sh
 npm install -D @retrobreeze/supagame-cli
 npm install -D --save-exact supabase@3.1.0
+# Optional JavaScript/TypeScript client integration:
 npm install @retrobreeze/supagame-sdk @supabase/supabase-js@2.119.0
 # TypeScript projects, including browser applications:
 npm install --save-dev @types/node@24.19.2

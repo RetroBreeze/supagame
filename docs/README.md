@@ -2,6 +2,9 @@
 
 Public documentation has moved to the [GitHub Wiki](https://github.com/RetroBreeze/supagame/wiki).
 Start with the [quickstart](https://github.com/RetroBreeze/supagame/wiki/Quickstart).
+The [CLI guide](../packages/cli/README.md) covers guided engine-neutral setup,
+explicit automation, JSON output and optional public connection exports; its
+Wiki counterpart is [CLI](https://github.com/RetroBreeze/supagame/wiki/CLI).
 Edit public guides and verification records in the Wiki; update its Home page and
 sidebar when adding or renaming pages.
 

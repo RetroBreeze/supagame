@@ -36,33 +36,33 @@
 
 Files: new `src/lib/terminal.ts`, `src/lib/prompts.ts`, tests `tests/cli/terminal.test.ts`, `prompts.test.ts`.
 Interfaces: typed output events; context-scoped reporter; injectable line input with text/select/multiselect/confirm/integer methods; cancellation error.
-- [ ] Write regressions for TTY/CI/NO_COLOR, JSON integrity, defaults, validation, cancellation and invalid choices; observe failure.
-- [ ] Implement terminal/prompt services with bounded input and no decorative animation outside a terminal.
-- [ ] Run targeted Vitest and CLI typecheck/lint; commit verified stage.
+- [x] Write regressions for TTY/CI/NO_COLOR, JSON integrity, defaults, validation, cancellation and invalid choices; observe failure.
+- [x] Implement terminal/prompt services with bounded input and no decorative animation outside a terminal.
+- [x] Run targeted Vitest and CLI typecheck/lint; commit verified stage.
 
 ### 2. Guided definition commands and automation boundary
 
 Files: CLI registration, leaderboard/achievement commands, file-stage reporting; new command runner and creation workflows.
-- [ ] Tests: explicit flags bypass prompts, missing flags fail unattended, guided validation and summaries, dry runs, immutable definitions and cancellation preserve bytes.
-- [ ] Extract plan preparation from create commands; reuse existing definition/SQL validation. Route output through the reporter; structured JSON includes file statuses, definitions and diagnostics, never file contents.
-- [ ] Keep existing Admin JSON contract and mutation consent; apply global non-interactive control to all confirmation paths.
-- [ ] Run CLI unit/typecheck/lint and commit.
+- [x] Tests: explicit flags bypass prompts, missing flags fail unattended, guided validation and summaries, dry runs, immutable definitions and cancellation preserve bytes.
+- [x] Extract plan preparation from create commands; reuse existing definition/SQL validation. Route output through the reporter; structured JSON includes file statuses, definitions and diagnostics, never file contents.
+- [x] Keep existing Admin JSON contract and mutation consent; apply global non-interactive control to all confirmation paths.
+- [x] Run CLI unit/typecheck/lint and commit.
 
 ### 3. Guided init and public connections
 
 Files: init/add plan composition, `lib/setup-environment.ts`, `lib/connection.ts`, `commands/connection.ts`, guided initialization workflow.
-- [ ] Tests: dependency resolution, atomic rollback, existing config/link conflicts, missing executable/version/auth, malformed project/key data, optional origins, public-only export/replacement, custom URLs and dry-run cancellation.
-- [ ] Inspect actual supported CLI discovery/API-key JSON using synthetic loopback responses; implement strict parsers and closed-stdin isolated subprocesses. Offer normal CLI login only interactively with explicit consent.
-- [ ] Compose all local changes before preview/confirmation; optional export belongs to the same transaction. Preserve legacy explicit offline initialization.
-- [ ] Provide `connection` display and `--output` export with explicit replacement, safe paths and project identity checks.
-- [ ] Run targeted/unit/typecheck/lint and commit.
+- [x] Tests: dependency resolution, atomic rollback, existing config/link conflicts, missing executable/version/auth, malformed project/key data, optional origins, public-only export/replacement, custom URLs and dry-run cancellation.
+- [x] Inspect actual supported CLI discovery/API-key JSON using synthetic loopback responses; implement strict parsers and closed-stdin isolated subprocesses. Offer normal CLI login only interactively with explicit consent.
+- [x] Compose all local changes before preview/confirmation; optional export belongs to the same transaction. Preserve legacy explicit offline initialization.
+- [x] Provide `connection` display and `--output` export with explicit replacement, safe paths and project identity checks.
+- [x] Run targeted/unit/typecheck/lint and commit.
 
 ### 4. Consistent command presentation and PTY coverage
 
 Files: deploy/doctor and remaining command presentation; PTY tests and compatibility fixtures.
-- [ ] Tests: migration/diagnostic detail survives concise output and JSON; no raw subprocess credentials; no-TTY/CI/JSON never wait; actual PTY guided and explicit invocation, EOF/SIGINT.
-- [ ] Present headings, summaries, structured stages and static progress with optional detailed diagnostics. Keep hosted mutation ordering, confirmation revalidation and recovery logic intact.
-- [ ] Run CLI regression suite, compatibility and packaging checks; commit.
+- [x] Tests: migration/diagnostic detail survives concise output and JSON; no raw subprocess credentials; no-TTY/CI/JSON never wait; actual PTY guided and explicit invocation, EOF/SIGINT.
+- [x] Present headings, summaries, structured stages and static progress with optional detailed diagnostics. Keep hosted mutation ordering, confirmation revalidation and recovery logic intact.
+- [x] Run CLI regression suite, compatibility and packaging checks; commit.
 
 ### 5. Documentation and release verification
 
@@ -76,3 +76,10 @@ Files: root/CLI READMEs, local Wiki Quickstart/Installation-Reference/Troublesho
 - Inspection: command registration, init/add/create/deploy/doctor/auth/admin, manifest, planner rollback, Supabase process boundary and compatibility/E2E tests reviewed. Existing source uses direct console output and several independent confirmation implementations.
 - Existing CLI baseline: 343 tests passed. Stage 1: 14 terminal/prompt tests, CLI typecheck and lint passed. Stage 2: complete CLI suite 364 tests passed; focused creation/help regressions 40 passed; CLI typecheck/lint passed. Native Node execution caught parameter-property syntax, corrected to erasable TypeScript.
 - Ruling: work in the requested feature branch in the current checkout, preserving all user edits; no additional worktree or dependency reinstall needed.
+
+- Stage 3: combined init/module plans, public-key/custom-domain discovery and safe exports verified. Additional export-path and target-drift regressions were observed failing, then passed. Commit `0060381`.
+- Stage 4: concise deployment/doctor output and 7 Linux PTY regressions verified. The PTY harness needed a bounded wait between terminal closure and child reaping under full-suite load. Commit `755e779`.
+- Whole-suite checkpoint: 641 unit tests passed before the 5 export-boundary additions; all workspace/Edge typechecks, lint, build and package tests passed. Matrix is now running against the final formatted implementation.
+- Ruling: no subagent review because the user's repository instructions prohibit subagents. Performed a separate author security/requirements review; export destination and project-drift findings were fixed with failing regressions.
+- Environment: the pre-existing local stack lacked its Edge Runtime, producing 12 HTTP integration failures (503). Started only the local fixture's function server; rerun passed all 13 HTTP steps. Existing database containers were preserved. No production/hosted changes.
+- Auth/domain transport was checked using real Supabase binaries and synthetic loopback responses, including the documented hostname API response. Actual hosted login, key/domain permissions and custom-domain TLS remain unverified.
