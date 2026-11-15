@@ -1,3 +1,4 @@
+import { interactive } from '../lib/terminal.ts';
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline/promises";
 import {
@@ -31,7 +32,7 @@ export interface AdminDependencies {
 const defaults = (): AdminDependencies => ({
   run: runSupabase,
   log: console.log,
-  interactive: !!process.stdin.isTTY && !process.env.CI,
+  interactive: interactive({}),
   confirm: async (prompt) => {
     const rl = createInterface({
       input: process.stdin,

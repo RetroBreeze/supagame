@@ -1,3 +1,4 @@
+import { interactive } from '../lib/terminal.ts';
 import { log } from '../lib/terminal.ts';
 import { createInterface } from "node:readline/promises";
 import { inspectionWorkspace, DoctorInspector } from "../lib/doctor-inspect.ts";
@@ -21,7 +22,7 @@ const defaults = (): Dependencies => ({
   run: runSupabase,
   fetcher: fetch,
   log: log,
-  interactive: !!process.stdin.isTTY && !process.env.CI,
+  interactive: interactive({}),
   confirm: async (ref) => {
     const rl = createInterface({
       input: process.stdin,

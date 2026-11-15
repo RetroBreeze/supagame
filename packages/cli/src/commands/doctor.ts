@@ -1,4 +1,5 @@
-import { log } from '../lib/terminal.ts';
+import { log, currentTerminal } from '../lib/terminal.ts';
+import { diagnosticSummary } from '../lib/presentation.ts';
 import { achievementSql } from '../lib/achievements.ts';
 import { existsSync } from 'node:fs';
 import { projectRoot, readProjectFile, safePath } from '../lib/file-stage.ts';
@@ -62,6 +63,8 @@ export async function doctor(
     }
   };
   const finish = () => {
+    const terminal = currentTerminal();
+    if (terminal) { diagnosticSummary(terminal, findings); return findings; }
     for (const f of findings) {
       dependencies.log(`${f.status.toUpperCase()} [${f.scope}:${f.id}] ${f.message}`);
     }

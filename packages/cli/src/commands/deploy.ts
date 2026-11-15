@@ -1,4 +1,5 @@
-import { log } from '../lib/terminal.ts';
+import { log, currentTerminal } from '../lib/terminal.ts';
+import { deploymentPreview } from '../lib/presentation.ts';
 import { rawDeploymentLog } from '../lib/raw-deployment-log.ts';
 import { DeploymentDiagnostic } from '../lib/deployment-diagnostic.ts';
 import { inspectRealtime } from '../lib/realtime-inspection.ts';
@@ -94,6 +95,7 @@ export async function deploy(
     const cli = new SupabaseCli(run, isolated.directory, ref);
     await cli.checkVersion();
     await cli.checkCapabilities();
+    currentTerminal()?.event({kind:'progress',message:'Inspecting migration history, function and hosted configuration…'});
     const plan = await cli.inspect(files.sql);
     hosted = new HostedConfiguration(run, ref);
     const configuration = await hosted.inspect();
@@ -135,6 +137,14 @@ export async function deploy(
       plan.fn?.status === 'ACTIVE' && plan.fn.verifyJwt === false &&
       plan.fn.hash !== null &&
       JSON.stringify(previous.remoteFunction) === JSON.stringify(plan.fn);
+    const terminal = currentTerminal();
+    if (terminal) deploymentPreview(terminal, {
+      projectRef:ref, modules:manifest.modules as Record<string,string>, applied:plan.applied,
+      pending:plan.pending.map(name=>({name,owned:files.owned.has(name),hash:digest(files.sql.find(f=>f.name===name)!.content)})),
+      functionAction:unchanged?'unchanged (verified receipt)':plan.fn?'redeploy (remote content differs or cannot be proven identical)':'create',functionHash:files.functionHash,
+      configuration,originAction:origins.action,origins:manifest.origins,live:!!manifest.modules['live-leaderboards'],realtimeIssues,realtime,
+    });
+    else {
     dependencies.log(
       `Destination: ${
         configuration.projectName ? JSON.stringify(configuration.projectName) + ' ' : ''
@@ -218,6 +228,7 @@ export async function deploy(
     dependencies.log(
       'Only the supagame function is selected. Seeds, custom roles, Vault synchronization and unrelated config/secrets are excluded. Hosted configuration uses a separate one-property Auth plan and only SG_ALLOWED_ORIGINS. SQL migrations themselves can have arbitrary effects; review their contents.',
     );
+    }
     if (options.dryRun) {
       dependencies.log('Dry run complete; no hosted mutations authorized.');
       return;
@@ -304,6 +315,7 @@ export async function deploy(
       state.phase = 'database_started';
       writeState(root, state);
       try {
+        currentTerminal()?.event({kind:'progress',message:'Applying authorized database migrations…'});
         await cli.push();
         const after = await cli.inspect(files.sql);
         if (after.pending.length) {
@@ -342,6 +354,7 @@ export async function deploy(
       writeState(root, state);
       let stage = 'function deployment';
       try {
+        currentTerminal()?.event({kind:'progress',message:'Deploying the authorized supagame function…'});
         await cli.deployFunction();
         stage = 'post-deployment function inspection';
         state.remoteFunction = await cli.functionInfo();

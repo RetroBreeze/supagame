@@ -27,7 +27,8 @@ it.each([[false, {}], [true, { NO_COLOR: '' }], [true, { CI: '1' }]] as const)('
   terminal.values({ Project: 'Arcade', Destination: 'abcdefghijklmnopqrst' });
   terminal.event({ kind: 'warning', message: 'Cannot verify runtime' });
   terminal.event({ kind: 'info', message: 'Untrusted\u001b[2Jname\rspoof' });
-  expect(output).not.toMatch(/[\u001b\r]/);
+  expect(output).not.toContain(String.fromCharCode(27));
+  expect(output).not.toContain('\r');
   expect(output).toContain('Cannot verify runtime');
   expect(output).toContain('abcdefghijklmnopqrst');
 });
