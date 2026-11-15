@@ -5,6 +5,7 @@ export class Cancelled extends Error { constructor() { super('Cancelled; no proj
 interface TextOptions { default?: string; validate?: (value: string) => string | undefined }
 export interface Choice { value: string; label: string }
 export class Prompts {
+  external: <T>(operation: () => Promise<T>) => Promise<T> = operation => operation();
   private readonly ask: (question: string) => Promise<string | null>;
   private readonly write: (message: string) => void;
   constructor(ask: (question: string) => Promise<string | null>, write: (message: string) => void) { this.ask = ask; this.write = write; }
@@ -56,13 +57,19 @@ export function terminalPrompts(): { prompts: Prompts; close: () => void } {
   rl.on('line', line => { if (pending) { const resolve = pending; pending = undefined; resolve(line); } else lines.push(line); });
   rl.on('close', end);
   rl.on('SIGINT', () => { lines.length = 0; end(); rl.close(); });
-  return {
-    prompts: new Prompts(question => {
+  const prompts = new Prompts(question => {
       process.stdout.write(question);
       if (lines.length) return Promise.resolve(lines.shift()!);
       if (ended) return Promise.resolve(null);
       return new Promise(resolve => { pending = resolve; });
-    }, message => { process.stdout.write(`${message}\n`); }),
+    }, message => { process.stdout.write(`${message}\n`); });
+  prompts.external = async operation => {
+    rl.pause();
+    process.stdin.setRawMode?.(false);
+    try { return await operation(); } finally { process.stdin.setRawMode?.(true); rl.resume(); }
+  };
+  return {
+    prompts,
     close: () => rl.close(),
   };
 }

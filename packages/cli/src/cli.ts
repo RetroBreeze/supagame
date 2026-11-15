@@ -11,9 +11,10 @@ import { CliFailure } from './lib/cli-error.ts';
 import { doctor, doctorExitCode } from './commands/doctor.ts';
 import type { DoctorOptions } from './commands/doctor.ts';
 import { upgrade } from './commands/upgrade.ts';
-import { Command, CommanderError } from 'commander';
+import { Command, CommanderError, Option } from 'commander';
 import { addOrigins } from './commands/config-origins.ts';
-import { init } from './commands/init.ts';
+import { guidedInit } from './commands/guided-init.ts';
+import { connection } from './commands/connection.ts';
 import { deploy } from './commands/deploy.ts';
 import type { DeployOptions } from './commands/deploy.ts';
 import type { BoardOptions } from './lib/migration-generator.ts';
@@ -43,7 +44,19 @@ local(
     'Record this Supabase project ref; must agree with local link metadata',
   )
   .option('--origin <origin>', 'Allow a browser origin (repeatable)', (value: string, previous: string[]) => [...(previous ?? []), value], undefined as string[] | undefined)
-  .action((options) => init(options));
+  .option('--module <name>', 'Service to stage (repeatable; dependencies included)', (value: string, prior: string[]) => [...(prior ?? []), value])
+  .option('--connection-file <path>', 'Optional public connection JSON export, relative to project root')
+  .option('--replace', 'Replace only a recognized connection export for this same project')
+  .option('--key-id <id>', 'Explicit public key ID when a project has multiple keys')
+  .option('--url <url>', 'Canonical URL or verified active custom domain')
+  .action(options => prompted(options, p => guidedInit(options, p)));
+local(program.command('connection').description('Display public game connection information; optionally export JSON'))
+  .option('--project-ref <ref>', 'Exact project reference; must match local records')
+  .option('--output <path>', 'Create a connection export relative to the project root')
+  .option('--replace', 'Replace only a recognized export for the same project')
+  .option('--key-id <id>', 'Select a public key by ID')
+  .option('--url <url>', 'Canonical URL or verified active custom domain')
+  .action(async options => { await prompted(options, p => connection(options, p)); });
 local(program.command('config').description('Manage installation configuration').command('origins').description('Manage allowed browser origins').command('add').argument('<origins...>'))
   .action((origins: string[], options: LocalOptions) => addOrigins(origins, options));
 local(
@@ -128,7 +141,7 @@ for (const [kind, verbs] of Object.entries({leaderboard:['list','inspect','reset
 }
 // Global presentation flags never grant mutation consent.
 program.option('--json', 'Emit a versioned JSON result; disables prompts')
-  .option('--no-interactive', 'Never prompt or launch login')
+  .addOption(new Option('--no-interactive', 'Never prompt or launch login').default(undefined))
   .option('--interactive', 'Request guided setup in a terminal')
   .option('--verbose', 'Include detailed successful diagnostics');
 const presentation: TerminalOptions = { json: process.argv.slice(2).includes('--json') };
@@ -158,7 +171,7 @@ await withTerminal(terminal, async () => {
   try {
     if (process.argv.length === 2) program.help();
     await program.parseAsync();
-    if (!legacyAdmin) terminal.finish(commandName);
+    if (!legacyAdmin) terminal.finish(commandName, terminal.result, process.exitCode ? {category:'configuration',code:Number(process.exitCode)===2?'DIAGNOSTIC_INCOMPLETE':'DIAGNOSTIC_FAILED',message:'Review the reported diagnostic findings.'} : undefined);
   } catch (error) {
     if (error instanceof CommanderError && error.exitCode === 0) return;
     const cancelled = error instanceof Cancelled;

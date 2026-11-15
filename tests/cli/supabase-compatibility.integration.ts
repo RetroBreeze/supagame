@@ -8,6 +8,7 @@ import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { SupabaseCli, type ProcessRunner } from '../../packages/cli/src/lib/supabase-cli.ts';
 import { DoctorInspector } from '../../packages/cli/src/lib/doctor-inspect.ts';
+import { SetupEnvironment } from '../../packages/cli/src/lib/setup-environment.ts';
 import { HostedConfiguration } from '../../packages/cli/src/lib/hosted-config.ts';
 
 test('actual supported CLI capabilities, JSON serialization and unattended consent', { timeout: 60_000 }, async (t) => {
@@ -27,6 +28,8 @@ test('actual supported CLI capabilities, JSON serialization and unattended conse
       [`/v1/projects/${ref}`]: project,
       [`/v1/projects/${ref}/functions`]: [{ id: '11111111-1111-4111-8111-111111111111', slug: 'supagame', name: 'supagame', status: 'ACTIVE', version: 2, created_at: 1687423025152, updated_at: 1687423025152, verify_jwt: false }],
       [`/v1/projects/${ref}/secrets`]: [],
+      [`/v1/projects/${ref}/api-keys`]: [{id:'public-id',name:'default',type:'publishable',api_key:'sb_publishable_synthetic_public_key'}],
+      [`/v1/projects/${ref}/custom-hostname`]: {status:'5_services_reconfigured',custom_hostname:'games.example.com',data:{success:true,errors:[],messages:[],result:{id:'domain-id',hostname:'games.example.com',status:'active',ssl:{status:'active',validation_records:[],validation_errors:[]},ownership_verification:{type:'txt',name:'fixture',value:'fixture'},custom_origin_server:'example.com',verification_errors:[]}}},
       [`/v2/projects/${ref}/config`]: { data: { type: 'project_config', id: ref, attributes: { auth: { external_anonymous_users_enabled: false, disable_signup: false } } } },
     };
     const body = responses[req.url ?? ''];
@@ -58,6 +61,10 @@ test('actual supported CLI capabilities, JSON serialization and unattended conse
   const cli = new SupabaseCli(run, root, ref);
   await cli.checkVersion();
   await cli.checkCapabilities();
+  const setup = new SetupEnvironment(run);
+  assert.deepEqual(await setup.projects(), [{ref,name:'fixture'}]);
+  assert.deepEqual(await setup.keys(ref), [{id:'public-id',name:'default',key:'sb_publishable_synthetic_public_key'}]);
+  assert.equal(await setup.customDomain(ref), 'games.example.com');
   const version = (await run(['--version'], root)).stdout.trim();
   if (process.env.SUPABASE_TEST_VERSION) assert.equal(version, process.env.SUPABASE_TEST_VERSION);
   t.diagnostic(`Actual Supabase CLI ${version}; Node ${process.version}`);

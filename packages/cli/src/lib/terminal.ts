@@ -16,6 +16,7 @@ export function terminalText(value: string): string {
 }
 export class Terminal {
   readonly events: Event[] = [];
+  result: unknown = null;
   private readonly color: boolean;
   readonly options: TerminalOptions;
   private readonly write: (s: string) => void;
@@ -39,7 +40,7 @@ export class Terminal {
   }
   heading(message: string): void { this.event({ kind: 'heading', message }); }
   values(values: Record<string, string>): void { this.event({ kind: 'values', values }); }
-  finish(command: string, result: unknown = null, error?: { category: string; message: string; code: string }): void {
+  finish(command: string, result: unknown = this.result, error?: { category: string; message: string; code: string }): void {
     if (this.options.json) this.write(JSON.stringify({ schemaVersion: 1, command, ok: !error, result, events: this.events, ...(error ? { error } : {}) }) + '\n');
     else if (error) this.event({ kind: 'error', message: error.message });
   }

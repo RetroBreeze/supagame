@@ -1,10 +1,10 @@
 import { log } from '../lib/terminal.ts';
-import { storageConfig } from '../lib/cloud-saves.ts';
+import { modulePlan } from '../lib/module-plan.ts';
 import { executePlan, planFiles } from '../lib/file-stage.ts';
 import { MANIFEST, manifestBytes, object, readManifest } from '../lib/manifest.ts';
-import { functionConfig, readProject, selectedRef } from '../lib/project.ts';
+import { readProject, selectedRef } from '../lib/project.ts';
 import type { LocalOptions } from '../lib/project.ts';
-import { checkMigrationVersions, MODULE_VERSION, templateFiles, migrationModule } from '../lib/templates.ts';
+import { MODULE_VERSION } from '../lib/templates.ts';
 
 export function add(module: string, options: LocalOptions): void {
   if (module !== 'leaderboards' && module !== 'live-leaderboards' && module !== 'achievements' && module !== 'cloud-saves' && module !== 'admin') {
@@ -16,32 +16,10 @@ export function add(module: string, options: LocalOptions): void {
   const existing = readManifest(project.root);
   if (!existing) throw new Error('Run supagame init before adding a module.');
   const ref = selectedRef(project.root, undefined, existing.value.projectRef);
-  for (const [name, version] of Object.entries(existing.value.modules)) {
-    if (version !== MODULE_VERSION) {
-      throw new Error(
-        `Installed ${name} version ${version} differs from CLI templates ${MODULE_VERSION}. Use a matching CLI version, or inspect known forward-only paths with supagame upgrade --dry-run.`,
-      );
-    }
-  }
-  checkMigrationVersions(project.root);
-  const functionBytes = functionConfig(project.bytes, project.config);
-  const config = module === 'cloud-saves' ? storageConfig(functionBytes) : functionBytes;
-  const value = {
-    ...existing.value,
-    modules: {
-      ...existing.value.modules,
-      ...(module === 'admin' ? { admin: MODULE_VERSION } : {}),
-      core: MODULE_VERSION,
-      leaderboards: MODULE_VERSION,
-      ...(module === 'cloud-saves' ? { 'cloud-saves': MODULE_VERSION } : {}),
-      ...(module === 'achievements' ? { achievements: MODULE_VERSION } : {}),
-      ...(module === 'live-leaderboards' ? { 'live-leaderboards': MODULE_VERSION } : {}),
-    },
-  };
-  const unchanged = (module !== 'admin' || existing.value.modules.admin === MODULE_VERSION) && (module !== 'cloud-saves' || existing.value.modules['cloud-saves'] === MODULE_VERSION) && (module !== 'achievements' || existing.value.modules.achievements === MODULE_VERSION) && (module !== 'live-leaderboards' || existing.value.modules[module] === MODULE_VERSION) && existing.value.modules.core === MODULE_VERSION &&
-    existing.value.modules.leaderboards === MODULE_VERSION;
+  const { value, config, files } = modulePlan(project, existing.value, [module]);
+  const unchanged = JSON.stringify(value) === JSON.stringify(existing.value);
   const plan = planFiles(project.root, [
-    ...templateFiles().filter(f => { const module = migrationModule(f.path); return !module || !!value.modules[module]; }),
+    ...files,
     {
       path: 'supabase/config.toml',
       content: config,

@@ -1,3 +1,5 @@
+import { parse } from 'smol-toml';
+import { modulePlan } from '../lib/module-plan.ts';
 import { log } from '../lib/terminal.ts';
 import { installationIgnore, localOrigins } from '../lib/local-origins.ts';
 import { mergeOrigins } from '../lib/origins.ts';
@@ -8,8 +10,9 @@ import type { LocalOptions } from '../lib/project.ts';
 
 export interface InitOptions extends LocalOptions {
   origin?: string[];
+  module?: string[];
 }
-export function init(options: InitOptions): void {
+export function planInit(options: InitOptions) {
   const root = projectRoot(options.workdir ?? process.cwd());
   const previousConfig = readProjectFile(root, 'supabase/config.toml');
   if (!previousConfig && ['json', 'jsonc'].some((extension) => readProjectFile(root, `supabase/config.${extension}`))) {
@@ -44,31 +47,27 @@ export function init(options: InitOptions): void {
     )
     : undefined;
   const origins = runtime?.origins ?? desired;
-  const value = existing?.value ?? {
+  let value = existing?.value ?? {
     formatVersion: 1 as const,
     projectRef,
     modules: {},
     leaderboards: [],
   };
-  const content = existing &&
-      JSON.stringify(origins) === JSON.stringify(existing.value.origins)
-    ? existing.bytes
-    : manifestBytes({ ...value, ...(origins ? { origins } : {}) });
-  log(
-    `Project reference: ${projectRef} (local record only; no remote operation).`,
-  );
-  executePlan(
-    project.root,
-    planFiles(project.root, [
-      { path: 'supabase/config.toml', content: project.bytes },
-      ...(runtime?.files ??
-        (!previousConfig ? [installationIgnore(root)] : [])),
-      {
-        path: MANIFEST,
-        content,
-        ...(existing ? { replace: existing.bytes } : {}),
-      },
-    ]),
-    options.dryRun ?? false,
-  );
+  value = { ...value, ...(origins ? { origins } : {}) };
+  const selected = options.module?.length ? modulePlan({...project, config:parse(project.bytes.toString())}, value, options.module) : undefined;
+  value = selected?.value ?? value;
+  const content = existing && JSON.stringify(value) === JSON.stringify(existing.value) ? existing.bytes : manifestBytes(value);
+  const plan = planFiles(project.root, [
+    ...(selected?.files ?? []),
+    { path: 'supabase/config.toml', content: selected?.config ?? project.bytes, ...(previousConfig ? {replace:previousConfig} : {}) },
+    ...(runtime?.files ?? (!previousConfig ? [installationIgnore(root)] : [])),
+    { path: MANIFEST, content, ...(existing ? {replace:existing.bytes} : {}) },
+  ]);
+  return {root,plan,manifest:value};
+}
+export function init(options: InitOptions): void {
+  const prepared = planInit(options);
+  log(`Project reference: ${prepared.manifest.projectRef} (local record only; no remote operation).`);
+  executePlan(prepared.root,prepared.plan,options.dryRun ?? false);
+
 }
