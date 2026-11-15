@@ -67,9 +67,9 @@ Files: deploy/doctor and remaining command presentation; PTY tests and compatibi
 ### 5. Documentation and release verification
 
 Files: root/CLI READMEs, local Wiki Quickstart/Installation-Reference/Troubleshooting, verification record and CI commands.
-- [ ] Document guided and explicit engine-neutral sessions, JSON schema/exit codes, optional connection exports, prerequisites and diagnostic limitations.
-- [ ] Run full build/typecheck/lint/contracts/unit/Edge/package/database/API/SDK/E2E suite under all four Node × CLI combinations. Record exact results and blockers; never label simulated APIs hosted verification.
-- [ ] Self-review complete diff against request and security constraints (user prohibits subagents). Verify user edits remain excluded. Commit documentation/verification separately, no push.
+- [x] Document guided and explicit engine-neutral sessions, JSON schema/exit codes, optional connection exports, prerequisites and diagnostic limitations.
+- [x] Run full build/typecheck/lint/contracts/unit/Edge/package/database/API/SDK/E2E suite under all four Node × CLI combinations. Record exact results and blockers; never label simulated APIs hosted verification.
+- [x] Self-review complete diff against request and security constraints (user prohibits subagents). Verify user edits remain excluded. Commit documentation/verification separately, no push.
 
 ## Execution record
 
@@ -83,3 +83,6 @@ Files: root/CLI READMEs, local Wiki Quickstart/Installation-Reference/Troublesho
 - Ruling: no subagent review because the user's repository instructions prohibit subagents. Performed a separate author security/requirements review; export destination and project-drift findings were fixed with failing regressions.
 - Environment: the pre-existing local stack lacked its Edge Runtime, producing 12 HTTP integration failures (503). Started only the local fixture's function server; rerun passed all 13 HTTP steps. Existing database containers were preserved. No production/hosted changes.
 - Auth/domain transport was checked using real Supabase binaries and synthetic loopback responses, including the documented hostname API response. Actual hosted login, key/domain permissions and custom-domain TLS remain unverified.
+- Final matrix: Node 24.22.3/26.13.0 × Supabase 3.0.0/3.1.0 passed all 60 command runs. Each entry included 646 unit tests, 7 real PTY scenarios, 809 pgTAP checks, local integrations, packaging and 15 E2E tests. Exact commands/counts and boundaries are in [CLI-DX-VERIFICATION.md](../../../CLI-DX-VERIFICATION.md).
+- Documentation commit `513fcfb`; local Wiki commit `7db945e`. No pushes. Restored the generated test CLI to 3.0.0 and stopped only the fixture function server started for this task.
+- Final evidence covers the working tree including pre-existing user example/lockfile/test edits, which remain excluded from feature commits. GO for the subsequent release audit; no publication approval or actual hosted verification claimed.
