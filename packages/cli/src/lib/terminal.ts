@@ -17,7 +17,11 @@ export function terminalText(value: string): string {
 export class Terminal {
   readonly events: Event[] = [];
   private readonly color: boolean;
-  constructor(readonly options: TerminalOptions = {}, private readonly write = (s: string) => { process.stdout.write(s); }, tty = Boolean(process.stdout.isTTY), env = process.env) {
+  readonly options: TerminalOptions;
+  private readonly write: (s: string) => void;
+  constructor(options: TerminalOptions = {}, write = (s: string) => { process.stdout.write(s); }, tty = Boolean(process.stdout.isTTY), env = process.env) {
+    this.options = options;
+    this.write = write;
     this.color = tty && !options.json && !env.CI && env.NO_COLOR === undefined && env.TERM !== 'dumb';
   }
   event(event: Event): void {

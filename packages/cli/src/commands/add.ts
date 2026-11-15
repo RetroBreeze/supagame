@@ -1,3 +1,4 @@
+import { log } from '../lib/terminal.ts';
 import { storageConfig } from '../lib/cloud-saves.ts';
 import { executePlan, planFiles } from '../lib/file-stage.ts';
 import { MANIFEST, manifestBytes, object, readManifest } from '../lib/manifest.ts';
@@ -52,7 +53,7 @@ export function add(module: string, options: LocalOptions): void {
       replace: existing.bytes,
     },
   ]);
-  console.log(
+  log(
     `Project reference: ${ref}; ${Object.keys(value.modules).join(', ')} ${MODULE_VERSION} (local staging only).`,
   );
   executePlan(project.root, plan, options.dryRun ?? false);
@@ -60,11 +61,11 @@ export function add(module: string, options: LocalOptions): void {
     !object(project.config.auth) ||
     project.config.auth.enable_anonymous_sign_ins !== true
   ) {
-    console.log(
+    log(
       'Anonymous sign-in is not enabled in local config. Enable auth.enable_anonymous_sign_ins for anonymous players; deploy previews and enables the hosted prerequisite after authorization. Existing settings were preserved.',
     );
   }
-  console.log(
+  log(
     value.origins ? 'Browser origins are configured; deploy will inspect hosted configuration. No hosted changes were made.' : 'For browser games, run supagame config origins add <origin>. No database migrations or function deployments were executed.',
   );
 }

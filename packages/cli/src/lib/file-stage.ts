@@ -1,3 +1,4 @@
+import { fileEvent, log } from './terminal.ts';
 import {
   closeSync,
   constants,
@@ -323,8 +324,8 @@ export function reportPlan(
   plan: readonly PlannedFile[],
   dryRun: boolean,
 ): void {
-  console.log(dryRun ? 'Dry run: local preview only.' : 'Local staging plan:');
-  for (const file of plan) console.log(`${file.status} ${file.path}`);
+  log(dryRun ? 'Dry run: local preview only.' : 'Local staging plan:');
+  for (const file of plan) fileEvent(file.status, file.path);
   if (plan.some((file) => file.status === 'conflict')) {
     throw new Error(
       'Resolve the listed file conflicts; existing files will not be overwritten. No files changed.',
@@ -341,10 +342,10 @@ export function executePlan(
     try {
       requireStaleStage(root);
     } catch (error) {
-      console.log('conflict .supagame-stage');
+      log('conflict .supagame-stage');
       throw error;
     }
-    console.log(
+    log(
       dryRun
         ? 'unchanged .supagame-stage (interrupted operation; real execution will recover)'
         : 'Recovering interrupted local staging.',

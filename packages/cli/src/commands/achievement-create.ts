@@ -7,18 +7,11 @@ import {
 import { migrations, nextVersion } from "../lib/migration-generator.ts";
 import { type LocalOptions, readProject, selectedRef } from "../lib/project.ts";
 import { MODULE_VERSION } from "../lib/templates.ts";
-export function createAchievement(
-  id: string,
-  options: LocalOptions & {
-    title: string;
-    description: string;
-    board: string;
-    threshold: string;
-    icon?: string;
-    category?: string;
-    metadata?: string;
-  },
-) {
+export interface AchievementOptions extends LocalOptions {
+  title: string; description: string; board: string; threshold: string;
+  icon?: string; category?: string; metadata?: string;
+}
+export function planAchievement(id: string, options: AchievementOptions) {
   const { root } = readProject(options), existing = readManifest(root);
   if (!existing || existing.value.modules.achievements !== MODULE_VERSION) {
     throw new Error("Run supagame add achievements first.");
@@ -59,13 +52,15 @@ export function createAchievement(
     ...existing.value,
     achievements: previous ? definitions : [...definitions, a],
   };
-  executePlan(
-    root,
-    planFiles(root, [{ path: `supabase/migrations/${name}`, content }, {
+  const plan = planFiles(root, [{ path: `supabase/migrations/${name}`, content }, {
       path: MANIFEST,
       content: manifestBytes(value),
       replace: existing.bytes,
-    }]),
-    options.dryRun ?? false,
-  );
+    }]);
+  return { root, plan, definition: a };
+}
+
+export function createAchievement(id: string, options: AchievementOptions): void {
+  const { root, plan } = planAchievement(id, options);
+  executePlan(root, plan, options.dryRun ?? false);
 }

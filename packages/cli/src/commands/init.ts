@@ -1,3 +1,4 @@
+import { log } from '../lib/terminal.ts';
 import { installationIgnore, localOrigins } from '../lib/local-origins.ts';
 import { mergeOrigins } from '../lib/origins.ts';
 import { executePlan, planFiles, projectRoot, readProjectFile } from '../lib/file-stage.ts';
@@ -53,7 +54,7 @@ export function init(options: InitOptions): void {
       JSON.stringify(origins) === JSON.stringify(existing.value.origins)
     ? existing.bytes
     : manifestBytes({ ...value, ...(origins ? { origins } : {}) });
-  console.log(
+  log(
     `Project reference: ${projectRef} (local record only; no remote operation).`,
   );
   executePlan(

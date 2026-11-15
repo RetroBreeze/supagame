@@ -1,3 +1,4 @@
+import { log } from '../lib/terminal.ts';
 import {
   defaultSaveLimits,
   saveLimitsSql,
@@ -34,7 +35,7 @@ export function configureSaves(
       "Invalid save limits: slots 1–1000, JSON up to 1 MiB, binary up to 5 GiB, total up to 50 GiB.",
     );
   if (JSON.stringify(value) === JSON.stringify(previous)) {
-    console.log("Cloud Saves limits unchanged.");
+    log("Cloud Saves limits unchanged.");
     return;
   }
   const files = migrations(root);
@@ -52,7 +53,7 @@ export function configureSaves(
     ]),
     options.dryRun ?? false,
   );
-  console.log(
+  log(
     "Cloud Saves quotas and private bucket limit staged. Global hosted Storage limits may be lower; doctor reports what can be verified.",
   );
 }

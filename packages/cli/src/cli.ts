@@ -4,16 +4,18 @@ import { adminCommand } from './commands/admin.ts';
 import { configureAuth } from './commands/auth.ts';
 import { cleanupSaves } from './commands/saves-cleanup.ts';
 import { configureSaves } from './commands/saves-configure.ts';
-import { createAchievement } from './commands/achievement-create.ts';
+import { guidedAchievement, guidedLeaderboard } from './commands/guided-create.ts';
+import { Terminal, withTerminal, interactive, type TerminalOptions } from './lib/terminal.ts';
+import { Cancelled, terminalPrompts, type Prompts } from './lib/prompts.ts';
+import { CliFailure } from './lib/cli-error.ts';
 import { doctor, doctorExitCode } from './commands/doctor.ts';
 import type { DoctorOptions } from './commands/doctor.ts';
 import { upgrade } from './commands/upgrade.ts';
-import { Command } from 'commander';
+import { Command, CommanderError } from 'commander';
 import { addOrigins } from './commands/config-origins.ts';
 import { init } from './commands/init.ts';
 import { deploy } from './commands/deploy.ts';
 import type { DeployOptions } from './commands/deploy.ts';
-import { createLeaderboard } from './commands/leaderboard-create.ts';
 import type { BoardOptions } from './lib/migration-generator.ts';
 import { add } from './commands/add.ts';
 import type { LocalOptions } from './lib/project.ts';
@@ -56,17 +58,17 @@ local(
     'Configure leaderboard definitions',
   ).command('create').argument('<id>'),
 )
-  .requiredOption('--type <type>', 'time or points')
-  .requiredOption('--order <order>', 'asc or desc')
+  .option('--type <type>', 'time or points')
+  .option('--order <order>', 'asc or desc')
   .option('--keep-best', 'Retain only personal best scores (required)')
   .option('--min <integer>', 'Minimum accepted score')
   .option('--max <integer>', 'Maximum accepted score')
-  .action((id: string, options: LocalOptions & BoardOptions) => createLeaderboard(id, options));
+  .action((id: string, options: LocalOptions & BoardOptions) => prompted(options, p => guidedLeaderboard(id, options, p)));
 local(program.command('achievement').description('Configure immutable achievement definitions').command('create').argument('<id>'))
-.requiredOption('--title <text>', 'Display title').requiredOption('--description <text>', 'Description')
-.requiredOption('--board <id>', 'Existing descending leaderboard').requiredOption('--threshold <integer>', 'Single accepted score threshold')
+.option('--title <text>', 'Display title').option('--description <text>', 'Description')
+.option('--board <id>', 'Existing descending leaderboard').option('--threshold <integer>', 'Single accepted score threshold')
 .option('--icon <id>', 'Game-defined icon identifier').option('--category <text>', 'Category').option('--metadata <json>', 'Optional JSON object')
-.action(createAchievement);
+.action((id, options) => prompted(options, p => guidedAchievement(id, options, p)));
 local(
   program.command('deploy').description(
     'Preview all pending migrations and explicitly authorize hosted deployment',
@@ -124,14 +126,49 @@ for (const [kind, verbs] of Object.entries({leaderboard:['list','inspect','reset
   else cmd.action(opts=>adminCommand(kind as 'leaderboard'|'audit'|'doctor',verb,undefined,opts));
  }
 }
-if (process.argv.length === 2) program.help();
-try {
-  await program.parseAsync();
-} catch (error) {
-  program.error(
-    error instanceof Error
-      ? error.message
-      : 'Local setup failed; inspect project permissions and retry.',
-    { exitCode: 1 },
-  );
+// Global presentation flags never grant mutation consent.
+program.option('--json', 'Emit a versioned JSON result; disables prompts')
+  .option('--no-interactive', 'Never prompt or launch login')
+  .option('--interactive', 'Request guided setup in a terminal')
+  .option('--verbose', 'Include detailed successful diagnostics');
+const presentation: TerminalOptions = { json: process.argv.slice(2).includes('--json') };
+const terminal = new Terminal(presentation);
+let commandName = 'supagame';
+let legacyAdmin = false;
+program.exitOverride();
+program.configureOutput({ writeErr: () => {} });
+program.hook('preAction', (_command, action) => {
+  Object.assign(presentation, action.optsWithGlobals());
+  for (const key of ['interactive', 'json', 'verbose']) {
+    const value = action.optsWithGlobals()[key];
+    if (value !== undefined) action.setOptionValue(key, value);
+  }
+  const names: string[] = [];
+  for (let current: Command | null = action; current?.parent; current = current.parent) names.unshift(current.name());
+  commandName = names.join(' ');
+  legacyAdmin = names[0] === 'admin';
+  if (!legacyAdmin) terminal.heading(commandName);
+});
+async function prompted<T>(options: TerminalOptions, action: (prompts?: Prompts) => Promise<T>): Promise<T> {
+  if (!interactive({...presentation,...options})) return action();
+  const session = terminalPrompts();
+  try { return await action(session.prompts); } finally { session.close(); }
 }
+await withTerminal(terminal, async () => {
+  try {
+    if (process.argv.length === 2) program.help();
+    await program.parseAsync();
+    if (!legacyAdmin) terminal.finish(commandName);
+  } catch (error) {
+    if (error instanceof CommanderError && error.exitCode === 0) return;
+    const cancelled = error instanceof Cancelled;
+    const category = error instanceof CliFailure ? error.category : cancelled ? 'cancelled'
+      : error instanceof CommanderError || commandName.includes('create') ? 'validation'
+      : commandName === 'deploy' ? 'deployment' : 'configuration';
+    const message = error instanceof SyntaxError ? 'Invalid JSON input; check the documented format. Input contents are withheld.'
+      : error instanceof Error ? error.message : 'Operation failed. Check project configuration and permissions.';
+    process.exitCode = cancelled ? 130 : 1;
+    if (presentation.json && !legacyAdmin) terminal.finish(commandName, null, { category, code: error instanceof CliFailure ? error.code : category.toUpperCase(), message });
+    else process.stderr.write(`error: ${message}\n`);
+  }
+});

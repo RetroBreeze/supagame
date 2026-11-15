@@ -123,7 +123,7 @@ export async function adminCommand(
     };
     adminMutation(operation);
     if (!(options.remote ? options.allowRemote : options.yes)) {
-      if (!deps.interactive) {
+      if ((options.interactive === false || options.json || !deps.interactive)) {
         throw new Error(
           "Explicit confirmation required: --allow-remote for hosted or --yes for local automation.",
         );

@@ -1,3 +1,4 @@
+import { log } from '../lib/terminal.ts';
 import { achievementSql } from '../lib/achievements.ts';
 import { existsSync } from 'node:fs';
 import { projectRoot, readProjectFile, safePath } from '../lib/file-stage.ts';
@@ -33,7 +34,7 @@ export async function doctor(
   options: DoctorOptions,
   dependencies: DoctorDependencies = {
     run: runSupabase,
-    log: console.log,
+    log: log,
     inventory: currentInventory(templateFiles()),
   },
 ): Promise<Diagnostic[]> {

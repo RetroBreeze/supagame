@@ -3,6 +3,9 @@ import { projectRoot, readProjectFile } from './file-stage.ts';
 import { object, projectRef } from './manifest.ts';
 
 export interface LocalOptions {
+  interactive?: boolean;
+  json?: boolean;
+  verbose?: boolean;
   workdir?: string;
   dryRun?: boolean;
   projectRef?: string;

@@ -1,3 +1,4 @@
+import { log } from '../lib/terminal.ts';
 import { achievementSql } from '../lib/achievements.ts';
 import { existsSync } from 'node:fs';
 import { executePlan, planFiles, readProjectFile, safePath } from '../lib/file-stage.ts';
@@ -26,7 +27,7 @@ export function upgrade(
     );
   }
   if (!Object.keys(existing.value.modules).length) {
-    console.log('No installed modules. Run supagame add leaderboards first.');
+    log('No installed modules. Run supagame add leaderboards first.');
     return;
   }
   if (
@@ -84,7 +85,7 @@ export function upgrade(
     }
     changed ||= target.version !== installed.version;
     value.modules[module] = target.version;
-    console.log(`${module}: installed ${installed.version}; available ${target.version}.`);
+    log(`${module}: installed ${installed.version}; available ${target.version}.`);
   }
   if (value.modules.leaderboards) {
     if (
@@ -115,7 +116,7 @@ export function upgrade(
     replace: existing.bytes,
   });
   executePlan(project.root, planFiles(project.root, desired), options.dryRun ?? false);
-  console.log(
+  log(
     changed
       ? 'Forward-only upgrade staged locally. Review and commit the files; deployment is a separate explicitly confirmed command.'
       : 'Up to date; no upgrade available. No files changed.',

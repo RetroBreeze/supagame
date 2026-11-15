@@ -1,3 +1,4 @@
+import { log } from '../lib/terminal.ts';
 import { localOrigins } from '../lib/local-origins.ts';
 import { executePlan, planFiles } from '../lib/file-stage.ts';
 import { MANIFEST, manifestBytes, object, readManifest } from '../lib/manifest.ts';
@@ -29,7 +30,7 @@ export function addOrigins(additions: string[], options: LocalOptions): void {
     }]),
     options.dryRun ?? false,
   );
-  console.log(
+  log(
     `${origins.length} browser origins configured locally. Run supagame deploy to preview and authorize hosted configuration.`,
   );
 }

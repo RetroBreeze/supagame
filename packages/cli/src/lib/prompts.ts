@@ -5,7 +5,9 @@ export class Cancelled extends Error { constructor() { super('Cancelled; no proj
 interface TextOptions { default?: string; validate?: (value: string) => string | undefined }
 export interface Choice { value: string; label: string }
 export class Prompts {
-  constructor(private readonly ask: (question: string) => Promise<string | null>, private readonly write: (message: string) => void) {}
+  private readonly ask: (question: string) => Promise<string | null>;
+  private readonly write: (message: string) => void;
+  constructor(ask: (question: string) => Promise<string | null>, write: (message: string) => void) { this.ask = ask; this.write = write; }
   async text(question: string, options: TextOptions = {}): Promise<string> {
     for (;;) {
       const answer = await this.ask(terminalText(`? ${question}${options.default === undefined ? '' : ` [${options.default}]`}: `));

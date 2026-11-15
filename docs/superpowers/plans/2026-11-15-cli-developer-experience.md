@@ -74,5 +74,5 @@ Files: root/CLI READMEs, local Wiki Quickstart/Installation-Reference/Troublesho
 ## Execution record
 
 - Inspection: command registration, init/add/create/deploy/doctor/auth/admin, manifest, planner rollback, Supabase process boundary and compatibility/E2E tests reviewed. Existing source uses direct console output and several independent confirmation implementations.
-- Existing CLI test baseline started before implementation; result pending.
+- Existing CLI baseline: 343 tests passed. Stage 1: 14 terminal/prompt tests, CLI typecheck and lint passed. Stage 2: complete CLI suite 364 tests passed; focused creation/help regressions 40 passed; CLI typecheck/lint passed. Native Node execution caught parameter-property syntax, corrected to erasable TypeScript.
 - Ruling: work in the requested feature branch in the current checkout, preserving all user edits; no additional worktree or dependency reinstall needed.

@@ -1,3 +1,4 @@
+import { log } from '../lib/terminal.ts';
 import { stringify } from "smol-toml";
 import { createInterface } from "node:readline/promises";
 import { readProject, selectedRef, type LocalOptions } from "../lib/project.ts";
@@ -23,7 +24,7 @@ function defaults(): Dependencies {
   return {
     fetch: globalThis.fetch,
     env: process.env,
-    log: console.log,
+    log: log,
     interactive: !!(
       process.stdin.isTTY &&
       process.stdout.isTTY &&
@@ -243,7 +244,7 @@ export async function configureAuth(
   if (options.dryRun) return;
   if (
     !options.allowRemote &&
-    (!deps.interactive || (await deps.confirm(ref)) !== `auth ${ref}`)
+    ((options.interactive === false || options.json || !deps.interactive) || (await deps.confirm(ref)) !== `auth ${ref}`)
   )
     throw Error("Auth configuration cancelled; no hosted settings changed.");
   const fresh = await request("GET");

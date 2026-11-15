@@ -1,3 +1,4 @@
+import { log } from '../lib/terminal.ts';
 import { createInterface } from "node:readline/promises";
 import { inspectionWorkspace, DoctorInspector } from "../lib/doctor-inspect.ts";
 import { readManifest, object } from "../lib/manifest.ts";
@@ -19,7 +20,7 @@ interface Dependencies {
 const defaults = (): Dependencies => ({
   run: runSupabase,
   fetcher: fetch,
-  log: console.log,
+  log: log,
   interactive: !!process.stdin.isTTY && !process.env.CI,
   confirm: async (ref) => {
     const rl = createInterface({
@@ -89,7 +90,7 @@ export async function cleanupSaves(options: Options, deps = defaults()) {
       return;
     }
     if (options.remote && !options.allowRemote) {
-      if (!deps.interactive)
+      if ((options.interactive === false || options.json || !deps.interactive))
         throw new Error(
           "Hosted cleanup requires explicit confirmation or --allow-remote.",
         );

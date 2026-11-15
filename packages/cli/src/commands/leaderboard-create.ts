@@ -6,10 +6,10 @@ import { readProject, selectedRef } from '../lib/project.ts';
 import type { LocalOptions } from '../lib/project.ts';
 import { MODULE_VERSION } from '../lib/templates.ts';
 
-export function createLeaderboard(
+export function planLeaderboard(
   id: string,
   options: LocalOptions & BoardOptions,
-): void {
+) {
   const board = definition(id, options);
   const { root } = readProject(options);
   const existing = readManifest(root);
@@ -49,5 +49,10 @@ export function createLeaderboard(
       replace: existing.bytes,
     },
   ]);
+  return { root, plan, definition: board };
+}
+
+export function createLeaderboard(id: string, options: LocalOptions & BoardOptions): void {
+  const { root, plan } = planLeaderboard(id, options);
   executePlan(root, plan, options.dryRun ?? false);
 }

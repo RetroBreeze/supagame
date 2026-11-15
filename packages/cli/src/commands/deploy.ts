@@ -1,3 +1,4 @@
+import { log } from '../lib/terminal.ts';
 import { rawDeploymentLog } from '../lib/raw-deployment-log.ts';
 import { DeploymentDiagnostic } from '../lib/deployment-diagnostic.ts';
 import { inspectRealtime } from '../lib/realtime-inspection.ts';
@@ -35,7 +36,7 @@ function defaults(): DeployDependencies {
     interactive: Boolean(
       process.stdin.isTTY && process.stdout.isTTY && !process.env.CI,
     ),
-    log: console.log,
+    log: log,
     confirm: async (ref) => {
       const prompt = createInterface({
         input: process.stdin,
@@ -71,7 +72,7 @@ export async function deploy(
       'Use either --dry-run or --allow-remote; preview and authorization are distinct.',
     );
   }
-  if (!options.dryRun && !dependencies.interactive && !options.allowRemote) {
+  if (!options.dryRun && (options.interactive === false || options.json || !dependencies.interactive) && !options.allowRemote) {
     throw new Error(
       'Noninteractive deployment requires --allow-remote and an explicit --project-ref. Environment variables are not consent.',
     );
