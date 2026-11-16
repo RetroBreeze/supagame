@@ -22,7 +22,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
+          # No cache here: bundled npm fails the repository devEngines check.
       - name: Install the pinned development package manager
         run: npm install --global npm@12.2.0
         working-directory: ${{ runner.temp }}
@@ -59,7 +59,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
+          # No cache here: bundled npm fails the repository devEngines check.
       - name: Install the pinned development package manager
         run: npm install --global npm@12.2.0
         working-directory: ${{ runner.temp }}
