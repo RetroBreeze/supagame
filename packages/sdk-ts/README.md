@@ -1,129 +1,64 @@
 # @retrobreeze/supagame-sdk
 
-Browser-compatible TypeScript wrappers for the Supagame v1 HTTP API. The caller
-supplies a Supabase client initialized with the project's **publishable** key.
-Never initialize a game client with a secret or service-role key.
+The TypeScript client for Supagame. Use it with your existing Supabase client
+in JavaScript or TypeScript games. Set up the backend with the
+[quickstart](https://github.com/RetroBreeze/supagame/wiki/Quickstart) first.
 
-The package is currently private in this repository; no npm publication is part
-of this implementation. Proposed first public version: **0.1.0**.
-Node.js consumers support **24 or 26**; the browser SDK still uses standard Web APIs.
-After publication, install the SDK and its peer dependency:
+## Install
 
 ```sh
 npm install @retrobreeze/supagame-sdk @supabase/supabase-js@2.119.0
 ```
 
-For TypeScript projects, also install the Node declarations referenced by the
-Supabase client's types, including when targeting browsers:
+TypeScript projects also need `npm install -D @types/node@24.19.2` for Supabase's
+declarations, including browser projects. If `compilerOptions.types` is restricted,
+include `node`. This adds no browser runtime polyfills. Node.js consumers use 24 or 26.
+The contracts package is installed automatically.
 
-```sh
-npm install --save-dev @types/node@24.19.2
-```
+## Submit and read scores
 
-If `tsconfig.json` restricts `compilerOptions.types`, include `node` in that list.
-These are development-only declarations; the browser runtime needs no Node polyfills.
-
-For backend setup and a complete runnable integration, see the
-[npm quickstart](https://github.com/RetroBreeze/supagame/tree/main/packages/cli).
-For source development, build the workspace with `pnpm build`.
+Use the URL and publishable key from `npx supagame connection`. If your application
+already has a Supabase client, reuse it.
 
 ```ts
+import { createClient } from '@supabase/supabase-js';
 import { createGameServices } from '@retrobreeze/supagame-sdk';
 
-// Reuse your application's existing Supabase client and storage adapter.
+const supabase = createClient(
+  'https://YOUR_PROJECT_REF.supabase.co',
+  'sb_publishable_YOUR_PROJECT_KEY',
+);
 const game = createGameServices({ supabase });
-const { userId } = await game.players.ensureAnonymousSession();
-const profile = await game.players.getMe();
+
+await game.players.ensureAnonymousSession();
 await game.players.updateMe({ displayName: 'Player One' });
-
-const submissionKey = crypto.randomUUID();
-const result = await game.leaderboards.submit('level-1', 42500, submissionKey);
-const page = await game.leaderboards.getTop('level-1', { limit: 10 });
-const mine = await game.leaderboards.getMine('level-1'); // null if no score
-if (page.nextCursor !== null) {
-  const nextPage = await game.leaderboards.getTop('level-1', {
-    limit: 10,
-    cursor: page.nextCursor,
-  });
-}
+const result = await game.leaderboards.submit('arcade', 1250);
+const top = await game.leaderboards.getTop('arcade', { limit: 10 });
+const mine = await game.leaderboards.getMine('arcade');
+console.log(result.bestScore, top.entries, mine);
 ```
 
-## Sessions and identity
+Public reads need no player session. `ensureAnonymousSession()` reuses an existing
+anonymous or permanent session and creates a guest only when none exists. Auth
+failures do not silently replace the player. Supabase handles storage and refresh;
+losing an unlinked guest's session can lose access to their data.
 
-Supabase owns session persistence, token refresh and provider authentication.
-Configure your caller-owned client's session storage for your application's
-environment as usual. The SDK observes Auth changes to protect in-flight
-operations from account switches; session operations share one observer per Auth
-client, and achievements also observe identity changes. It does not persist a
-separate session-credential store.
+## Core methods
 
-Optional features have their own lifecycle and storage: live leaderboards use
-Auth/Realtime subscriptions and debounce/request timers; achievement subscriptions
-poll, and notification queues use timers. Call their `unsubscribe()` or `dispose()`
-handles when finished. Offline saves use the supplied persistence adapter, and
-account-transition journals use `accounts.store` or the default IndexedDB adapter.
-The browser adapters access IndexedDB when used; they do not replace Supabase's
-session store. Configure `accounts.namespace` before using account flows.
+| Method | Result |
+| --- | --- |
+| `players.ensureAnonymousSession()` | `{ userId }` |
+| `players.getMe()` | Player profile |
+| `players.updateMe({ displayName })` | Updated profile; names are 3–24 printable characters |
+| `leaderboards.submit(id, score, submissionKey?)` | `{ outcome, score, bestScore }` |
+| `leaderboards.getTop(id, { limit?, cursor? })` | `{ entries, nextCursor }` |
+| `leaderboards.getMine(id)` | Personal rank entry or `null` |
 
-The tested peer dependency is `@supabase/supabase-js` 2.119.0; the peer range is
-`^2.119.0`.
-
-`ensureAnonymousSession()` reuses both anonymous and permanent sessions, checks
-an existing user with Supabase Auth, and signs in anonymously only when the
-client reports no session and no authentication error. Simultaneous calls using
-the same Auth client share one pending operation. A failed refresh or rejected
-identity raises `AuthenticationError`; it never silently replaces that identity.
-Independent clients/tabs remain subject to the caller's Supabase storage/locking
-configuration; the SDK's in-flight coalescing operates within one JavaScript realm.
-
-Only `ensureAnonymousSession()` initiates sign-in. Profile, personal score and
-submission methods require an existing session. Public leaderboard reads do not
-sign the player in. Each protected request reads the current session through
-Supabase; an expired session is refreshed through that same client. The backend
-still verifies the JWT and enforces authorization. Revocation follows Supabase
-Auth/JWT validity rules; the SDK does not promise immediate access-token revocation.
-
-If anonymous credentials are lost (for example, storage is cleared), their old
-identity and scores cannot be recovered by this SDK. With no remaining session,
-an explicit `ensureAnonymousSession()` creates a new identity. Preserve storage
-or link the anonymous account through Supabase Auth before that happens.
-
-## Transport and API compatibility
-
-By default, the SDK uses the supplied client's public `functions.invoke` transport
-for `supagame/v1/...`. That preserves the project URL, publishable key and custom
-fetch configuration without reading protected client fields. The client may also
-attach a current user JWT to public requests; the existing Edge public routes
-continue to authorize using the publishable key.
-
-For a trusted proxy or custom API location, supply the **full v1 API base** and
-an explicit project publishable key:
-
-```ts
-const game = createGameServices({
-  supabase,
-  baseUrl: 'https://game.example/functions/v1/supagame/v1',
-  publishableKey: 'sb_publishable_YOUR_PROJECT_KEY',
-});
-```
-
-The optional `publishableKey` extension is required with `baseUrl` because the
-Supabase client's project key is not a public getter. Overrides use the browser's
-`fetch` with cookies omitted and redirects rejected. HTTPS is required except on
-loopback for local testing. Choose only trusted URLs belonging to the intended
-project: protected requests send the current user's JWT there. An override does
-not inherit the Supabase client's custom fetch transport. The default transport
-inherits the caller's redirect/network behavior.
-
-DTOs are re-exported from `@retrobreeze/supagame-contracts`; response and body validators are
-generated from the same OpenAPI schemas. Validation rejects malformed responses,
-unsafe score/rank integers, private extra fields and invalid formats. The SDK
-leaves ordering, competition ranks, idempotency and all database business rules
-to the API. Cursors stay opaque, preserving timestamp precision and tied entries.
-Page size defaults to 50 and must be an integer from 1 to 100. Scores must be safe
-integers. Display names are trimmed and checked against the API schema.
+Scores must be safe integers. Page limits are 1–100, defaulting to 50.
+Pass `nextCursor` unchanged to fetch another page. Ranks are calculated by the backend.
 
 ## Errors and retries
+
 
 All SDK errors extend `GameServicesError`, have a `kind` discriminator and can be
 narrowed with `instanceof`:
@@ -155,63 +90,33 @@ Do not call `submit()` again without a key to retry an uncertain outcome: that
 starts a new submission attempt. The server returns the original result for an
 idempotent retry, which may differ from a subsequently improved personal best.
 
-## Development and verification
 
-```sh
-pnpm --filter @retrobreeze/supagame-sdk test
-pnpm --filter @retrobreeze/supagame-sdk typecheck
-pnpm --filter @retrobreeze/supagame-sdk build
-pnpm contracts:check
-# Only the repository's isolated local Supabase fixture:
-pnpm api:start
-pnpm test:sdk:integration
-pnpm db:stop
+## Other features
+
+- [Live Leaderboards](https://github.com/RetroBreeze/supagame/wiki/Live-Leaderboards): subscriptions and rank-change events.
+- [Achievements](https://github.com/RetroBreeze/supagame/wiki/Achievements): unlocks and notifications.
+- [Cloud Saves](https://github.com/RetroBreeze/supagame/wiki/Cloud-Saves): JSON, binary and offline saves.
+- [Accounts](https://github.com/RetroBreeze/supagame/wiki/Accounts): linking, sign-in and recovery.
+
+Dispose subscriptions and notification queues when leaving a screen. Account flows
+need a stable `accounts.namespace` and a persistence adapter; see the account guide.
+
+## Custom API location
+
+The default transport uses the Supabase client's project URL, key and custom fetch.
+For a trusted custom location, supply the full API URL and project publishable key:
+
+```ts
+const game = createGameServices({
+  supabase,
+  baseUrl: 'https://game.example/functions/v1/supagame/v1',
+  publishableKey: 'sb_publishable_YOUR_PROJECT_KEY',
+});
 ```
 
-After an approved OpenAPI change, run
-`pnpm --filter @retrobreeze/supagame-sdk validators:generate`. The committed standalone
-validators require no Ajv, dynamic code generation or Node modules at runtime.
-`pnpm contracts:check` checks their freshness along with generated DTOs. The
-browser test bundles the SDK for a browser and executes it without Node globals
-or eval. The standalone browser consumer is exercised in Chromium; native platforms
-are optional and are not a v0.1 release requirement.
+Overrides use standard `fetch`, omit cookies and reject redirects. HTTPS is required
+except on loopback. Protected requests send the player's JWT to this URL; use only
+a trusted endpoint. Never put privileged credentials in a game client.
 
-The runtime is ESM and uses standard Web APIs (Fetch, URL, Web Crypto). WebViews
-without `crypto.randomUUID` use `crypto.getRandomValues`; if secure randomness is
-unavailable, supply a UUID explicitly. The SDK does not import Supabase at runtime;
-the host application owns that peer dependency. Tooling scripts are excluded from
-the package's runtime file list.
-
-MIT licensed, as specified in the repository's LICENSE.
-
-Live Leaderboards adds `game.leaderboards.subscribe(id, { onUpdate, onRankChange,
-onStatus, onError, topN: 10 })`, returning an idempotent `unsubscribe()` handle.
-Install the optional `live-leaderboards` module and establish a player session
-first. See [Live Leaderboards](https://github.com/RetroBreeze/supagame/wiki/Live-Leaderboards) for lifecycle, security,
-rank semantics and operational requirements.
-
-Achievements are available as `game.achievements`, with the framework-independent
-`createAchievementQueue` export. Optional DOM rendering is a separate
-`@retrobreeze/supagame-sdk/browser` entry point. See [Achievements](https://github.com/RetroBreeze/supagame/wiki/Achievements)
-for configuration, security, migration and complete examples.
-
-## Accounts and recovery
-
-See [account linking, OAuth callbacks and save conflict resolution](https://github.com/RetroBreeze/supagame/wiki/Accounts).
-Configure `accounts.namespace` and a Supabase PKCE client. Use `players.linkProvider`
-to preserve the guest ID; use `players.signInWithProvider` explicitly for account
-recovery. Stage progress with `saves.prepareAccountSwitch`, inspect after authentication,
-and resolve with Keep Cloud, Keep Guest, Cancel or a game-specific merge callback.
-Backups are durable on the preparing device; no scores or achievements are migrated.
-
-Server-side recovery: account replacements now require `backupExisting: true` internally.
-Use `saves.listRevisions(slot)`, `loadRevision(slot, revision)`,
-`loadBinaryRevision(slot, revision, {maxBytes})` and
-`restoreRevision(slot, revision, {expectedRevision, operationId, expectedPlayerId})`.
-Five backups per slot are retained for up to 30 days, within existing quotas. Restoration
-backs up the current valid save and checks its revision. See [recovery](https://github.com/RetroBreeze/supagame/wiki/Accounts#backups-and-recovery).
-
-`strategy: 'defer'` returns `status: 'deferred'` and leaves the authenticated target signed
-in. The deprecated `cancel` alias has the same behavior. To stop authentication *before*
-callback exchange while the original session still exists, use
-`players.cancelAuthFlow(flowId)`; it does not restore departed guest credentials.
+[HTTP API](https://github.com/RetroBreeze/supagame/wiki/API) ·
+[Target Rush example](https://github.com/RetroBreeze/supagame/tree/main/examples/target-rush)

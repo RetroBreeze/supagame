@@ -1,10 +1,6 @@
 # @retrobreeze/supagame-contracts
 
-Versioned OpenAPI 3.1 contract and shared TypeScript DTOs for Supagame's HTTP API.
-Proposed first npm release: **0.1.0**. Publication is not yet authorized; the
-manifest deliberately remains private.
-
-After publication:
+OpenAPI 3.1 schema and shared TypeScript types for the Supagame HTTP API.
 
 ```sh
 npm install @retrobreeze/supagame-contracts
@@ -14,10 +10,9 @@ npm install @retrobreeze/supagame-contracts
 import type { LeaderboardPage, SubmitScoreRequest } from '@retrobreeze/supagame-contracts';
 ```
 
-The SDK installs this dependency automatically and re-exports its public DTOs.
-The schema is exported as `@retrobreeze/supagame-contracts/openapi.yaml` for
-engine-independent HTTP clients. Requests use `/functions/v1/supagame/v1` in the
-developer's own Supabase project. Scores must be JSON-safe integers.
+The [TypeScript SDK](https://github.com/RetroBreeze/supagame/blob/main/packages/sdk-ts/README.md)
+installs this dependency automatically and re-exports its public types.
+For other engines, use `@retrobreeze/supagame-contracts/openapi.yaml` to build an HTTP client.
 
-See the [API guide](https://github.com/RetroBreeze/supagame/wiki/API) and
-[repository](https://github.com/RetroBreeze/supagame). MIT licensed; see LICENSE.
+See the [HTTP API reference](https://github.com/RetroBreeze/supagame/wiki/API)
+for authentication, endpoints and examples.

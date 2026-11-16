@@ -1,107 +1,53 @@
-# Supabase Game Services
+# Supagame
 
-## Guided, engine-neutral setup
+Ready-to-use game features, backed by your own Supabase project.
 
-Run `npx supagame init` in a terminal to select your Supabase project and services,
-skip browser origins for native engines, preview files and optionally export public
-connection information. Setup never deploys or generates framework/client code.
-Unity, Godot, Unreal and custom engines can use the HTTP API directly; the
-TypeScript SDK is optional.
+Add player identities, leaderboards, achievements and cloud saves to your game.
+Supagame handles backend setup through a guided CLI. Connect any engine through
+the HTTP API, or use the TypeScript SDK for JavaScript and TypeScript games.
+
+## Quick start
+
+You need a Supabase project and Node.js **24 or 26**. Run these commands in your game project:
 
 ```sh
+npm install -D @retrobreeze/supagame-cli supabase@3.1.0
 npx supagame init
-npx supagame leaderboard create target-rush
-npx supagame connection --output supagame.connection.json
-# Explicit automation remains supported:
-npx supagame init --project-ref YOUR_PROJECT_REF --module leaderboards --no-interactive --json
+npx supagame leaderboard create arcade
+npx supagame deploy --project-ref YOUR_PROJECT_REF
+npx supagame connection
 ```
 
-See the [CLI guide](packages/cli/README.md) for guided achievements, JSON contracts,
-connection exports and deployment safeguards. These commands use the installed
-CLI; before npm publication, install the local tarballs described in the release guide.
+In `init`, choose your project and **Leaderboards**. For `arcade`, choose points
+and descending order to keep each player's highest score. Deployment shows the
+changes and asks for confirmation before applying them.
 
-## Proposed npm release
+**[Follow the quickstart](https://github.com/RetroBreeze/supagame/wiki/Quickstart)**
+for setup and connecting your game. Hosted setup does not require Docker.
 
-The initial packages are `@retrobreeze/supagame-cli`, `@retrobreeze/supagame-sdk`
-and `@retrobreeze/supagame-contracts`, all version **0.1.0**. They remain private
-until publication is explicitly authorized. Use **Node.js 24 or 26**. After publication:
+## Features
 
-```sh
-npm install -D @retrobreeze/supagame-cli
-npm install -D --save-exact supabase@3.1.0
-# Optional JavaScript/TypeScript client integration:
-npm install @retrobreeze/supagame-sdk @supabase/supabase-js@2.119.0
-# TypeScript projects, including browser applications:
-npm install --save-dev @types/node@24.19.2
-npx supagame init --project-ref YOUR_PROJECT_REF --origin http://localhost:5173
-```
+- **Players:** anonymous sign-in, display names and account linking.
+- **Leaderboards:** personal bests, tied ranks and optional live updates.
+- **Achievements:** permanent unlocks based on leaderboard scores.
+- **Cloud saves:** player-owned JSON and binary saves with revision handling.
+- **Admin tools:** inspect players, moderate scores and manage boards through the CLI or local dashboard.
 
-Follow the [npm quickstart](packages/cli/README.md) for board creation, deployment,
-SDK initialization, score submission, reads and live subscriptions. The CLI
-supports Supabase CLI **3.0.0 and 3.1.0** (`3.0.0 || 3.1.0`).
-See [CLI compatibility and verification limits](SUPABASE-COMPATIBILITY.md) and
-[release preparation](RELEASING.md) for local tarballs, verification and the
-separately authorized publication steps.
+Your data stays in your Supabase project. Scores are validated and rate-limited;
+these checks do not prove that a submitted score came from honest gameplay.
 
-An MIT-licensed toolkit for installing modular gaming services into your own
-Supabase project. Games use a versioned HTTP API or a thin TypeScript SDK; the CLI
-provisions and maintains the backend. There is no central service operated by this
-project.
+## Documentation
 
-**[Documentation Wiki](https://github.com/RetroBreeze/supagame/wiki)** ·
-**[Quickstart](https://github.com/RetroBreeze/supagame/wiki/Quickstart)** ·
-**[API reference](https://github.com/RetroBreeze/supagame/wiki/API)**
+[Guides](https://github.com/RetroBreeze/supagame/wiki) ·
+[CLI](https://github.com/RetroBreeze/supagame/wiki/CLI) ·
+[HTTP API](https://github.com/RetroBreeze/supagame/wiki/API) ·
+[TypeScript SDK](packages/sdk-ts/README.md) ·
+[Troubleshooting](https://github.com/RetroBreeze/supagame/wiki/Troubleshooting)
 
-## Services
+Try [Target Rush](examples/target-rush/README.md), a small game demonstrating the
+leaderboard integration. See [contributor documentation](docs/README.md) for source
+layout, development and historical records.
 
-- Anonymous player identities, display names and best-score leaderboards.
-- Optional [Live Leaderboards](https://github.com/RetroBreeze/supagame/wiki/Live-Leaderboards)
-  and [Achievements](https://github.com/RetroBreeze/supagame/wiki/Achievements).
-- [Cloud Saves](https://github.com/RetroBreeze/supagame/wiki/Cloud-Saves),
-  [account linking and recovery](https://github.com/RetroBreeze/supagame/wiki/Accounts).
-- Optional [CLI administration](https://github.com/RetroBreeze/supagame/wiki/Admin)
-  and a [local Admin Dashboard](https://github.com/RetroBreeze/supagame/wiki/Admin-Dashboard).
+## License
 
-## Get started
-
-Follow the [quickstart](https://github.com/RetroBreeze/supagame/wiki/Quickstart)
-for local tarball installation, CLI login, feature selection and deployment.
-Packages are private until publication is separately approved.
-
-Deployment previews the destination and changes and requires explicit confirmation.
-Each installation belongs to your Supabase project. Games use only a publishable
-key and their own session; see the
-[security model and limitations](https://github.com/RetroBreeze/supagame/wiki/Security).
-
-- [Installation reference](https://github.com/RetroBreeze/supagame/wiki/Installation-Reference)
-- [Local development](https://github.com/RetroBreeze/supagame/wiki/Local-Development)
-- [TypeScript SDK](packages/sdk-ts/README.md) and [browser demo](examples/browser-demo/README.md)
-- [Troubleshooting](https://github.com/RetroBreeze/supagame/wiki/Troubleshooting)
-- [Diagnostics and upgrades](https://github.com/RetroBreeze/supagame/wiki/Upgrades)
-
-## Contributing
-
-Development setup, database and HTTP internals, CLI behavior and verification
-commands are in the
-[implementation reference](https://github.com/RetroBreeze/supagame/wiki/Implementation-reference).
-See the [verification records](https://github.com/RetroBreeze/supagame/wiki/Verification)
-for recorded results and remaining release gates.
-
-Public documentation is maintained in the Wiki. The [documentation index](docs/README.md)
-maps the former guide paths to their Wiki pages. Design and implementation plans
-remain in [docs/superpowers](docs/superpowers/); package and example READMEs stay
-with their source. The [OpenAPI contract](packages/contracts/openapi.yaml) is the
-source of truth for the public HTTP interface.
-
-## Licence
-
-[MIT](LICENSE), copyright 2026 Supabase Game Services contributors.
-
-Hosted `supagame deploy` does not require Docker: Edge Functions use Supabase's
-API bundling (`--use-api`) from the existing isolated staging directory.
-Local Supabase development and database/integration tests ordinarily require
-Docker or another supported container runtime. Deployment authorization,
-explicit project selection, previews, journals and recovery are unchanged.
-API bundling cannot deploy `static_files`; current Supagame templates need no
-static assets, and configured static files are rejected before deployment.
-See [Supabase's asset limitation](https://supabase.com/docs/guides/functions/wasm).
+[MIT](LICENSE)
