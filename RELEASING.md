@@ -53,3 +53,12 @@ versions; keep its build and validation hooks enabled.
 Module/schema versions are independent of npm package versions. Preserve applied
 migrations and provide additive upgrades when backend changes are needed.
 See the [compatibility record](SUPABASE-COMPATIBILITY.md) for the tested runtime matrix.
+
+## Cloud Saves protocol gate for the first public release
+
+The approved generation protocol changes the pre-release Cloud Saves contract.
+Ship matching migrations, Edge assets, contracts and SDK together. Confirm the
+[retention and upgrade guide](docs/guides/cloud-save-protocol.md), existing-data
+upgrade tests and retained-JWT regressions before publication. Historical
+verification reports do not certify the remediation changes. The local Wiki
+update draft requires separate authorization before pushing.

@@ -1,0 +1,86 @@
+{
+  "baselineCommit": "d7c326ac42c77f7ad259868b46044f8ace10fe15",
+  "unchangedHistoricalMigrations": 16,
+  "migrations": [
+    {
+      "path": "modules/leaderboards/migrations/001_leaderboards.sql",
+      "before": "736156c90d310cfe00f23db26f1588542224a0b8aa81a3b7123125c1fe05d1b6",
+      "after": "736156c90d310cfe00f23db26f1588542224a0b8aa81a3b7123125c1fe05d1b6"
+    },
+    {
+      "path": "modules/leaderboards/migrations/002_submit_score.sql",
+      "before": "4700da91e5155323418aa6df8f8322896d3ccb15b5650c6a9e2f9ff5a71c4404",
+      "after": "4700da91e5155323418aa6df8f8322896d3ccb15b5650c6a9e2f9ff5a71c4404"
+    },
+    {
+      "path": "modules/leaderboards/migrations/003_rank_reads.sql",
+      "before": "33446604411f40921dc8c49cb506befe92b43a12d5c9bc91650ea51bc31edf91",
+      "after": "33446604411f40921dc8c49cb506befe92b43a12d5c9bc91650ea51bc31edf91"
+    },
+    {
+      "path": "modules/live-leaderboards/migrations/002_admin_reads.sql",
+      "before": "17c8f028e70fc7589c8b7ede3e32a52683223d822f7062b675f06e6db3bd5e83",
+      "after": "17c8f028e70fc7589c8b7ede3e32a52683223d822f7062b675f06e6db3bd5e83"
+    },
+    {
+      "path": "modules/live-leaderboards/migrations/001_broadcast.sql",
+      "before": "8c5f3bb0c91d946dfa6aa0a0b1e3a6026f6ae8c230fa97f790b32678935a1091",
+      "after": "8c5f3bb0c91d946dfa6aa0a0b1e3a6026f6ae8c230fa97f790b32678935a1091"
+    },
+    {
+      "path": "modules/core/migrations/001_players.sql",
+      "before": "70273c0d7c7dc4effe1813a98aac82da6fe3dda5fafa1339d9bc3aba8d714642",
+      "after": "70273c0d7c7dc4effe1813a98aac82da6fe3dda5fafa1339d9bc3aba8d714642"
+    },
+    {
+      "path": "modules/core/migrations/002_player_functions.sql",
+      "before": "7c069d1896196d1b7d3422edaee1660fee9ec204d2682a3b0ff90e812cf34d17",
+      "after": "7c069d1896196d1b7d3422edaee1660fee9ec204d2682a3b0ff90e812cf34d17"
+    },
+    {
+      "path": "modules/cloud-saves/migrations/001_cloud_saves.sql",
+      "before": "6bc18757c9155da9a2414534bd35cf35a2917aff8c25e70f3dfa1ee2a3c37add",
+      "after": "6bc18757c9155da9a2414534bd35cf35a2917aff8c25e70f3dfa1ee2a3c37add"
+    },
+    {
+      "path": "modules/cloud-saves/migrations/004_storage_preflight.sql",
+      "before": "716c7766c73cb07d75ed6811e64ca2f8232c29c16cf583ff99a1e97bc832ca9d",
+      "after": "716c7766c73cb07d75ed6811e64ca2f8232c29c16cf583ff99a1e97bc832ca9d"
+    },
+    {
+      "path": "modules/cloud-saves/migrations/002_binary_integrity.sql",
+      "before": "3c49efeb6e6631f3e16fc60d213a2a63c76696fd4ac3dc48167c21a397d25f51",
+      "after": "3c49efeb6e6631f3e16fc60d213a2a63c76696fd4ac3dc48167c21a397d25f51"
+    },
+    {
+      "path": "modules/cloud-saves/migrations/007_save_revisions.sql",
+      "before": "6042dfb0cfe5c2e075ff47f46c5fcab7d4020418c41e6fe673184b7968eac4ae",
+      "after": "6042dfb0cfe5c2e075ff47f46c5fcab7d4020418c41e6fe673184b7968eac4ae"
+    },
+    {
+      "path": "modules/cloud-saves/migrations/005_garbage_collection.sql",
+      "before": "e723a389af8f56adfc64802bc8ddd95079e6ffbfd62d61f84a3bcc6cd9c97494",
+      "after": "e723a389af8f56adfc64802bc8ddd95079e6ffbfd62d61f84a3bcc6cd9c97494"
+    },
+    {
+      "path": "modules/cloud-saves/migrations/003_upload_quota_guard.sql",
+      "before": "fe8cc5b8bbba22f71875f82707206d57444f6f859d46e36006bd8e3c755029a6",
+      "after": "fe8cc5b8bbba22f71875f82707206d57444f6f859d46e36006bd8e3c755029a6"
+    },
+    {
+      "path": "modules/cloud-saves/migrations/006_save_throttling.sql",
+      "before": "9c78969632037b030ee12d900cba23afafe06f7fa0401c89a098b96a0f2440f4",
+      "after": "9c78969632037b030ee12d900cba23afafe06f7fa0401c89a098b96a0f2440f4"
+    },
+    {
+      "path": "modules/achievements/migrations/001_achievements.sql",
+      "before": "4cf705d38bd78ce28da72aa174667fd1c7b64fdec9490dba03efb75361db2e1e",
+      "after": "4cf705d38bd78ce28da72aa174667fd1c7b64fdec9490dba03efb75361db2e1e"
+    },
+    {
+      "path": "modules/admin/migrations/001_admin.sql",
+      "before": "9b864afebd75f45f4071baf37dcb8d65a9126c4edb6c65cd275a8f435637b8a2",
+      "after": "9b864afebd75f45f4071baf37dcb8d65a9126c4edb6c65cd275a8f435637b8a2"
+    }
+  ]
+}

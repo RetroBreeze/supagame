@@ -51,3 +51,7 @@ layout, development and historical records.
 ## License
 
 [MIT](LICENSE)
+
+Cloud Saves writers must retain generation context with durable operations. The
+[protocol and retention guide](docs/guides/cloud-save-protocol.md) defines the
+finite replay guarantee, upload limits and explicit offline reconciliation.

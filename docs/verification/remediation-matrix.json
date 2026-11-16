@@ -1,0 +1,938 @@
+{
+  "commands": [
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run build",
+      "exitCode": 0,
+      "seconds": 3.89,
+      "log": "node26-cli3.0.0-01-build.log",
+      "logSha256": "3925753e1898d36a3b93a1ffdf71a9ae9e63ae0c7a119d5cbc903f7f5bec1a10",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "seconds": 6.82,
+      "log": "node26-cli3.0.0-02-typecheck.log",
+      "logSha256": "055dd18c291e21e51a671dfb35f00091192b59de39b3e8a1f1e29b53129aca5c",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run lint",
+      "exitCode": 0,
+      "seconds": 2.27,
+      "log": "node26-cli3.0.0-03-lint.log",
+      "logSha256": "47a0d767340af6bb9da7565b4a245ecb623c2848bbb1036e771b43af32d73181",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run contracts:check",
+      "exitCode": 0,
+      "seconds": 3.65,
+      "log": "node26-cli3.0.0-04-contracts-check.log",
+      "logSha256": "92b9aca5549820bca3b048df21136c1e2b222d21d54076d4a142e3d131588adc",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run test",
+      "exitCode": 0,
+      "seconds": 24.89,
+      "log": "node26-cli3.0.0-05-test.log",
+      "logSha256": "419b414d72b5332bed661d4ecdd526a80fdbd313e2331e5ea40ac55082721f52",
+      "summary": [
+        "Tests  654 passed (654)"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run test:cli:compatibility",
+      "exitCode": 0,
+      "seconds": 8.31,
+      "log": "node26-cli3.0.0-06-test-cli-compatibility.log",
+      "logSha256": "a8e4d3a94be2373adceec42637bf90966d6d39fa4b5330a0b568a14f6f171286",
+      "summary": [
+        "\u2139 tests 2",
+        "\u2139 pass 2",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run test:edge",
+      "exitCode": 0,
+      "seconds": 1.51,
+      "log": "node26-cli3.0.0-07-test-edge.log",
+      "logSha256": "254480986b298ef5e6cf7e4510c6a1b4954ca5538ac6d646d21b9d41e46c4326",
+      "summary": [
+        "ok | 84 passed | 0 failed (152ms)"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run test:packages",
+      "exitCode": 0,
+      "seconds": 24.61,
+      "log": "node26-cli3.0.0-08-test-packages.log",
+      "logSha256": "bc46344f3584e3c29db67bbaef98fcf10483e42bc3c0cf6c8e773e343b83e378",
+      "summary": [
+        "\u2139 tests 3",
+        "\u2139 pass 3",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run db:migrate",
+      "exitCode": 0,
+      "seconds": 1.08,
+      "log": "node26-cli3.0.0-09-db-migrate.log",
+      "logSha256": "8dea0d193bf6c6732003e319417c33505fc6b0f722d32c2ad6a87e0ccfa51cdf",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run test:db",
+      "exitCode": 0,
+      "seconds": 87.05,
+      "log": "node26-cli3.0.0-10-test-db.log",
+      "logSha256": "9edbfdbd531d7cae6898492539853e2a061573d24be529e8d526b238f7d63bc5",
+      "summary": [
+        "Files=19, Tests=880, 72 wallclock secs ( 0.09 usr  0.03 sys +  0.16 cusr  0.07 csys =  0.35 CPU)",
+        "Result: PASS",
+        "\u2139 tests 2",
+        "\u2139 pass 2",
+        "\u2139 fail 0",
+        "\u2139 tests 27",
+        "\u2139 pass 27",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run test:cli:db",
+      "exitCode": 0,
+      "seconds": 5.46,
+      "log": "node26-cli3.0.0-11-test-cli-db.log",
+      "logSha256": "91e20343fb6ac8329093602b706cc5e16d0b826f7477868705f17d30f8b6e8b8",
+      "summary": [
+        "\u2139 tests 33",
+        "\u2139 pass 33",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run test:edge:integration",
+      "exitCode": 0,
+      "seconds": 1.79,
+      "log": "node26-cli3.0.0-12-test-edge-integration.log",
+      "logSha256": "39d1fcd69cb7be1b92cddb8f072ad8ecfe67306caece20a85a4f1813d1e45d00",
+      "summary": [
+        "ok | 1 passed (13 steps) | 0 failed (987ms)"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run test:sdk:integration",
+      "exitCode": 0,
+      "seconds": 6.1,
+      "log": "node26-cli3.0.0-13-test-sdk-integration.log",
+      "logSha256": "f2148eda0a7348d7f121b5ce3f9c65b0797aebd2213cc968b3b8c006223ae748",
+      "summary": [
+        "Tests  16 passed (16)"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run test:cli:db",
+      "exitCode": 0,
+      "seconds": 5.66,
+      "log": "node26-cli3.0.0-14-test-cli-db.log",
+      "logSha256": "f354849be23e3e9161f0696d55c6eb31c4265ee56e63fc4a7fef85a1d69d5da0",
+      "summary": [
+        "\u2139 tests 33",
+        "\u2139 pass 33",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run test:e2e",
+      "exitCode": 0,
+      "seconds": 78.59,
+      "log": "node26-cli3.0.0-15-test-e2e.log",
+      "logSha256": "bb947aa8fc3d9af4c48615989d55e04c344238f6a2cac6dc2b18b99e6b52a9c8",
+      "summary": [
+        "\u2139 tests 16",
+        "\u2139 pass 16",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run build",
+      "exitCode": 0,
+      "seconds": 3.69,
+      "log": "node26-cli3.1.0-01-build.log",
+      "logSha256": "bed80eea1ba834b482e87e8e2ea227f379c1527281468cebda5ae7c0a0c1cb78",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "seconds": 5.49,
+      "log": "node26-cli3.1.0-02-typecheck.log",
+      "logSha256": "055dd18c291e21e51a671dfb35f00091192b59de39b3e8a1f1e29b53129aca5c",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run lint",
+      "exitCode": 0,
+      "seconds": 2.48,
+      "log": "node26-cli3.1.0-03-lint.log",
+      "logSha256": "47a0d767340af6bb9da7565b4a245ecb623c2848bbb1036e771b43af32d73181",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run contracts:check",
+      "exitCode": 0,
+      "seconds": 0.98,
+      "log": "node26-cli3.1.0-04-contracts-check.log",
+      "logSha256": "92b9aca5549820bca3b048df21136c1e2b222d21d54076d4a142e3d131588adc",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run test",
+      "exitCode": 0,
+      "seconds": 24.04,
+      "log": "node26-cli3.1.0-05-test.log",
+      "logSha256": "fd1fe5e000ecdfcefaee82170a75a1edb3dbfc28bf08dc95f6d71c37b49b9ab4",
+      "summary": [
+        "Tests  654 passed (654)"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run test:cli:compatibility",
+      "exitCode": 0,
+      "seconds": 7.69,
+      "log": "node26-cli3.1.0-06-test-cli-compatibility.log",
+      "logSha256": "2b9bffe4ff565e992dd1d6f967aa7a2e8cd87965bbbe45f12fbf3dd92cacee87",
+      "summary": [
+        "\u2139 tests 2",
+        "\u2139 pass 2",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run test:edge",
+      "exitCode": 0,
+      "seconds": 0.71,
+      "log": "node26-cli3.1.0-07-test-edge.log",
+      "logSha256": "77aafb7be793ee50b5b67348076e013b4132e3492b051473a98dde1f1603899f",
+      "summary": [
+        "ok | 84 passed | 0 failed (153ms)"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run test:packages",
+      "exitCode": 0,
+      "seconds": 23.25,
+      "log": "node26-cli3.1.0-08-test-packages.log",
+      "logSha256": "c5c0a0ec55a1ca63e4818c43d6b98345fac334ac924d4c5f2e6ed7f2e40d1278",
+      "summary": [
+        "\u2139 tests 3",
+        "\u2139 pass 3",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run db:migrate",
+      "exitCode": 0,
+      "seconds": 0.66,
+      "log": "node26-cli3.1.0-09-db-migrate.log",
+      "logSha256": "7160c39f70928c68c386152ddc7a837b8c7c6294451029c8edc5d163e155e5f8",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run test:db",
+      "exitCode": 0,
+      "seconds": 79.91,
+      "log": "node26-cli3.1.0-10-test-db.log",
+      "logSha256": "6dc2bb2f97b3ccb66a679e25456c32f8e6c514ebeee0e8608e99d9555adee32e",
+      "summary": [
+        "Files=19, Tests=880, 70 wallclock secs ( 0.06 usr  0.02 sys +  0.13 cusr  0.06 csys =  0.27 CPU)",
+        "Result: PASS",
+        "\u2139 tests 2",
+        "\u2139 pass 2",
+        "\u2139 fail 0",
+        "\u2139 tests 27",
+        "\u2139 pass 27",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run test:cli:db",
+      "exitCode": 0,
+      "seconds": 5.52,
+      "log": "node26-cli3.1.0-11-test-cli-db.log",
+      "logSha256": "4f09d8de26979d144f3065845118a945bdc1b41db860ac217e2b3fce82b772b3",
+      "summary": [
+        "\u2139 tests 33",
+        "\u2139 pass 33",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run test:edge:integration",
+      "exitCode": 0,
+      "seconds": 2.07,
+      "log": "node26-cli3.1.0-12-test-edge-integration.log",
+      "logSha256": "c16037694ee85dc3c3c6833c906057d80178df0fff76665d7c72fe72e73ec936",
+      "summary": [
+        "ok | 1 passed (13 steps) | 0 failed (1s)"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run test:sdk:integration",
+      "exitCode": 0,
+      "seconds": 6.03,
+      "log": "node26-cli3.1.0-13-test-sdk-integration.log",
+      "logSha256": "1f1fdc24c3fd8bbf353369253f7a269e39296c883f5a4f3593ff26a1589c86ce",
+      "summary": [
+        "Tests  16 passed (16)"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run test:cli:db",
+      "exitCode": 0,
+      "seconds": 5.47,
+      "log": "node26-cli3.1.0-14-test-cli-db.log",
+      "logSha256": "9b3be87bac64a186dd79904aba33ffbaacd7aaaf208bce05c787c588037cc023",
+      "summary": [
+        "\u2139 tests 33",
+        "\u2139 pass 33",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run test:e2e",
+      "exitCode": 0,
+      "seconds": 130.93,
+      "log": "node26-cli3.1.0-15-test-e2e.log",
+      "logSha256": "a9af6ba6bba82dc156f765f1cd96621a2e99c48c97f02ff25a537757e1059f91",
+      "summary": [
+        "\u2139 tests 16",
+        "\u2139 pass 16",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.0.0",
+      "command": "npm run build",
+      "exitCode": 0,
+      "seconds": 3.95,
+      "log": "node24-cli3.0.0-01-build.log",
+      "logSha256": "6a7cc8501aa244513dcd6030dee6b5c46d3fe556b884646a43d5d54664b9527e",
+      "summary": []
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.0.0",
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "seconds": 5.5,
+      "log": "node24-cli3.0.0-02-typecheck.log",
+      "logSha256": "055dd18c291e21e51a671dfb35f00091192b59de39b3e8a1f1e29b53129aca5c",
+      "summary": []
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.0.0",
+      "command": "npm run lint",
+      "exitCode": 0,
+      "seconds": 2.65,
+      "log": "node24-cli3.0.0-03-lint.log",
+      "logSha256": "47a0d767340af6bb9da7565b4a245ecb623c2848bbb1036e771b43af32d73181",
+      "summary": []
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.0.0",
+      "command": "npm run contracts:check",
+      "exitCode": 0,
+      "seconds": 0.86,
+      "log": "node24-cli3.0.0-04-contracts-check.log",
+      "logSha256": "92b9aca5549820bca3b048df21136c1e2b222d21d54076d4a142e3d131588adc",
+      "summary": []
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.0.0",
+      "command": "npm run test",
+      "exitCode": 0,
+      "seconds": 23.0,
+      "log": "node24-cli3.0.0-05-test.log",
+      "logSha256": "500f737ac54eb75dff34e6bb9b42c49c8155d860453a4fb30e01760bd9f9dae3",
+      "summary": [
+        "Tests  655 passed (655)"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.0.0",
+      "command": "npm run test:cli:compatibility",
+      "exitCode": 0,
+      "seconds": 7.75,
+      "log": "node24-cli3.0.0-06-test-cli-compatibility.log",
+      "logSha256": "2d89936e840045d76a0c23abd01343073cb3d997a56670d887ed40c0be09895e",
+      "summary": [
+        "\u2139 tests 2",
+        "\u2139 pass 2",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.0.0",
+      "command": "npm run test:edge",
+      "exitCode": 0,
+      "seconds": 0.57,
+      "log": "node24-cli3.0.0-07-test-edge.log",
+      "logSha256": "eb8e124e24f3d374691e9a502c7e07823c423d00da1e3b1062bb2b9558726e25",
+      "summary": [
+        "ok | 84 passed | 0 failed (176ms)"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.0.0",
+      "command": "npm run test:packages",
+      "exitCode": 0,
+      "seconds": 22.92,
+      "log": "node24-cli3.0.0-08-test-packages.log",
+      "logSha256": "c395617f7955d8969bfafc66031ee12c0c4b0f0d583f3cbddded6655320ec2b1",
+      "summary": [
+        "\u2139 tests 3",
+        "\u2139 pass 3",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.0.0",
+      "command": "npm run db:migrate",
+      "exitCode": 0,
+      "seconds": 0.63,
+      "log": "node24-cli3.0.0-09-db-migrate.log",
+      "logSha256": "8dea0d193bf6c6732003e319417c33505fc6b0f722d32c2ad6a87e0ccfa51cdf",
+      "summary": []
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.0.0",
+      "command": "npm run test:db",
+      "exitCode": 0,
+      "seconds": 80.73,
+      "log": "node24-cli3.0.0-10-test-db.log",
+      "logSha256": "8376bedec66941d98c866726a49167bb0f4cabff57e5fb835f7d19401e25c69d",
+      "summary": [
+        "Files=19, Tests=880, 71 wallclock secs ( 0.08 usr  0.01 sys +  0.14 cusr  0.05 csys =  0.28 CPU)",
+        "Result: PASS",
+        "\u2139 tests 2",
+        "\u2139 pass 2",
+        "\u2139 fail 0",
+        "\u2139 tests 27",
+        "\u2139 pass 27",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.0.0",
+      "command": "npm run test:cli:db",
+      "exitCode": 0,
+      "seconds": 6.57,
+      "log": "node24-cli3.0.0-11-test-cli-db.log",
+      "logSha256": "3550ee0357b1cde8a83b2dba67640d81b16fe4e7c7db3ed30b4a015cd29a2fd3",
+      "summary": [
+        "\u2139 tests 33",
+        "\u2139 pass 33",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.0.0",
+      "command": "npm run test:edge:integration",
+      "exitCode": 0,
+      "seconds": 1.84,
+      "log": "node24-cli3.0.0-12-test-edge-integration.log",
+      "logSha256": "0cc793608bf736f47b067fa85fb9e25d81acf12835ab657fa50b0f00a73cbc5c",
+      "summary": [
+        "ok | 1 passed (13 steps) | 0 failed (1s)"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.0.0",
+      "command": "npm run test:sdk:integration",
+      "exitCode": 0,
+      "seconds": 6.15,
+      "log": "node24-cli3.0.0-13-test-sdk-integration.log",
+      "logSha256": "275996c503b912cf176409b8e35efe0ebf89ccbdee5c1fc2a9f8dd50935d8664",
+      "summary": [
+        "Tests  16 passed (16)"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.0.0",
+      "command": "npm run test:cli:db",
+      "exitCode": 0,
+      "seconds": 5.51,
+      "log": "node24-cli3.0.0-14-test-cli-db.log",
+      "logSha256": "1ece3a4a6b2e7de289ac53ffc71d5627052f74b84583da32f8da2c523fcec0c9",
+      "summary": [
+        "\u2139 tests 33",
+        "\u2139 pass 33",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.0.0",
+      "command": "npm run test:e2e",
+      "exitCode": 0,
+      "seconds": 73.71,
+      "log": "node24-cli3.0.0-15-test-e2e.log",
+      "logSha256": "6cbd62ca90afef85013d81723dfab4c1af6051339754aa0288f502c6d5a3984e",
+      "summary": [
+        "\u2139 tests 16",
+        "\u2139 pass 16",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.1.0",
+      "command": "npm run build",
+      "exitCode": 0,
+      "seconds": 3.43,
+      "log": "node24-cli3.1.0-01-build.log",
+      "logSha256": "5c8c82aad26e8ee50eab16ce9a7a37b929ebc908a7d72bc713151bcd912bdf50",
+      "summary": []
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.1.0",
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "seconds": 5.49,
+      "log": "node24-cli3.1.0-02-typecheck.log",
+      "logSha256": "055dd18c291e21e51a671dfb35f00091192b59de39b3e8a1f1e29b53129aca5c",
+      "summary": []
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.1.0",
+      "command": "npm run lint",
+      "exitCode": 0,
+      "seconds": 2.41,
+      "log": "node24-cli3.1.0-03-lint.log",
+      "logSha256": "47a0d767340af6bb9da7565b4a245ecb623c2848bbb1036e771b43af32d73181",
+      "summary": []
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.1.0",
+      "command": "npm run contracts:check",
+      "exitCode": 0,
+      "seconds": 0.89,
+      "log": "node24-cli3.1.0-04-contracts-check.log",
+      "logSha256": "92b9aca5549820bca3b048df21136c1e2b222d21d54076d4a142e3d131588adc",
+      "summary": []
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.1.0",
+      "command": "npm run test",
+      "exitCode": 0,
+      "seconds": 22.98,
+      "log": "node24-cli3.1.0-05-test.log",
+      "logSha256": "78510619f71b92a04981af4946371e6720eb855ed114e3a536b714d2e610af07",
+      "summary": [
+        "Tests  655 passed (655)"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.1.0",
+      "command": "npm run test:cli:compatibility",
+      "exitCode": 0,
+      "seconds": 7.85,
+      "log": "node24-cli3.1.0-06-test-cli-compatibility.log",
+      "logSha256": "42d0ae65a855645d1dabb7d4b2e0895eb9d7365c5a5cbfe7c0e32a918ff6633c",
+      "summary": [
+        "\u2139 tests 2",
+        "\u2139 pass 2",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.1.0",
+      "command": "npm run test:edge",
+      "exitCode": 0,
+      "seconds": 0.63,
+      "log": "node24-cli3.1.0-07-test-edge.log",
+      "logSha256": "1b71b7e9dd56c5923d81e1635d842bf81f95b87b2d3528017447e56b117ae8ff",
+      "summary": [
+        "ok | 84 passed | 0 failed (154ms)"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.1.0",
+      "command": "npm run test:packages",
+      "exitCode": 0,
+      "seconds": 22.42,
+      "log": "node24-cli3.1.0-08-test-packages.log",
+      "logSha256": "b3eb2b83f6e9d3d31af55e775437588b2ac30cfc888a143a16ff850f81fec2ed",
+      "summary": [
+        "\u2139 tests 3",
+        "\u2139 pass 3",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.1.0",
+      "command": "npm run db:migrate",
+      "exitCode": 0,
+      "seconds": 0.62,
+      "log": "node24-cli3.1.0-09-db-migrate.log",
+      "logSha256": "7160c39f70928c68c386152ddc7a837b8c7c6294451029c8edc5d163e155e5f8",
+      "summary": []
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.1.0",
+      "command": "npm run test:db",
+      "exitCode": 0,
+      "seconds": 80.8,
+      "log": "node24-cli3.1.0-10-test-db.log",
+      "logSha256": "4861117b91f4b21536c18695468b5bf2ca0a15def2df3ea201f00ae57cd37008",
+      "summary": [
+        "Files=19, Tests=880, 71 wallclock secs ( 0.06 usr  0.02 sys +  0.13 cusr  0.06 csys =  0.27 CPU)",
+        "Result: PASS",
+        "\u2139 tests 2",
+        "\u2139 pass 2",
+        "\u2139 fail 0",
+        "\u2139 tests 27",
+        "\u2139 pass 27",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.1.0",
+      "command": "npm run test:cli:db",
+      "exitCode": 0,
+      "seconds": 5.57,
+      "log": "node24-cli3.1.0-11-test-cli-db.log",
+      "logSha256": "0924779cf0f494ea22adfa0c30445f34bf21b5a5cc2696baa9b81d82505159f2",
+      "summary": [
+        "\u2139 tests 33",
+        "\u2139 pass 33",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.1.0",
+      "command": "npm run test:edge:integration",
+      "exitCode": 0,
+      "seconds": 2.06,
+      "log": "node24-cli3.1.0-12-test-edge-integration.log",
+      "logSha256": "80147844cf9bf57fc955ddd198886ff4265e067c54a6b152b044cd2dbea754e7",
+      "summary": [
+        "ok | 1 passed (13 steps) | 0 failed (1s)"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.1.0",
+      "command": "npm run test:sdk:integration",
+      "exitCode": 0,
+      "seconds": 6.07,
+      "log": "node24-cli3.1.0-13-test-sdk-integration.log",
+      "logSha256": "de8c9092d6679b7241c9117e8dbeb116392f3abd7616c06eac3cde8b0b3305ba",
+      "summary": [
+        "Tests  16 passed (16)"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.1.0",
+      "command": "npm run test:cli:db",
+      "exitCode": 0,
+      "seconds": 5.62,
+      "log": "node24-cli3.1.0-14-test-cli-db.log",
+      "logSha256": "1dd5fa3b54545853638fb16ee17018c8651ec6630095ab9bbfab50681c58a989",
+      "summary": [
+        "\u2139 tests 33",
+        "\u2139 pass 33",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v24.22.2",
+      "supabase": "3.1.0",
+      "command": "npm run test:e2e",
+      "exitCode": 0,
+      "seconds": 68.48,
+      "log": "node24-cli3.1.0-15-test-e2e.log",
+      "logSha256": "20602a8cecfc4c80b35a7a4c17c9e51fa2da1a0f05cc0cc65d51721b6d8a7325",
+      "summary": [
+        "\u2139 tests 16",
+        "\u2139 pass 16",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run build",
+      "exitCode": 0,
+      "seconds": 3.7,
+      "log": "final-node26-cli3.0.0-01-build.log",
+      "logSha256": "ef1d31373e4e0d73e3028f59748da7e23ed08de2b6bc918ce6db47a83453b35a",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "seconds": 5.63,
+      "log": "final-node26-cli3.0.0-02-typecheck.log",
+      "logSha256": "055dd18c291e21e51a671dfb35f00091192b59de39b3e8a1f1e29b53129aca5c",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run lint",
+      "exitCode": 0,
+      "seconds": 2.2,
+      "log": "final-node26-cli3.0.0-03-lint.log",
+      "logSha256": "47a0d767340af6bb9da7565b4a245ecb623c2848bbb1036e771b43af32d73181",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run contracts:check",
+      "exitCode": 0,
+      "seconds": 0.8,
+      "log": "final-node26-cli3.0.0-04-contracts-check.log",
+      "logSha256": "92b9aca5549820bca3b048df21136c1e2b222d21d54076d4a142e3d131588adc",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run test",
+      "exitCode": 0,
+      "seconds": 23.87,
+      "log": "final-node26-cli3.0.0-05-test.log",
+      "logSha256": "32bda8e47178a8b9275a9e4527c09b8cc13123926aaf6b60ee0016607199f19a",
+      "summary": [
+        "Tests  655 passed (655)"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run test:packages",
+      "exitCode": 0,
+      "seconds": 23.99,
+      "log": "final-node26-cli3.0.0-06-test-packages.log",
+      "logSha256": "c7051b3e016e9ff0b5ac1962cdc92fea1353c69815e2db5cd4b89f45728cbd91",
+      "summary": [
+        "\u2139 tests 3",
+        "\u2139 pass 3",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run test:sdk:integration",
+      "exitCode": 0,
+      "seconds": 6.16,
+      "log": "final-node26-cli3.0.0-07-test-sdk-integration.log",
+      "logSha256": "b0b66f709e17c74eb0cc515155f0f348ec7318df2ce590699c55e222e45cc3bd",
+      "summary": [
+        "Tests  16 passed (16)"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.0.0",
+      "command": "npm run test:e2e",
+      "exitCode": 0,
+      "seconds": 74.04,
+      "log": "final-node26-cli3.0.0-08-test-e2e.log",
+      "logSha256": "cb138514c4dba71cddb21f89446ef0df74a41e97b75b3112e36fca58beb66c3c",
+      "summary": [
+        "\u2139 tests 16",
+        "\u2139 pass 16",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run build",
+      "exitCode": 0,
+      "seconds": 3.66,
+      "log": "final-node26-cli3.1.0-01-build.log",
+      "logSha256": "afd57c6acc45fe706c4d49532ab88865a829c94bab502c03b2a22b3423c6c4d2",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run typecheck",
+      "exitCode": 0,
+      "seconds": 5.68,
+      "log": "final-node26-cli3.1.0-02-typecheck.log",
+      "logSha256": "055dd18c291e21e51a671dfb35f00091192b59de39b3e8a1f1e29b53129aca5c",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run lint",
+      "exitCode": 0,
+      "seconds": 2.45,
+      "log": "final-node26-cli3.1.0-03-lint.log",
+      "logSha256": "47a0d767340af6bb9da7565b4a245ecb623c2848bbb1036e771b43af32d73181",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run contracts:check",
+      "exitCode": 0,
+      "seconds": 0.9,
+      "log": "final-node26-cli3.1.0-04-contracts-check.log",
+      "logSha256": "92b9aca5549820bca3b048df21136c1e2b222d21d54076d4a142e3d131588adc",
+      "summary": []
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run test",
+      "exitCode": 0,
+      "seconds": 24.54,
+      "log": "final-node26-cli3.1.0-05-test.log",
+      "logSha256": "d00629aaf0892b5a5c12d64483b64c1f1e832879b9d5a3d9eacda0bae68cc65e",
+      "summary": [
+        "Tests  655 passed (655)"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run test:packages",
+      "exitCode": 0,
+      "seconds": 24.47,
+      "log": "final-node26-cli3.1.0-06-test-packages.log",
+      "logSha256": "b7e1b44ab1f773fb64e3f0c8f9bb4d1be4fd7e4d241057e2b37f26457634c3fc",
+      "summary": [
+        "\u2139 tests 3",
+        "\u2139 pass 3",
+        "\u2139 fail 0"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run test:sdk:integration",
+      "exitCode": 0,
+      "seconds": 6.3,
+      "log": "final-node26-cli3.1.0-07-test-sdk-integration.log",
+      "logSha256": "9c856fe03fe50bf2e886be9ff854bb9d6e113beb49743f412950591409dfe906",
+      "summary": [
+        "Tests  16 passed (16)"
+      ]
+    },
+    {
+      "node": "v26.10.0",
+      "supabase": "3.1.0",
+      "command": "npm run test:e2e",
+      "exitCode": 0,
+      "seconds": 67.97,
+      "log": "final-node26-cli3.1.0-08-test-e2e.log",
+      "logSha256": "4f08843e6e42e3f75c712adcb12e014f1b3bd1dfc16fbb70b805ff893e34e197",
+      "summary": [
+        "\u2139 tests 16",
+        "\u2139 pass 16",
+        "\u2139 fail 0"
+      ]
+    }
+  ],
+  "total": 76,
+  "failures": 0
+}

@@ -1,0 +1,99 @@
+diff --git a/Account-Recovery.md b/Account-Recovery.md
+index 923e85c..37b1561 100644
+--- a/Account-Recovery.md
++++ b/Account-Recovery.md
+@@ -145,0 +146 @@ await game.saves.restoreRevision('slot1', selected.save.revision, {
++  generation: current.generation,
+@@ -153 +154 @@ increasing revision, with the same CAS/receipt rules as replacement. Retry the i
+-request after a lost response. A deleted slot's tombstone revision comes in
++request, including generation, after a lost response. Exact replay is guaranteed for the latest 3,072 completed operations that are also younger than 30 days. A deleted slot's tombstone revision comes in
+@@ -170,0 +172,2 @@ skipped or stuffed into localStorage.
++
++Legacy interrupted journals without generation require explicit re-review: call `inspectAccountSwitch` with the associated `flowId` and `restart: true`, then review and resolve again. Old payloads and previous reviews remain recoverable. Never automatically attach fresh context to an old write.
+diff --git a/Cloud-Saves.md b/Cloud-Saves.md
+index eacc2c7..8d607c0 100644
+--- a/Cloud-Saves.md
++++ b/Cloud-Saves.md
+@@ -35 +35 @@ Slots use 1–64 letters, digits, underscores or hyphens, beginning with a lette
+-Responses contain slot, kind, revision, schemaVersion, metadata, sizeBytes, createdAt, updatedAt, deleted and objectPath (null for JSON). Loads also contain JSON data. Metadata is a JSON object up to 4 KiB. Schema versions are positive integers defined by the game; Supagame does not migrate or interpret game data. Games must validate data and handle unsupported schema versions.
++Responses contain generation, slot, kind, revision, schemaVersion, metadata, sizeBytes, createdAt, updatedAt, deleted and objectPath (null for JSON). Loads also contain JSON data. Metadata is a JSON object up to 4 KiB. Schema versions are positive integers defined by the game; Supagame does not migrate or interpret game data. Games must validate data and handle unsupported schema versions.
+@@ -45,0 +46 @@ try {
++    generation: loaded.generation,
+@@ -54,0 +56 @@ try {
++      generation: (await supagame.saves.context()).generation,
+@@ -60 +62 @@ try {
+-Use `createOperationId()` for secure UUIDs, including HTTP LAN browsers with `getRandomValues` but no `randomUUID`. Persist the operation ID, payload and expected revision before sending. A retry must use all three unchanged. Successful operations retain fingerprinted receipts; identical retries return their original acknowledgement even after subsequent edits. Reusing a key with a different payload is `DUPLICATE_KEY_CONFLICT`. Errors carry `operationId` when one was allocated by the SDK. A retry acknowledgement does not assert that its revision is still the latest: load again to discover subsequent writes.
++Use `createOperationId()` for secure UUIDs, including HTTP LAN browsers with `getRandomValues` but no `randomUUID`. Persist the operation ID, generation, payload and expected revision before sending. An exact retry keeps all four unchanged. Replay is guaranteed for the latest 3,072 completed operations that are also less than 30 days old, not all operations within 30 days. At most 4,096 fingerprinted receipts are retained; covered exact retries remain valid across generation changes. Reusing a key with a different payload is `DUPLICATE_KEY_CONFLICT`. Errors carry `operationId` and the attempted `operationGeneration`; a conflict may separately carry the current server `generation`. Never refresh the generation on a stale queued write automatically: preserve the payload and reconcile explicitly. A retry acknowledgement does not assert that its revision is still the latest: load again to discover subsequent writes.
+@@ -62 +64 @@ Use `createOperationId()` for secure UUIDs, including HTTP LAN browsers with `ge
+-Deletion creates a tombstone and increments the revision. Loads return `SAVE_NOT_FOUND` and lists omit it, but its revision prevents an old offline create from resurrecting deleted data. Explicit recreation uses the tombstone revision supplied in a conflict. Original creation timestamps survive deletion/recreation.
++Deletion creates a tombstone and increments the revision. Loads return `SAVE_NOT_FOUND` and lists omit it, but its revision prevents an old offline create from resurrecting deleted data. While retained, explicit recreation uses the tombstone revision supplied in a conflict. Maintenance bounds unbacked tombstones to 1,024 and removes expired ones after 30 days. It advances generation atomically before forgetting any protection. After removal, explicit recreation uses revision 0 and fresh generation, with a new creation timestamp; old queued creates cannot resurrect the slot.
+@@ -67,0 +70 @@ const file = new Blob([largeGameFile], { type: 'application/octet-stream' });
++const context = await supagame.saves.context(); // Persist with this new upload intent.
+@@ -68,0 +72 @@ const saved = await supagame.saves.saveBinary('rpg-campaign', file, {
++  generation: context.generation,
+@@ -86 +90 @@ The SDK manages bucket names, object paths and the upload protocol. Binary data
+-If upload or commit fails, the previous save remains readable. Retry with the same bytes/options/operation ID. Abort a failed upload with `saves.abortBinary(slot, operationId)`; this cannot abort a committed live version. Pending tickets expire after 24 hours. `saves.cleanup()` retries a bounded batch of the current player's garbage; call it after deletion/replacement or during routine synchronization. Metadata deletion is never used as a substitute for deleting Storage objects.
++If upload or commit fails, the previous save remains readable. Retry with the same bytes/options/operation ID and generation. If generation changes before an uncompleted commit, the commit returns `SAVE_CONFLICT`, its reservation becomes garbage, and the previous live save is untouched. Preserve the Blob and explicitly reconcile before preparing a new upload. A covered completed commit remains replayable after registry cleanup. Abort a failed upload with `saves.abortBinary(slot, operationId)`; this cannot abort a committed live version. Pending tickets expire after 24 hours. `saves.cleanup()` retries a bounded batch of the current player's garbage; call it after deletion/replacement or during routine synchronization. Metadata deletion is never used as a substitute for deleting Storage objects.
+@@ -119 +123 @@ The identity callback must return the selected locally restored identity; never
+-Queues retain operation IDs and revisions across reloads. Transactions prevent tabs from losing each other's queued writes. Network, authorization, permission and server errors remain distinct and leave pending data intact. Conflicts store both the current cloud record and the pending local queue. `local.resolve(slot, chosenJson, currentRevision)` explicitly replaces the queue and archives the old queue in history. Binary conflicts can retain the Blob locally and be explicitly retried through `saveBinary` against a chosen revision or copied to a different slot. Nothing silently merges game state.
++Queues retain operation IDs, generations and revisions across reloads. Old queues without generation preserve their payload but require explicit reconciliation before sync. Transactions prevent tabs from losing each other's queued writes. Network, authorization, permission and server errors remain distinct and leave pending data intact. Conflicts store both the current cloud record and the pending local queue. `local.resolve(slot, chosenJson, currentRevision)` explicitly replaces the queue and archives the old queue in history. Use `local.resolveBinary(slot, chosenBlob, currentRevision)` or `local.resolveDelete(slot, currentRevision)` for those operation kinds. Each explicit resolution obtains current context and preserves the replaced queue in history; call `sync` afterward. Nothing silently merges game state.
+@@ -125 +129 @@ IndexedDB can be cleared by the user, browser eviction or private-mode restricti
+-Defaults: 10 active slots, 1 MiB JSON per slot, 50 MiB binary per slot, 100 MiB total/player and 20 pending binary reservations. Total accounting includes retired binary objects until cleanup. JSON bytes use PostgreSQL's UTF-8 JSON representation, which can differ from minified wire size. Tombstones and operation receipts are retained for permanent retry safety and require long-term capacity planning; there is currently no automatic receipt pruning or account-abuse defense.
++Defaults: 10 active slots, 1 MiB JSON per slot, 50 MiB binary per slot, 100 MiB total/player and 20 pending binary reservations. Total accounting includes retired binary objects until cleanup. JSON bytes use PostgreSQL's UTF-8 JSON representation, which can differ from minified wire size. Per-player metadata is bounded: 4,096 receipts, 1,024 unbacked tombstones, 4,096 binary registry rows and three rate arrays of at most 60 timestamps. New receipt results and reservation requests each have an 8 KiB serialized limit. Backed slots are independently limited by `max_slots`, with five backups per slot for 30 days. Existing oversized accounts converge through bounded, generation-fenced maintenance; live saves and recovery history are preserved during schema migration. These are live-row bounds; normal autovacuum and Storage garbage collection remain necessary.
+@@ -150 +154 @@ Operator cleanup handles deleted Auth users and abandoned uploads without requir
+-Saves belong to the authenticated player. Other players cannot read or modify them.
++Saves belong to the authenticated player. Other players cannot read or modify them. Deleted or soft-deleted Auth identities cannot use RPCs, direct save reads or Storage authorization even with an unexpired JWT. Mutations and Storage checks serialize with account deletion through an Auth-row SHARE lock. Direct Data API reads check identity in their read-only snapshot. Orphanable object records survive for operator cleanup. Active-account sign-out revocation continues to follow JWT lifetime; no mandatory session-ID lookup is added.
+@@ -158 +162 @@ Storage policies protect access, not truth. Modified clients can fabricate plaus
+-Successful mutations are limited to 60 per player per minute. Idempotent retries do not consume another mutation; excess new writes return `RATE_LIMITED`. Batch game events into checkpoints rather than saving every frame.
++Completed mutations, new reservations and first state-changing aborts each have an independent allowance of 60 per rolling 60 seconds per player. Exact valid prepare retries and repeated retained aborts are free; cleanup remains available and cannot reset counters. Excess new work returns `RATE_LIMITED`. Batch game events into checkpoints rather than saving every frame.
+@@ -171,3 +175,3 @@ Authenticated `POST /v1/saves/:slot` actions use the existing `sg_cloud_save` RP
+-| `{ "action": "revisions" }` | `{revisions: [{save, archivedAt, expiresAt}]}` |
+-| `{ "action": "loadRevision", "revision": 1 }` | `{save}` including JSON or private binary object path |
+-| `{ "action": "restore", "revision": 1, "expectedRevision": 3, "operationId": "<uuid>" }` | `{save}` metadata for the new revision |
++| `{ "action": "revisions" }` | `{generation, revisions: [{save, archivedAt, expiresAt}]}` |
++| `{ "action": "loadRevision", "revision": 1 }` | `{generation, save}` including JSON or private binary object path |
++| `{ "action": "restore", "generation": "<observed generation>", "revision": 1, "expectedRevision": 3, "operationId": "<uuid>" }` | `{generation, save}` metadata for the new revision |
+@@ -177 +181 @@ locks the player, checks revision/quota and records a stable receipt. Retried re
+-return that receipt even if the original backup has since expired. No owner override,
++return that receipt within the documented replay guarantee even if the original backup has since expired. No owner override,
+@@ -193,0 +198,2 @@ and function update before using revision recovery.
++
++All mutations require observed generation. Upgrade matching database, Edge and SDK assets together; old generationless writes fail explicitly. See the [complete protocol and migration guide](https://github.com/RetroBreeze/supagame/blob/main/docs/guides/cloud-save-protocol.md).
+diff --git a/Leaderboards.md b/Leaderboards.md
+index 533b2a2..45751ea 100644
+--- a/Leaderboards.md
++++ b/Leaderboards.md
+@@ -41,0 +42,8 @@ Add [Live Leaderboards](Live-Leaderboards) for automatic updates or
++
++## Pagination performance
++
++The reader seeks page candidates through the ranking indexes and ranks at most
++`limit + 1` rows. Exact global ranks still count preceding visible rows under RLS,
++including ties; deep pages are not constant-time. Admin generation invalidation
++and deterministic ordering remain unchanged. See the [measurements and indexes](https://github.com/RetroBreeze/supagame/blob/main/docs/guides/leaderboard-performance.md)
++for scaling limits and index storage/write tradeoffs.
+diff --git a/Security.md b/Security.md
+index c98804b..a4fa30d 100644
+--- a/Security.md
++++ b/Security.md
+@@ -51,0 +52,6 @@ project owners retain control over their database and can alter its protections.
++
++Cloud Saves additionally verifies that the Auth identity exists and is not soft
++deleted, including Storage policy checks. Retained JWTs cannot authorize orphaned
++reservations after deletion. Independent per-player mutation/reservation/abort
++allowances and bounded generation-fenced metadata complement Auth signup limits.
++See [Cloud Saves](Cloud-Saves) for exact limits and offline reconciliation.
+diff --git a/Upgrades.md b/Upgrades.md
+index afabd59..b772fad 100644
+--- a/Upgrades.md
++++ b/Upgrades.md
+@@ -39,0 +40,9 @@ See [Troubleshooting](Troubleshooting) for interrupted deployments and configura
++
++## Cloud Saves generation protocol (module 0.1.5)
++
++Apply the additive migrations and matching Edge/SDK assets together. Existing live
++saves and five-revision recovery history survive. Old generationless writers fail
++closed; retain offline payloads and explicitly reconcile before creating new
++operations. Prepared legacy uploads cannot commit without generation context;
++abort/collect them and explicitly prepare again. Replay is finite: the latest
++3,072 completed operations that are also less than 30 days old. See [Cloud Saves](Cloud-Saves).

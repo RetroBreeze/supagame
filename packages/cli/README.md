@@ -28,3 +28,8 @@ or [TypeScript SDK](https://github.com/RetroBreeze/supagame/blob/main/packages/s
 The CLI is only needed for backend setup and maintenance.
 
 [MIT license](https://github.com/RetroBreeze/supagame/blob/main/LICENSE)
+
+Module version 0.1.5 adds forward migrations for deleted-account authorization,
+Cloud Saves generations and bounded retention, targeted foreign-key indexes and
+leaderboard pagination. Coordinate matching Edge/SDK upgrades; old Cloud Saves
+writes without generation fail closed. See the [upgrade guidance](https://github.com/RetroBreeze/supagame/blob/main/docs/guides/cloud-save-protocol.md).

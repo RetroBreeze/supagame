@@ -16,3 +16,8 @@ For other engines, use `@retrobreeze/supagame-contracts/openapi.yaml` to build a
 
 See the [HTTP API reference](https://github.com/RetroBreeze/supagame/wiki/API)
 for authentication, endpoints and examples.
+
+Cloud Saves mutations require the observed generation string. Exact replay is
+guaranteed only for the latest 3,072 completed operations also younger than
+30 days. Stale context returns `SAVE_CONFLICT` and requires explicit reconciliation.
+See the [protocol guide](https://github.com/RetroBreeze/supagame/blob/main/docs/guides/cloud-save-protocol.md).
