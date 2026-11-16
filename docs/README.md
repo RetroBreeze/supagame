@@ -9,6 +9,9 @@ Start with [Quickstart](https://github.com/RetroBreeze/supagame/wiki/Quickstart)
 - [Target Rush example](../examples/target-rush/README.md).
 - [Local development](https://github.com/RetroBreeze/supagame/wiki/Local-Development).
 - [Package maintenance](../RELEASING.md) and [compatibility record](../SUPABASE-COMPATIBILITY.md).
+- [Agent integration skill](../.agents/skills/supagame/SKILL.md) and its
+  [validation/scenario record](verification/AGENT-SKILL.md). Run
+  `node --test tests/e2e/agent-skill.test.ts` when changing its examples.
 - [Designs](superpowers/specs/) and [implementation plans](superpowers/plans/).
 
 Edit public guides in the Wiki checkout and update its Home and sidebar when
