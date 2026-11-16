@@ -1,35 +1,15 @@
 # Changelog
 
-## Proposed public npm release — 0.1.0
+## 0.1.0
 
-- Rename CLI, SDK and contracts to the `@retrobreeze/supagame-*` namespace.
-- Align their first public npm versions at 0.1.0; earlier unreleased versions below
-  describe development history, not published npm releases.
-- Preserve schema/module upgrade versions and all existing runtime APIs.
-- Add non-publishing Node 24/26 CI validation and isolated transitive package tests.
-- Retain `private: true`; publication still requires separate authorization.
+- npm packages: `@retrobreeze/supagame-cli`, `@retrobreeze/supagame-sdk` and `@retrobreeze/supagame-contracts`.
+- Guided setup, leaderboard and achievement creation, public connection exports and JSON automation.
+- Anonymous player identities, display names, best-score leaderboards and optional live updates.
+- Score-based achievements, JSON and binary cloud saves, account linking and recovery.
+- Optional administration: leaderboard resets, score moderation, player restrictions and audit history.
+- Local Admin Dashboard with project selection, launch-code authentication, previews and confirmations.
+- Hosted operator verification uses the operator transport while ordinary queries remain read-only.
+- Node.js 24/26 and Supabase CLI 3.0.0/3.1.0 support, with isolated package and local integration tests.
+- Standalone Target Rush example and npm-based setup guides.
 
-## Unreleased — CLI 0.1.6
-
-- Fixed hosted Admin Dashboard startup rejecting valid operators: the fixed
-  permission SELECT now uses the same operator transport as Admin CLI mutations,
-  rather than Supabase's separate read-only database role.
-- Retained role/EXECUTE checks, read-only data queries and immutable project
-  selection; reject ambiguous authorization results and sanitize probe failures.
-- Added hosted transport regressions for source and freshly packaged execution,
-  plus real PostgreSQL role/privilege checks. No migration or deployment required.
-
-## Unreleased — CLI 0.1.5
-
-- Bundled local Admin Dashboard with single-project resolution and explicit local/remote mode.
-- Loopback-only server, per-launch authentication, Host/Origin and CSRF validation, secure previews and exact operation retries.
-- Overview, leaderboard management, paginated score moderation, player restrictions and bounded audit history.
-- Shared operator service for the existing CLI and dashboard; no new migrations, SDK API or hosted endpoint.
-
-## Unreleased — Admin module, module templates 0.1.4
-
-- Optional `supagame add admin` with forward-only installation, upgrades, deployment inventory and diagnostics.
-- CLI leaderboard inspection, generation reset and disable/enable; score inspection and reversible moderation; player submission restrictions and reinstatement; audit listing.
-- Private operator authorization, future granular permission assignments, explicit confirmation/reasons, read-only previews, operation deduplication and stale revision checks.
-- Retained generation history, generation-bound pagination and live invalidation; typed `PLAYER_RESTRICTED` errors.
-- No dashboard, public admin endpoint, permanent deletion or hosted deployment.
+Installed module versions have their own upgrade history and need not match the npm version.

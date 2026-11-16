@@ -59,38 +59,15 @@ mark an incomplete journal complete. A process killed before cleanup can leave a
 lock: confirm no deployment is running and inspect remote progress before
 removing that lock. Do not remove the journal to bypass reconciliation.
 
-### Rebuild and reinstall on the MiniBook
+### Update the CLI
 
-From a checkout containing the API-bundling fix commit, with supported Node 24 or 26
-and the repository's pnpm version, run:
+From your game project:
 
-```bash
-pnpm install --frozen-lockfile
-mkdir -p /tmp/supagame-api-package
-pnpm --filter @retrobreeze/supagame-cli pack --pack-destination /tmp/supagame-api-package
-npm install --global /tmp/supagame-api-package/retrobreeze-supagame-cli-0.1.0.tgz
-hash -r
-command -v supagame
-supagame --version
+```sh
+npm install -D @retrobreeze/supagame-cli@latest
+npx supagame doctor --remote --project-ref YOUR_PROJECT_REF
+npx supagame deploy --dry-run --project-ref YOUR_PROJECT_REF
 ```
-
-Packing runs the prepack build and asset verification; it does not publish.
-If building on another machine, transfer that exact tarball to the same path on
-the MiniBook and run the last four commands there. The version remains 0.1.0;
-retain the source commit and tarball checksum to identify this build. Use the
-same npm prefix as the previous global installation. No SDK reinstall is needed.
-`private: true` remains unchanged.
-
-From the existing consumer project, these commands perform read-only inspection:
-
-```bash
-supagame doctor --remote --project-ref hbizuovcawypckpkmkjj
-supagame deploy --dry-run --project-ref hbizuovcawypckpkmkjj
-```
-
-They do not reproduce the mutating function step. Capturing its improved error
-requires a separately authorized future deployment; none was performed for this
-change. Do not run direct deployment merely to collect diagnostics.
 
 Verification for this change: `pnpm test` passed (584 tests); CLI typecheck,
 build, focused ESLint with zero warnings, and packing passed. The deployment and
@@ -132,13 +109,11 @@ is rejected before hosted calls because API bundling does not support it.
 Local Supabase development ordinarily still needs Docker or another supported
 container runtime.
 
-Rebuild/reinstall using the commands above, from the commit containing this
-option. Verify `supagame deploy --help` lists `--diagnostic-log` (the package
-version is still 0.1.0). For a future deployment that you explicitly choose to
-authorize, run from the existing consumer project:
+Use `npx supagame deploy --help` to inspect diagnostic options. For a deployment
+you intend to apply, run from your game project:
 
 ```bash
-supagame deploy --project-ref hbizuovcawypckpkmkjj \
+npx supagame deploy --project-ref YOUR_PROJECT_REF \
   --diagnostic-log "$HOME/supagame-minibook-deploy-raw.jsonl"
 ```
 

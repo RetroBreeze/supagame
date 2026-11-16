@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - There is **no existing software repository** in the supplied workspace. Start a new Git repository only when implementation is approved; never touch Toy Tanks or other projects directly.
-- Provisional npm namespace and CLI executable: `@retrobreeze/supagame-cli` / `supagame`; confirm availability before publication, rename consistently if unavailable.
+- npm package and CLI executable: `@retrobreeze/supagame-cli` / `supagame`.
 - One Supabase project corresponds to one game; no central hosted service or multi-game tenancy in v0.1.
 - Default authentication is anonymous Supabase Auth, but existing authenticated sessions must be retained.
 - Database scores are `BIGINT`; the JSON API and JavaScript SDK accept only safe integer values, documented as `Number.isSafeInteger(score)`, to avoid precision loss.

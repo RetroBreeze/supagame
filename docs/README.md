@@ -8,7 +8,7 @@ Start with [Quickstart](https://github.com/RetroBreeze/supagame/wiki/Quickstart)
 - [CLI package](../packages/cli/README.md), [TypeScript SDK](../packages/sdk-ts/README.md), and [contracts](../packages/contracts/README.md).
 - [Target Rush example](../examples/target-rush/README.md).
 - [Local development](https://github.com/RetroBreeze/supagame/wiki/Local-Development).
-- [Release procedure](../RELEASING.md) and [compatibility record](../SUPABASE-COMPATIBILITY.md).
+- [Package maintenance](../RELEASING.md) and [compatibility record](../SUPABASE-COMPATIBILITY.md).
 - [Designs](superpowers/specs/) and [implementation plans](superpowers/plans/).
 
 Edit public guides in the Wiki checkout and update its Home and sidebar when

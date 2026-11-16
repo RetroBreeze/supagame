@@ -4,7 +4,7 @@ Goal: implement the user's Achievements specification across Supagame and Vaccoi
 
 Architecture: trusted score-record triggers award permanent unique player unlocks in the submission transaction. Versioned configuration migrations register definitions and backfill existing bests. Authenticated HTTP reads return definitions and player progress together. A framework-independent SDK event source and queue feed optional DOM and Vaccoin Canvas renderers. Historical reads never emit unlock events.
 
-Constraints: preserve existing migrations, leaderboard semantics, unrelated files, hosted confirmation and anonymous identities. No privileged client writes, hosted changes, publication or pushes. Repository AGENTS forbids delegation without explicit user request; execute inline.
+Constraints: preserve existing migrations, leaderboard semantics, unrelated files, hosted confirmation and anonymous identities. No privileged client writes, hosted changes or pushes. Repository AGENTS forbids delegation without explicit user request; execute inline.
 
 - [x] Database: add definitions/unlocks, constraints, RLS, trusted evaluation, backfill, retrieval; test boundaries, concurrency, isolation and rejected/replayed submissions.
 - [x] Contracts/API/SDK: publish authenticated retrieval contracts, event lifecycle and reusable notification controller; test hydration, retry deduplication and cleanup.

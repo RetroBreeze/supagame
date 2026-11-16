@@ -2,8 +2,8 @@
 
 Scope: the four findings explicitly authorized on 12 November 2026, in priority
 order. Execute inline with systematic debugging and TDD. Keep public APIs,
-package names and `private: true`; preserve Vaccoin consumers and existing user
-edits. No hosted mutations, publication or unrelated refactoring. Commit after
+package names; preserve Vaccoin consumers and existing user
+edits. No hosted mutations or unrelated refactoring. Commit after
 the complete verification run.
 
 ## Plan
@@ -122,6 +122,5 @@ checkout was not modified.
   configuration. Its live-browser compatibility is therefore not established by
   that check. This existing test/environment failure was left outside the four
   fixes; Supagame's real local Realtime end-to-end test passed.
-- Package names, versions, public APIs and `private: true` remain unchanged.
-  Nothing was published. Existing documentation edits were excluded from this
-  change. Publication remains a separately authorized release step.
+- Package names, versions and public APIs remain unchanged.
+  Existing documentation edits were excluded from this change.

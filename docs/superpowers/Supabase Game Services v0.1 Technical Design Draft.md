@@ -1,6 +1,6 @@
 A self-hosted, MIT-licensed, open-source toolkit for adding game leaderboards to a developer's existing Supabase project. The developer uses a command-line tool to provision services, while games use a stable HTTP API or a thin language SDK at runtime.
 
-**Status:** Draft for review, 8 November 2026. **First implementation:** anonymous players and leaderboards, tested in Toy Tanks (Android/Capacitor). "Supagame" is a provisional working name, not a confirmed package name.
+**Status:** Draft for review, 8 November 2026. **First implementation:** anonymous players and leaderboards, tested in Toy Tanks (Android/Capacitor). The CLI package is `@retrobreeze/supagame-cli`; its executable is `supagame`.
 
 # Goals and boundaries
 
@@ -70,7 +70,7 @@ The CLI should use the existing Supabase project structure and official CLI wher
 
 # Runtime API contract
 
-A versioned function route is proposed under `/functions/v1/supagame/v1` (public names may change before release):
+The versioned function route is `/functions/v1/supagame/v1`:
 
 | Verb and route | Meaning | Access |
 | - | - | - |

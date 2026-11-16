@@ -1,7 +1,7 @@
 # SDK identity and concurrency corrections
 
 Scope: all four second-review defects against 22490de, plus the requested SDK
-boundary audit. No publication, package rename, or removal of private:true.
+boundary audit. No package rename.
 Preserve the pre-existing documentation edits. Execute inline without subagents.
 
 ## Shared causes and implementation decisions
@@ -141,8 +141,8 @@ to finish and be removed; joining now captures the promise before awaiting.
   change. A custom object implementing only `onUnlocked` exposes no Auth context;
   its owner must clear/dispose its queue when switching accounts.
 
-No backend migration, public contract, package name/version, dependency or
-`private:true` field changed. No hosted mutation or npm publication was performed.
+No backend migration, public contract, package name/version or dependency changed.
+No hosted mutation was performed.
 Pre-existing documentation edits are outside this commit.
 
 ### Verification

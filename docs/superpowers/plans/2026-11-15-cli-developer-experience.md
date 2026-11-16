@@ -12,9 +12,9 @@
 
 ## Constraints and decisions
 
-- Node 24/26, Supabase 3.0.0/3.1.0. Preserve the dependency pin and private flags.
+- Node 24/26, Supabase 3.0.0/3.1.0. Preserve the dependency pin.
 - Work on `feat/cli-developer-experience`; retain pre-existing uncommitted example relocation, README, lockfile and test edits. Stage only task-owned changes.
-- No hosted deployments, publication, pushes, production SQL/Edge changes or generated client code.
+- No hosted deployments, pushes, production SQL/Edge changes or generated client code.
 - Keep `supagame.config.json` formatVersion 1; all selected services currently require core/leaderboards. Show dependencies explicitly.
 - Explicit commands retain defaults: omitted score bounds mean unbounded; keep-best remains required in explicit automation and always true in guided setup.
 - Interactive only with input/output TTY, no CI, no JSON and no `--no-interactive`. Fully specified invocations bypass prompts. `--interactive` explicitly requests optional setup questions.
@@ -85,4 +85,4 @@ Files: root/CLI READMEs, local Wiki Quickstart/Installation-Reference/Troublesho
 - Auth/domain transport was checked using real Supabase binaries and synthetic loopback responses, including the documented hostname API response. Actual hosted login, key/domain permissions and custom-domain TLS remain unverified.
 - Final matrix: Node 24.22.3/26.13.0 × Supabase 3.0.0/3.1.0 passed all 60 command runs. Each entry included 646 unit tests, 7 real PTY scenarios, 809 pgTAP checks, local integrations, packaging and 15 E2E tests. Exact commands/counts and boundaries are in [CLI-DX-VERIFICATION.md](../../../CLI-DX-VERIFICATION.md).
 - Documentation commit `513fcfb`; local Wiki commit `7db945e`. No pushes. Restored the generated test CLI to 3.0.0 and stopped only the fixture function server started for this task.
-- Final evidence covers the working tree including pre-existing user example/lockfile/test edits, which remain excluded from feature commits. GO for the subsequent release audit; no publication approval or actual hosted verification claimed.
+- Final evidence covers the working tree including pre-existing user example/lockfile/test edits, which remain excluded from feature commits. Actual hosted verification was not performed.

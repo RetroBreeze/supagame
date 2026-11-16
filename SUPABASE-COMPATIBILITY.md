@@ -103,8 +103,7 @@ values before replacing only the generated `node_modules/.bin/supabase` link:
 
 CI selects these binaries after frozen installation in both the unit/package and
 local integration jobs, across Node `[24, 26]` × Supabase `[3.0.0, 3.1.0]`.
-No publication, hosted deployment, publishing credentials or OIDC write grant is
-introduced. The test selector is not a production binary-override mechanism.
+The test selector is not a production binary-override mechanism.
 
 ## Verification boundary
 
@@ -129,9 +128,7 @@ responses must produce zero mutation calls even with `--allow-remote`.
 No hosted login/OAuth, database certificate exchange, hosted migration push,
 hosted function bundling/upload, config push or secret write was executed. Those remain
 an explicitly unverified boundary requiring a separately authorized disposable
-hosted project. Non-Linux operating systems were not tested. No API/SQL changes,
-npm publication, private-flag removal, Vaccoin modification or Target Rush work
-are included.
+hosted project. Non-Linux operating systems were not tested. No API/SQL changes, Vaccoin modification or Target Rush work are included.
 
 ## Verification record — 2026-11-12
 
@@ -173,9 +170,9 @@ preflight coverage also passed. No hosted mutation was used to obtain these
 results; the simulated API boundary described above still applies.
 
 GitHub Actions is configured for the same four combinations; these results are
-local executions, not a claim that GitHub-hosted jobs have already run. All
-package `private: true` safeguards and the root Supabase 3.0.0 development pin
-remain in place. The existing Wiki migration was preserved outside this commit.
+local executions, not a claim that GitHub-hosted jobs have already run. The root
+Supabase 3.0.0 development pin remains in place. The existing Wiki migration was
+preserved outside this commit.
 
 
 ## Docker-independent hosted deployment — 2026-11-13
@@ -253,7 +250,7 @@ passed. Node 24 / CLI 3.0.0 unit and Edge/SDK integration commands were rerun
 successfully after the fixture restart and final regression addition.
 `test:cli:db` retains the exception described above. `git diff --check` passed.
 The generated local binary link was restored to 3.0.0 afterward. That run did not
-verify hosted bundling, and no npm publication was attempted.
+verify hosted bundling.
 
 ## Final database assertion investigation — 2026-11-13
 

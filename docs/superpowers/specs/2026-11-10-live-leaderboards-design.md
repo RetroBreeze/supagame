@@ -15,7 +15,7 @@ migration and SQL/RLS tests; SDK lifecycle and rank-transition tests; real local
 WebSocket integration; tarball installation in Vaccoin; title-screen Canvas
 integration and mocked desktop/mobile browser checks. Commit repositories
 separately after checks. Preserve pre-existing untracked files. Hosted writes,
-package publication, remote push and merges remain outside authorization.
+remote push and merges remain outside authorization.
 
 Runtime, lifecycle semantics, operational decisions and limitations are recorded
 in ../../live-leaderboards.md. The author selected these technical decisions

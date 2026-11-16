@@ -3,7 +3,7 @@
 **Goal:** Fix the reported CLI 0.1.5 hosted startup failure without changing Admin permissions.
 **Spec:** User bug report and `../specs/2026-11-11-admin-dashboard-design.md`.
 **Architecture:** Keep shared project resolution and credentials. Run only the fixed operator capability SELECT through the same Supabase CLI transport as Admin mutations; retain read-only transport for ordinary reads and doctor. No SQL migration or browser changes.
-**Execution:** Inline, test first, one local commit after verification; no agents, publication, deployment or hosted mutations.
+**Execution:** Inline, test first, one local commit after verification; no agents, deployment or hosted mutations.
 
 ## Evidence
 

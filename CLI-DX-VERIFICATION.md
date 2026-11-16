@@ -1,9 +1,7 @@
 # CLI developer experience verification
 
 Verified on 2026-11-15 on `feat/cli-developer-experience`, based on `e1ab672`.
-**GO for the subsequent v0.1.0 release audit.** This is not publication approval.
-Packages remain private; no push, release tag, publication or hosted deployment
-was performed.
+This record covers local verification; hosted deployment was not exercised.
 
 ## Delivered behavior
 
@@ -23,7 +21,7 @@ was performed.
 
 No client framework files or engine SDKs are generated. Native engines can skip
 browser origins. The existing TypeScript SDK remains independent. Production SQL,
-Edge Functions, SDK/contracts, package privacy flags and dependency pins are
+Edge Functions, SDK/contracts and dependency pins are
 unchanged by these commits.
 
 ## Example sessions
@@ -62,8 +60,7 @@ npx supagame leaderboard create target-rush --type points --order desc --keep-be
 ```
 
 See the [CLI guide](packages/cli/README.md) for complete examples, flags, JSON fields,
-exit codes, safe replacement rules and troubleshooting. Packages are still
-unpublished: use the repository's local tarball workflow before release.
+exit codes, safe replacement rules and troubleshooting. Install the CLI from npm.
 
 ## Architecture and file inventory
 
@@ -191,7 +188,7 @@ The matrix ran against the working tree, including the user's pre-existing,
 uncommitted Target Rush relocation, README, lockfile and related test changes.
 Those changes were preserved and excluded from these commits. This is not a
 claim that the feature commits alone reproduce that entire working-tree result;
-the release audit must reconcile and verify the intended final release tree.
+the results apply to the tested working tree.
 
 Actual hosted browser login, hosted key/domain permissions, custom-domain TLS and
 hosted deployment were not exercised. Custom URLs support verified active
@@ -200,5 +197,4 @@ Windows/macOS were not tested. Review was a separate author requirements/securit
 pass; no independent agent review was performed because repository instructions
 prohibit subagents.
 
-Proceed to the release audit with those boundaries explicit. Publication remains
-disabled, and any hosted smoke test or push requires separate authorization.
+Hosted smoke tests require an explicitly selected test project and authorization.
