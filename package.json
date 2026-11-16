@@ -52,9 +52,13 @@
   },
   "devEngines": {
     "runtime": {
-      "name": "deno",
-      "version": "2.9.6",
-      "onFail": "download"
-    }
+      "name": "node",
+      "version": ">=22",
+      "onFail": "error"
+  },
+  "packageManager": {
+    "name": "npm",
+    "onFail": "error"
   }
+}
 }
