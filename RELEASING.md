@@ -37,6 +37,7 @@ npm run lint
 npm run contracts:check
 npm run test:edge
 npm run test:packages
+node --test tests/e2e/agent-skill.test.ts
 npm run test:cli:compatibility
 npm audit
 ```
@@ -109,5 +110,10 @@ The approved generation protocol changes the pre-release Cloud Saves contract.
 Ship matching migrations, Edge assets, contracts and SDK together. Confirm the
 [retention and upgrade guide](docs/guides/cloud-save-protocol.md), existing-data
 upgrade tests and retained-JWT regressions before publication. Historical
-verification reports do not certify the remediation changes. The local Wiki
-update draft requires separate authorization before pushing.
+verification reports do not certify the remediation changes. Review the published
+[Cloud Saves](https://github.com/RetroBreeze/supagame/wiki/Cloud-Saves),
+[Upgrades](https://github.com/RetroBreeze/supagame/wiki/Upgrades) and
+[agent skill](.agents/skills/supagame/SKILL.md) against the same candidate. Keep
+current guides synchronized; archived examples are not installation instructions.
+Wiki publication, npm publication and hosted deployment are separate operations
+and each needs authorization for its own destination.

@@ -22,6 +22,9 @@ Supabase CLI **3.0.0 and 3.1.0** are supported. Hosted deployment needs no Docke
 See the [quickstart](https://github.com/RetroBreeze/supagame/wiki/Quickstart) for the
 full walkthrough and [CLI reference](https://github.com/RetroBreeze/supagame/wiki/CLI)
 for commands, automation and configuration.
+For a coding agent working in your game repository, install the separate
+[Supagame agent skill](https://github.com/RetroBreeze/supagame/wiki/Agent-Skill).
+Installing this npm package does not install the skill.
 
 Games connect through the [HTTP API](https://github.com/RetroBreeze/supagame/wiki/API)
 or [TypeScript SDK](https://github.com/RetroBreeze/supagame/blob/main/packages/sdk-ts/README.md).

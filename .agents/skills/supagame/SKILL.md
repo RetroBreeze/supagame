@@ -14,8 +14,8 @@ conventions. Node tooling for provisioning does not require a JavaScript game.
 
 These instructions target public packages **0.1.0**, HTTP **v1**, module templates
 **0.1.5** (distinct version numbers). Inspect installed package versions and CLI
-help before adapting examples. Prefer matching implementation/OpenAPI over older
-Wiki snippets, especially Cloud Saves examples without generation context.
+help before adapting examples. Prefer matching implementation/OpenAPI over
+historical examples. Cloud Saves durable writes require generation context.
 
 ## Workflow
 

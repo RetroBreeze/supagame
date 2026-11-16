@@ -22,6 +22,11 @@ Examples below assume the tools resolve in PATH through `npx` and the current
 directory is the intended project root. Supagame does not search parent folders.
 Replace `YOUR_PROJECT_REF` with the verified 20-character reference.
 
+For source-checkout development only, the Supagame workspace uses npm 12.2.0,
+`package-lock.json`, and `npm ci`, with Node 24.15+ (24.x) or 26.x. Deno is an npm
+development dependency for Edge checks, not the CLI runtime. Consumer games keep
+their own package manager and engine conventions.
+
 `npx supabase login` establishes operator access; `npx supabase projects list`
 can identify accessible projects. Keep management credentials in the operator
 environment, never game configuration. `init` records a reference locally; this

@@ -2,6 +2,8 @@
 
 User guides live in the [Wiki](https://github.com/RetroBreeze/supagame/wiki).
 Start with [Quickstart](https://github.com/RetroBreeze/supagame/wiki/Quickstart).
+For AI-assisted game integration, install the
+[Supagame skill](../README.md#ai-coding-agent-skill).
 
 ## For contributors
 
@@ -18,6 +20,10 @@ Edit public guides in the Wiki checkout and update its Home and sidebar when
 changing navigation. Keep package READMEs focused on installing and using each
 package. The [OpenAPI contract](../packages/contracts/openapi.yaml) defines the
 public HTTP interface.
+Current source development uses npm 12.2.0 and `npm ci`; see
+[package maintenance](../RELEASING.md) for Node versions and validation commands.
+The [Cloud Saves protocol](guides/cloud-save-protocol.md) is the detailed reference
+for generations, finite replay and explicit reconciliation.
 
 ## Archive
 

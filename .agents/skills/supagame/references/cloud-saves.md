@@ -1,7 +1,8 @@
 # Cloud Saves: generations, retries and reconciliation
 
 Read this before writing any save integration. It covers the current module
-0.1.5 protocol, not historical Wiki examples that omit `generation`.
+0.1.5 protocol. Historical examples without `generation` are not durable-write
+templates for this release.
 
 ## Durable operations
 

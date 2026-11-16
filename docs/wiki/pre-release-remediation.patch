@@ -1,69 +1,421 @@
+diff --git a/API.md b/API.md
+index 54561e0..6a6b678 100644
+--- a/API.md
++++ b/API.md
+@@ -19,0 +20,5 @@ means a request without a player session. Never send a service-role/secret key.
++| `GET /achievements` | Required | Achievement definitions and current-player unlock state |
++| `GET /saves` | Required | `{slots, generation}`; obtain context even with no slots |
++| `GET /saves/:slot` | Required | `{save, generation}`; missing slots return `SAVE_NOT_FOUND` |
++| `POST /saves/:slot` | Required | JSON/binary lifecycle and recovery actions; see [Cloud Saves](Cloud-Saves) |
++| `POST /saves/cleanup` | Required | `{objects, generation}` for the current player's eligible Storage garbage |
+@@ -86 +91,24 @@ Generate a new UUID for each gameplay attempt; reuse it when retrying that attem
+-Persist the session and refresh it through Supabase Auth as needed.
++Persist the session and refresh it through Supabase Auth as needed. A failed refresh
++must not silently create a new anonymous identity. Unity, Godot and Unreal use their
++HTTP/JSON facilities; no official Supagame native SDK exists. See the
++[agent integration skill](Agent-Skill) for engine-specific guidance.
++
++## Cloud Saves wire context
++
++Every `save`, `delete`, `prepare`, `commit`, `abort` and `restore` request carries
++an observed generation string. A JSON save body is:
++
++```json
++{"action":"save","generation":"<observed generation>","expectedRevision":0,"operationId":"<UUID>","schemaVersion":1,"metadata":{},"data":{"level":1}}
++```
++
++Persist the payload, generation, revision and operation ID together, scoped to the
++original player. Exact replay is guaranteed for the latest 3,072 completed
++operations that are also less than 30 days old. Stale context requires explicit
++reconciliation with a new operation; never silently refresh an old intent.
++Save errors additionally include `SAVE_CONFLICT` (409, with current state and
++generation), `SAVE_NOT_FOUND` (404), `INVALID_SAVE` (400),
++`SAVE_QUOTA_EXCEEDED` (413) and `STORAGE_UNAVAILABLE` (503).
++Save bodies allow 2 MiB transport overhead; JSON data is at most 1 MiB and may have
++a lower configured quota. Binary bytes use private Storage after preparation.
++See [Cloud Saves](Cloud-Saves) for action shapes, uploads and offline handling.
+diff --git a/Account-Recovery-Verification.md b/Account-Recovery-Verification.md
+index afd5253..713fbec 100644
+--- a/Account-Recovery-Verification.md
++++ b/Account-Recovery-Verification.md
+@@ -2,0 +3,4 @@
++> Current interfaces and commands: [Cloud Saves](Cloud-Saves), [Upgrades](Upgrades)
++> and [Local development](Local-Development). Old generationless save examples and
++> permanent-replay claims in this record are not valid for module 0.1.5.
++
 diff --git a/Account-Recovery.md b/Account-Recovery.md
-index 923e85c..37b1561 100644
+index 923e85c..a087ecd 100644
 --- a/Account-Recovery.md
 +++ b/Account-Recovery.md
-@@ -145,0 +146 @@ await game.saves.restoreRevision('slot1', selected.save.revision, {
-+  generation: current.generation,
-@@ -153 +154 @@ increasing revision, with the same CAS/receipt rules as replacement. Retry the i
+@@ -51 +51,2 @@ IDs. Retry the **same transition and strategy** after an interrupted response. C
+-slots and server receipts prevent duplicate revisions. Multi-slot replacement is a
++slots and retained server receipts prevent duplicate revisions within the Cloud Saves
++replay guarantee: the latest 3,072 completed operations that are also less than 30 days old. Multi-slot replacement is a
+@@ -108,2 +109,2 @@ archived in the same database transaction as replacement. Failed writes leave th
+-live save and previous history recoverable. Stable operation IDs prevent duplicate
+-archives on retries. Ordinary saves can opt into the same flag; restoration always
++live save and previous history recoverable. Retained operation receipts prevent duplicate
++archives on covered retries; do not assume indefinite replay. Ordinary saves can opt into the same flag; restoration always
+@@ -130,0 +132 @@ journal or guest credential is required:
++import { createOperationId } from '@retrobreeze/supagame-sdk';
+@@ -131,0 +134 @@ const owner = await game.players.getAuthStatus();
++if (!owner.userId) throw Error('Restore the existing session first');
+@@ -143,6 +146,9 @@ const current = await game.saves.load('slot1');
+-const operationId = crypto.randomUUID(); // Persist with the request if retrying after reload.
+-await game.saves.restoreRevision('slot1', selected.save.revision, {
+-  expectedRevision: current.revision,
+-  expectedPlayerId: owner.userId!,
+-  operationId,
+-});
++const restoreIntent = {
++  slot: 'slot1', revision: selected.save.revision,
++  options: {
++    expectedRevision: current.revision, generation: current.generation,
++    expectedPlayerId: owner.userId, operationId: createOperationId(),
++  },
++};
++await persistIntent(restoreIntent); // Your durable application store, before sending.
++await game.saves.restoreRevision(restoreIntent.slot, restoreIntent.revision, restoreIntent.options);
+@@ -153 +159 @@ increasing revision, with the same CAS/receipt rules as replacement. Retry the i
 -request after a lost response. A deleted slot's tombstone revision comes in
 +request, including generation, after a lost response. Exact replay is guaranteed for the latest 3,072 completed operations that are also younger than 30 days. A deleted slot's tombstone revision comes in
-@@ -170,0 +172,2 @@ skipped or stuffed into localStorage.
+@@ -170,0 +177,2 @@ skipped or stuffed into localStorage.
 +
 +Legacy interrupted journals without generation require explicit re-review: call `inspectAccountSwitch` with the associated `flowId` and `restart: true`, then review and resolve again. Old payloads and previous reviews remain recoverable. Never automatically attach fresh context to an old write.
+diff --git a/Account-Verification.md b/Account-Verification.md
+index 668878c..e30fd23 100644
+--- a/Account-Verification.md
++++ b/Account-Verification.md
+@@ -2,0 +3,4 @@
++> Current interfaces and commands: [Cloud Saves](Cloud-Saves), [Upgrades](Upgrades)
++> and [Local development](Local-Development). Old generationless save examples and
++> permanent-replay claims in this record are not valid for module 0.1.5.
++
+diff --git a/Accounts.md b/Accounts.md
+index 6bc8a54..a652cbc 100644
+--- a/Accounts.md
++++ b/Accounts.md
+@@ -122 +122,4 @@ SDK authenticated responses are discarded if the session changes during a reques
+-Save revision caches and offline queues are keyed by user identity. Live leaderboard
++Save revision/generation caches and offline queues are keyed by user identity.
++Durable operations retain their original generation alongside UUID, expected
++revision and payload; expired or stale context needs explicit reconciliation,
++not automatic resubmission under the newly signed-in identity. Live leaderboard
+diff --git a/Achievements-Verification.md b/Achievements-Verification.md
+index 4fe5ded..558e40a 100644
+--- a/Achievements-Verification.md
++++ b/Achievements-Verification.md
+@@ -2,0 +3,4 @@
++> Current interfaces and commands: [Cloud Saves](Cloud-Saves), [Upgrades](Upgrades)
++> and [Local development](Local-Development). Old generationless save examples and
++> permanent-replay claims in this record are not valid for module 0.1.5.
++
+diff --git a/Achievements.md b/Achievements.md
+index 77c041c..73df95a 100644
+--- a/Achievements.md
++++ b/Achievements.md
+@@ -13,0 +14,2 @@ npx supagame achievement create run-coins-500 \
++npx supagame deploy --project-ref YOUR_PROJECT_REF --dry-run
++# After approval of the previewed hosted changes:
+@@ -60 +62 @@ queue.dispose(); // unsubscribes, clears timers and queued notifications
+-The queue is framework-independent and imports no DOM code. Multiple unlocks use FIFO order. Duplicate IDs are suppressed for the queue lifetime. The limit includes the current card; overflow drops newest notifications, never persisted achievements. Pause preserves the current card; resume gives it the configured duration. Recreate the queue when changing player identity so queued cards and deduplication belong to the new player. Use `current` and `pending` for Canvas or native renderer integration. Runtime TypeScript polling/queue helpers can be reimplemented over the same HTTP contract in Unity/Godot.
++The queue is framework-independent and imports no DOM code. Multiple unlocks use FIFO order. Duplicate IDs are suppressed for the queue lifetime. The limit includes the current card; overflow drops newest notifications, never persisted achievements. Pause preserves the current card; resume gives it the configured duration. SDK-backed queues reset cards and deduplication on identity changes. For a custom source without SDK identity notifications, dispose/recreate its queue when the player changes. Use `current` and `pending` for Canvas or native renderer integration. Runtime TypeScript polling/queue helpers can be reimplemented over the same HTTP contract in Unity/Godot.
+diff --git a/Admin-Dashboard-Verification.md b/Admin-Dashboard-Verification.md
+index 85e9016..ebd74e7 100644
+--- a/Admin-Dashboard-Verification.md
++++ b/Admin-Dashboard-Verification.md
+@@ -2,0 +3,4 @@
++> Current interfaces and commands: [Cloud Saves](Cloud-Saves), [Upgrades](Upgrades)
++> and [Local development](Local-Development). Old generationless save examples and
++> permanent-replay claims in this record are not valid for module 0.1.5.
++
+diff --git a/Admin-Verification.md b/Admin-Verification.md
+index f3fff2e..e69baf9 100644
+--- a/Admin-Verification.md
++++ b/Admin-Verification.md
+@@ -2,0 +3,4 @@
++> Current interfaces and commands: [Cloud Saves](Cloud-Saves), [Upgrades](Upgrades)
++> and [Local development](Local-Development). Old generationless save examples and
++> permanent-replay claims in this record are not valid for module 0.1.5.
++
+diff --git a/Admin.md b/Admin.md
+index 0f6b4d7..01fe6e4 100644
+--- a/Admin.md
++++ b/Admin.md
+@@ -9,0 +10,2 @@ npx supagame add admin
++npx supagame deploy --project-ref YOUR_PROJECT_REF --dry-run
++# After approval of the previewed hosted changes:
+diff --git a/Agent-Skill.md b/Agent-Skill.md
+new file mode 100644
+index 0000000..a3721c3
+--- /dev/null
++++ b/Agent-Skill.md
+@@ -0,0 +1,49 @@
++# Supagame AI agent skill
++
++The official `supagame` skill helps coding agents integrate Supagame into your own
++game: setup, leaderboards, score-based achievements, live leaderboards, Cloud Saves,
++diagnostics and upgrades. It covers the TypeScript SDK and the HTTP/OpenAPI path
++for Unity, Godot, Unreal and custom clients. It does not invent native SDKs or
++replace your engine's project conventions.
++
++## Install in your game repository
++
++Get a trusted Supagame source checkout matching your installation. Copy the
++**whole directory**, including its `references/` files (POSIX shell example):
++
++```sh
++mkdir -p /path/to/your-game/.agents/skills
++cp -R /path/to/supagame/.agents/skills/supagame /path/to/your-game/.agents/skills/
++```
++
++Check for an existing destination first; review differences before updating a
++customized copy. The authoritative source is
++[`.agents/skills/supagame/` in the Supagame repository](https://github.com/RetroBreeze/supagame/tree/main/.agents/skills/supagame).
++It is a portable [Agent Skills](https://agentskills.io/specification) directory.
++
++[Codex discovers repository skills in `.agents/skills`](https://developers.openai.com/codex/skills).
++Other compatible coding agents can install the same folder using their supported
++skill path or installer. Follow that agent's reload instructions and check that
++`supagame` appears in its available skills. Keeping the skill only in the Supagame
++source checkout does not make it available in a different game repository.
++The npm packages do not install or activate the skill.
++
++## Invoke
++
++In Codex, use `$supagame`; in another compatible agent, use its skill selector or
++ask explicitly to use the Supagame skill. For example:
++
++- “Use $supagame to add a leaderboard to this browser game.”
++- “Use the supagame skill to integrate Cloud Saves into my Godot project.”
++- “Use $supagame to check this deployment and plan an upgrade.”
++
++The agent should inspect your existing project/Auth/configuration, explain the
++smallest change, and verify the result. Cloud Saves guidance includes generation
++context, finite retry guarantees and explicit offline conflict decisions.
++For hosted deployment it must show the exact destination and actual dry-run
++preview and obtain your authorization. A request to integrate a feature is not
++permission to deploy it.
++
++The [validation record](https://github.com/RetroBreeze/supagame/blob/main/docs/verification/AGENT-SKILL.md)
++distinguishes exercised CLI/SDK/Godot checks from scenario walkthroughs and untested
++platforms. Keep copied skills aligned with backend and SDK upgrades.
+diff --git a/Archive.md b/Archive.md
+index 63b398b..a06136e 100644
+--- a/Archive.md
++++ b/Archive.md
+@@ -4 +4,4 @@ Historical implementation and verification records. For current setup, use
+-[Quickstart](Quickstart); archived commands and version numbers may be obsolete.
++[Quickstart](Quickstart), [Cloud Saves](Cloud-Saves), [Upgrades](Upgrades) and
++[Local development](Local-Development). Archived commands/version numbers,
++generationless save examples and indefinite-replay claims describe older code.
++They do not supersede the current generation protocol or npm tooling.
+diff --git a/CLI.md b/CLI.md
+index 7e4bec6..60a0dd0 100644
+--- a/CLI.md
++++ b/CLI.md
+@@ -25,0 +26,4 @@ an interactive terminal. Fully specified commands run without questions.
++Without prompts, `init` needs an explicit project reference (or an existing matching
++local selection); include `--module` to stage features. An explicit ref/existing
++manifest bypasses the fresh-init wizard unless `--interactive` is requested.
++`add`, `saves configure`, `upgrade` and `config origins add` have no setup wizard.
+@@ -73,0 +78,2 @@ npx supagame leaderboard create arcade --type points --order desc --keep-best --
++npx supagame deploy --project-ref YOUR_PROJECT_REF --dry-run --json
++# Only after explicit approval of this destination and preview:
+@@ -116,0 +123,2 @@ doctor requested live checks have incomplete evidence, **130** guided cancellati
++The advisory HTTP `cannot verify` finding does not itself force exit 2; inspect
++all findings even on exit 0. A successful configuration check is not runtime proof.
+diff --git a/Cloud-Saves-Verification.md b/Cloud-Saves-Verification.md
+index 5bce889..9bcf1db 100644
+--- a/Cloud-Saves-Verification.md
++++ b/Cloud-Saves-Verification.md
+@@ -2,0 +3,4 @@
++> Current interfaces and commands: [Cloud Saves](Cloud-Saves), [Upgrades](Upgrades)
++> and [Local development](Local-Development). Old generationless save examples and
++> permanent-replay claims in this record are not valid for module 0.1.5.
++
 diff --git a/Cloud-Saves.md b/Cloud-Saves.md
-index eacc2c7..8d607c0 100644
+index eacc2c7..c4abeb8 100644
 --- a/Cloud-Saves.md
 +++ b/Cloud-Saves.md
-@@ -35 +35 @@ Slots use 1–64 letters, digits, underscores or hyphens, beginning with a lette
+@@ -4,0 +5,4 @@ Cloud Saves stores player-owned JSON and binary progress in the developer's Supa
++This guide targets the v0.1.0 packages and module 0.1.5. The
++[protocol and retention reference](https://github.com/RetroBreeze/supagame/blob/main/docs/guides/cloud-save-protocol.md)
++defines the generation and finite replay guarantees.
++
+@@ -10,0 +15,2 @@ npx supagame add cloud-saves
++npx supagame deploy --project-ref YOUR_PROJECT_REF --dry-run
++# After reviewing the destination and authorizing the displayed changes:
+@@ -25 +31 @@ await supagame.saves.save('slot1', { level: 2, coins: 20 }, {
+-  expectedRevision: loaded.revision,
++  expectedRevision: loaded.revision, generation: loaded.generation,
+@@ -35 +41 @@ Slots use 1–64 letters, digits, underscores or hyphens, beginning with a lette
 -Responses contain slot, kind, revision, schemaVersion, metadata, sizeBytes, createdAt, updatedAt, deleted and objectPath (null for JSON). Loads also contain JSON data. Metadata is a JSON object up to 4 KiB. Schema versions are positive integers defined by the game; Supagame does not migrate or interpret game data. Games must validate data and handle unsupported schema versions.
 +Responses contain generation, slot, kind, revision, schemaVersion, metadata, sizeBytes, createdAt, updatedAt, deleted and objectPath (null for JSON). Loads also contain JSON data. Metadata is a JSON object up to 4 KiB. Schema versions are positive integers defined by the game; Supagame does not migrate or interpret game data. Games must validate data and handle unsupported schema versions.
-@@ -45,0 +46 @@ try {
-+    generation: loaded.generation,
-@@ -54,0 +56 @@ try {
-+      generation: (await supagame.saves.context()).generation,
-@@ -60 +62 @@ try {
+@@ -39 +45,15 @@ Responses contain slot, kind, revision, schemaVersion, metadata, sizeBytes, crea
+-Revision 0 is create-only. The SDK remembers the last observed revision per player and slot; without one, it uses 0. Passing `expectedRevision` explicitly is recommended for saved snapshots. Concurrent operations serialize per authenticated player, including quota accounting. A stale attempt receives HTTP 409 `SAVE_CONFLICT`, with the current record or null. It cannot silently overwrite another tab or device.
++Revision 0 is create-only within the observed generation. Every save, delete, prepare,
++commit, abort and restore wire request requires a `generation` string. Read
++`GET /saves` for `{slots, generation}`, or use the loaded save's revision/generation
++pair. The SDK may infer context for immediate writes; a durable write with a supplied
++`operationId` must also supply `generation`. Do not infer it anew on a retry.
++
++The SDK remembers observed revisions per player/slot and defaults to revision 0
++without one. Concurrent operations serialize per authenticated player, including
++quota accounting. Stale revision or generation returns HTTP 409 `SAVE_CONFLICT`
++with the current record (possibly null) and server generation. Missing generation
++is `INVALID_SAVE` at the wire boundary. Preserve the local payload.
++
++In this example, `originalPlayerId` is the identity that owned the loaded/local
++snapshot, `persistIntent` is your durable application store, and `chooseProgress`
++is an explicit player/game decision. Persist all options with the payload:
+@@ -41,0 +62,10 @@ Revision 0 is create-only. The SDK remembers the last observed revision per play
++import { createOperationId } from '@retrobreeze/supagame-sdk';
++const intent = {
++  data: localData,
++  options: {
++    expectedPlayerId: originalPlayerId,
++    expectedRevision: loaded.revision, generation: loaded.generation,
++    operationId: createOperationId(),
++  },
++};
++await persistIntent(intent); // Before first send; retry these exact values.
+@@ -43,4 +73 @@ try {
+-  await supagame.saves.save('slot1', localData, {
+-    expectedRevision: loaded.revision,
+-    operationId: stableOperationId,
+-  });
++  await supagame.saves.save('slot1', intent.data, intent.options);
+@@ -48,5 +75,6 @@ try {
+-  if (error instanceof SaveConflictError) {
+-    // Keep localData and error.current. Ask the player, or apply a game-specific
+-    // operation replay. Never generically merge arbitrary JSON.
+-    const chosen = await chooseProgress(localData, error.current);
+-    await supagame.saves.save('slot1', chosen, {
++  if (!(error instanceof SaveConflictError) || !error.generation) throw error;
++  const chosen = await chooseProgress(intent.data, error.current);
++  const resolution = {
++    data: chosen,
++    options: {
++      expectedPlayerId: originalPlayerId,
+@@ -54,3 +82,7 @@ try {
+-      operationId: newOperationId,
+-    });
+-  } else throw error;
++      generation: error.generation, // Context paired with the state just reviewed.
++      operationId: createOperationId(), // Explicit new intent, not a rebased retry.
++    },
++  };
++  await persistIntent(resolution); // Keep the original intent in recovery history.
++  await supagame.saves.save('slot1', resolution.data, resolution.options);
++  // A further conflict needs another review; never loop by refreshing context.
+@@ -60 +92 @@ try {
 -Use `createOperationId()` for secure UUIDs, including HTTP LAN browsers with `getRandomValues` but no `randomUUID`. Persist the operation ID, payload and expected revision before sending. A retry must use all three unchanged. Successful operations retain fingerprinted receipts; identical retries return their original acknowledgement even after subsequent edits. Reusing a key with a different payload is `DUPLICATE_KEY_CONFLICT`. Errors carry `operationId` when one was allocated by the SDK. A retry acknowledgement does not assert that its revision is still the latest: load again to discover subsequent writes.
 +Use `createOperationId()` for secure UUIDs, including HTTP LAN browsers with `getRandomValues` but no `randomUUID`. Persist the operation ID, generation, payload and expected revision before sending. An exact retry keeps all four unchanged. Replay is guaranteed for the latest 3,072 completed operations that are also less than 30 days old, not all operations within 30 days. At most 4,096 fingerprinted receipts are retained; covered exact retries remain valid across generation changes. Reusing a key with a different payload is `DUPLICATE_KEY_CONFLICT`. Errors carry `operationId` and the attempted `operationGeneration`; a conflict may separately carry the current server `generation`. Never refresh the generation on a stale queued write automatically: preserve the payload and reconcile explicitly. A retry acknowledgement does not assert that its revision is still the latest: load again to discover subsequent writes.
-@@ -62 +64 @@ Use `createOperationId()` for secure UUIDs, including HTTP LAN browsers with `ge
+@@ -62 +94 @@ Use `createOperationId()` for secure UUIDs, including HTTP LAN browsers with `ge
 -Deletion creates a tombstone and increments the revision. Loads return `SAVE_NOT_FOUND` and lists omit it, but its revision prevents an old offline create from resurrecting deleted data. Explicit recreation uses the tombstone revision supplied in a conflict. Original creation timestamps survive deletion/recreation.
 +Deletion creates a tombstone and increments the revision. Loads return `SAVE_NOT_FOUND` and lists omit it, but its revision prevents an old offline create from resurrecting deleted data. While retained, explicit recreation uses the tombstone revision supplied in a conflict. Maintenance bounds unbacked tombstones to 1,024 and removes expired ones after 30 days. It advances generation atomically before forgetting any protection. After removal, explicit recreation uses revision 0 and fresh generation, with a new creation timestamp; old queued creates cannot resurrect the slot.
-@@ -67,0 +70 @@ const file = new Blob([largeGameFile], { type: 'application/octet-stream' });
-+const context = await supagame.saves.context(); // Persist with this new upload intent.
-@@ -68,0 +72 @@ const saved = await supagame.saves.saveBinary('rpg-campaign', file, {
-+  generation: context.generation,
-@@ -86 +90 @@ The SDK manages bucket names, object paths and the upload protocol. Binary data
+@@ -68,5 +100,13 @@ const file = new Blob([largeGameFile], { type: 'application/octet-stream' });
+-const saved = await supagame.saves.saveBinary('rpg-campaign', file, {
+-  expectedRevision: 0,
+-  schemaVersion: 4,
+-  operationId: durableUploadOperationId,
+-});
++const uploadOwner = await supagame.players.getAuthStatus();
++if (!uploadOwner.userId) throw Error('Restore the existing session first');
++const uploadContext = await supagame.saves.context();
++const uploadIntent = {
++  data: file,
++  options: {
++    expectedPlayerId: uploadOwner.userId,
++    generation: uploadContext.generation, expectedRevision: 0,
++    schemaVersion: 4, operationId: createOperationId(),
++  },
++};
++await persistIntent(uploadIntent); // Store the Blob and options together.
++const saved = await supagame.saves.saveBinary('rpg-campaign', uploadIntent.data, uploadIntent.options);
+@@ -81 +121 @@ The SDK manages bucket names, object paths and the upload protocol. Binary data
+-1. **Prepare:** reserve owner/operation UUID path, exact bytes, content hash, schema, metadata and expected revision. Pending reservations count toward quotas.
++1. **Prepare:** bind the observed generation and reserve owner/operation UUID path, exact bytes, content hash, schema, metadata and expected revision. Pending reservations count toward quotas.
+@@ -86 +126 @@ The SDK manages bucket names, object paths and the upload protocol. Binary data
 -If upload or commit fails, the previous save remains readable. Retry with the same bytes/options/operation ID. Abort a failed upload with `saves.abortBinary(slot, operationId)`; this cannot abort a committed live version. Pending tickets expire after 24 hours. `saves.cleanup()` retries a bounded batch of the current player's garbage; call it after deletion/replacement or during routine synchronization. Metadata deletion is never used as a substitute for deleting Storage objects.
 +If upload or commit fails, the previous save remains readable. Retry with the same bytes/options/operation ID and generation. If generation changes before an uncompleted commit, the commit returns `SAVE_CONFLICT`, its reservation becomes garbage, and the previous live save is untouched. Preserve the Blob and explicitly reconcile before preparing a new upload. A covered completed commit remains replayable after registry cleanup. Abort a failed upload with `saves.abortBinary(slot, operationId)`; this cannot abort a committed live version. Pending tickets expire after 24 hours. `saves.cleanup()` retries a bounded batch of the current player's garbage; call it after deletion/replacement or during routine synchronization. Metadata deletion is never used as a substitute for deleting Storage objects.
-@@ -119 +123 @@ The identity callback must return the selected locally restored identity; never
+@@ -119 +159 @@ The identity callback must return the selected locally restored identity; never
 -Queues retain operation IDs and revisions across reloads. Transactions prevent tabs from losing each other's queued writes. Network, authorization, permission and server errors remain distinct and leave pending data intact. Conflicts store both the current cloud record and the pending local queue. `local.resolve(slot, chosenJson, currentRevision)` explicitly replaces the queue and archives the old queue in history. Binary conflicts can retain the Blob locally and be explicitly retried through `saveBinary` against a chosen revision or copied to a different slot. Nothing silently merges game state.
 +Queues retain operation IDs, generations and revisions across reloads. Old queues without generation preserve their payload but require explicit reconciliation before sync. Transactions prevent tabs from losing each other's queued writes. Network, authorization, permission and server errors remain distinct and leave pending data intact. Conflicts store both the current cloud record and the pending local queue. `local.resolve(slot, chosenJson, currentRevision)` explicitly replaces the queue and archives the old queue in history. Use `local.resolveBinary(slot, chosenBlob, currentRevision)` or `local.resolveDelete(slot, currentRevision)` for those operation kinds. Each explicit resolution obtains current context and preserves the replaced queue in history; call `sync` afterward. Nothing silently merges game state.
-@@ -125 +129 @@ IndexedDB can be cleared by the user, browser eviction or private-mode restricti
+@@ -125 +165 @@ IndexedDB can be cleared by the user, browser eviction or private-mode restricti
 -Defaults: 10 active slots, 1 MiB JSON per slot, 50 MiB binary per slot, 100 MiB total/player and 20 pending binary reservations. Total accounting includes retired binary objects until cleanup. JSON bytes use PostgreSQL's UTF-8 JSON representation, which can differ from minified wire size. Tombstones and operation receipts are retained for permanent retry safety and require long-term capacity planning; there is currently no automatic receipt pruning or account-abuse defense.
 +Defaults: 10 active slots, 1 MiB JSON per slot, 50 MiB binary per slot, 100 MiB total/player and 20 pending binary reservations. Total accounting includes retired binary objects until cleanup. JSON bytes use PostgreSQL's UTF-8 JSON representation, which can differ from minified wire size. Per-player metadata is bounded: 4,096 receipts, 1,024 unbacked tombstones, 4,096 binary registry rows and three rate arrays of at most 60 timestamps. New receipt results and reservation requests each have an 8 KiB serialized limit. Backed slots are independently limited by `max_slots`, with five backups per slot for 30 days. Existing oversized accounts converge through bounded, generation-fenced maintenance; live saves and recovery history are preserved during schema migration. These are live-row bounds; normal autovacuum and Storage garbage collection remain necessary.
-@@ -150 +154 @@ Operator cleanup handles deleted Auth users and abandoned uploads without requir
+@@ -150 +190 @@ Operator cleanup handles deleted Auth users and abandoned uploads without requir
 -Saves belong to the authenticated player. Other players cannot read or modify them.
 +Saves belong to the authenticated player. Other players cannot read or modify them. Deleted or soft-deleted Auth identities cannot use RPCs, direct save reads or Storage authorization even with an unexpired JWT. Mutations and Storage checks serialize with account deletion through an Auth-row SHARE lock. Direct Data API reads check identity in their read-only snapshot. Orphanable object records survive for operator cleanup. Active-account sign-out revocation continues to follow JWT lifetime; no mandatory session-ID lookup is added.
-@@ -158 +162 @@ Storage policies protect access, not truth. Modified clients can fabricate plaus
+@@ -158 +198 @@ Storage policies protect access, not truth. Modified clients can fabricate plaus
 -Successful mutations are limited to 60 per player per minute. Idempotent retries do not consume another mutation; excess new writes return `RATE_LIMITED`. Batch game events into checkpoints rather than saving every frame.
 +Completed mutations, new reservations and first state-changing aborts each have an independent allowance of 60 per rolling 60 seconds per player. Exact valid prepare retries and repeated retained aborts are free; cleanup remains available and cannot reset counters. Excess new work returns `RATE_LIMITED`. Batch game events into checkpoints rather than saving every frame.
-@@ -171,3 +175,3 @@ Authenticated `POST /v1/saves/:slot` actions use the existing `sg_cloud_save` RP
+@@ -171,3 +211,3 @@ Authenticated `POST /v1/saves/:slot` actions use the existing `sg_cloud_save` RP
 -| `{ "action": "revisions" }` | `{revisions: [{save, archivedAt, expiresAt}]}` |
 -| `{ "action": "loadRevision", "revision": 1 }` | `{save}` including JSON or private binary object path |
 -| `{ "action": "restore", "revision": 1, "expectedRevision": 3, "operationId": "<uuid>" }` | `{save}` metadata for the new revision |
 +| `{ "action": "revisions" }` | `{generation, revisions: [{save, archivedAt, expiresAt}]}` |
 +| `{ "action": "loadRevision", "revision": 1 }` | `{generation, save}` including JSON or private binary object path |
 +| `{ "action": "restore", "generation": "<observed generation>", "revision": 1, "expectedRevision": 3, "operationId": "<uuid>" }` | `{generation, save}` metadata for the new revision |
-@@ -177 +181 @@ locks the player, checks revision/quota and records a stable receipt. Retried re
+@@ -177 +217 @@ locks the player, checks revision/quota and records a stable receipt. Retried re
 -return that receipt even if the original backup has since expired. No owner override,
 +return that receipt within the documented replay guarantee even if the original backup has since expired. No owner override,
-@@ -193,0 +198,2 @@ and function update before using revision recovery.
+@@ -193,0 +234,2 @@ and function update before using revision recovery.
 +
-+All mutations require observed generation. Upgrade matching database, Edge and SDK assets together; old generationless writes fail explicitly. See the [complete protocol and migration guide](https://github.com/RetroBreeze/supagame/blob/main/docs/guides/cloud-save-protocol.md).
++All save/delete/prepare/commit/abort/restore mutations require observed generation. Upgrade matching database, Edge and SDK assets together; old generationless writes fail explicitly. See the [complete protocol and migration guide](https://github.com/RetroBreeze/supagame/blob/main/docs/guides/cloud-save-protocol.md).
+diff --git a/Home.md b/Home.md
+index 9f1a84f..a5ba4dc 100644
+--- a/Home.md
++++ b/Home.md
+@@ -7 +7 @@ HTTP API or TypeScript SDK. Works with browser games, Unity, Godot, Unreal and
+-custom engines.
++custom engines. Native engines use HTTP; the official runtime SDK is TypeScript.
+@@ -29 +29,2 @@ For ongoing work: [upgrades](Upgrades), [local development](Local-Development),
+-and [troubleshooting](Troubleshooting).
++and [troubleshooting](Troubleshooting). Use the [official agent skill](Agent-Skill)
++for AI-assisted integration in your own game project.
+diff --git a/Implementation-reference.md b/Implementation-reference.md
+index cda0da8..ef0c439 100644
+--- a/Implementation-reference.md
++++ b/Implementation-reference.md
+@@ -2,0 +3,4 @@
++> Current interfaces and commands: [Cloud Saves](Cloud-Saves), [Upgrades](Upgrades)
++> and [Local development](Local-Development). Old generationless save examples and
++> permanent-replay claims in this record are not valid for module 0.1.5.
++
+diff --git a/Installation-Reference.md b/Installation-Reference.md
+index e6ffd01..70e0dfd 100644
+--- a/Installation-Reference.md
++++ b/Installation-Reference.md
+@@ -24,0 +25,2 @@ npx supagame config origins add http://localhost:5173 https://game.example
++npx supagame deploy --project-ref YOUR_PROJECT_REF --dry-run
++# After approval:
+@@ -56,2 +58,4 @@ Deployment spans multiple services and cannot roll back every step atomically.
+-After an interruption, run `deploy --dry-run` and inspect the actual state before
+-retrying. Preserve deployment journals and resolve uncertain database outcomes;
++After an interruption, run `npx supagame deploy --project-ref YOUR_PROJECT_REF --dry-run`
++and inspect the actual state before
++retrying. Preserve `supabase/.temp/supagame-deploy.json` and origin receipts, and
++resolve uncertain database outcomes;
+diff --git a/Installation-Validation.md b/Installation-Validation.md
+index f75b677..a7224f8 100644
+--- a/Installation-Validation.md
++++ b/Installation-Validation.md
+@@ -2,0 +3,4 @@
++> Current interfaces and commands: [Cloud Saves](Cloud-Saves), [Upgrades](Upgrades)
++> and [Local development](Local-Development). Old generationless save examples and
++> permanent-replay claims in this record are not valid for module 0.1.5.
++
 diff --git a/Leaderboards.md b/Leaderboards.md
-index 533b2a2..45751ea 100644
+index 533b2a2..aea1864 100644
 --- a/Leaderboards.md
 +++ b/Leaderboards.md
-@@ -41,0 +42,8 @@ Add [Live Leaderboards](Live-Leaderboards) for automatic updates or
+@@ -11,0 +12,2 @@ npx supagame leaderboard create arcade
++npx supagame deploy --project-ref YOUR_PROJECT_REF --dry-run
++# After approval of the previewed hosted changes:
+@@ -41,0 +44,8 @@ Add [Live Leaderboards](Live-Leaderboards) for automatic updates or
 +
 +## Pagination performance
 +
@@ -72,6 +424,92 @@ index 533b2a2..45751ea 100644
 +including ties; deep pages are not constant-time. Admin generation invalidation
 +and deterministic ordering remain unchanged. See the [measurements and indexes](https://github.com/RetroBreeze/supagame/blob/main/docs/guides/leaderboard-performance.md)
 +for scaling limits and index storage/write tradeoffs.
+diff --git a/Live-Leaderboards-Verification.md b/Live-Leaderboards-Verification.md
+index d9ed06d..21b7290 100644
+--- a/Live-Leaderboards-Verification.md
++++ b/Live-Leaderboards-Verification.md
+@@ -2,0 +3,4 @@
++> Current interfaces and commands: [Cloud Saves](Cloud-Saves), [Upgrades](Upgrades)
++> and [Local development](Local-Development). Old generationless save examples and
++> permanent-replay claims in this record are not valid for module 0.1.5.
++
+diff --git a/Live-Leaderboards.md b/Live-Leaderboards.md
+index c3dfcb3..7a4a7bc 100644
+--- a/Live-Leaderboards.md
++++ b/Live-Leaderboards.md
+@@ -6,0 +7,2 @@ npx supagame add live-leaderboards
++npx supagame deploy --project-ref YOUR_PROJECT_REF --dry-run
++# After approval of the previewed hosted changes:
+diff --git a/Local-Development.md b/Local-Development.md
+index 509633f..80e670d 100644
+--- a/Local-Development.md
++++ b/Local-Development.md
+@@ -44,3 +44,25 @@ contains the setup and run commands for the sample game. It uses a board named
+-Repository contributors should follow [AGENTS.md](https://github.com/RetroBreeze/supagame/blob/main/AGENTS.md)
+-and the scripts in [package.json](https://github.com/RetroBreeze/supagame/blob/main/package.json).
+-Historical verification results are in the [archive](Archive).
++For **Supagame source contributors**, use Node.js 24.15+ in the 24.x line or 26.x,
++npm 12.2.0 and the committed `package-lock.json`. From the repository root:
++
++```sh
++npm ci
++npm run build
++npm test
++npm run typecheck
++npm run lint
++npm run contracts:check
++npm run test:edge
++npm run test:packages
++node --test tests/e2e/agent-skill.test.ts
++```
++
++The CLI runs on Node; Deno 2.9.6 is installed through npm for Edge checks. Run the
++npm scripts rather than bare Deno commands so the Edge dependency graph remains
++separate from Node workspace resolution. No pnpm lockfile or global Deno install
++is needed. These contributor requirements do not impose npm on native game builds.
++
++For the complete local database/API/SDK/end-to-end suite and Node/Supabase CLI
++matrix, follow [package maintenance](https://github.com/RetroBreeze/supagame/blob/main/RELEASING.md).
++Follow [AGENTS.md](https://github.com/RetroBreeze/supagame/blob/main/AGENTS.md) for
++contributor scope and safety rules. Dated results in the [archive](Archive)
++retain their original commands; they are not current setup instructions.
+diff --git a/Quickstart.md b/Quickstart.md
+index 998c5b0..4493637 100644
+--- a/Quickstart.md
++++ b/Quickstart.md
+@@ -5 +5,2 @@ You need a Supabase account, an existing project, and **Node.js 24 or 26**.
+-Hosted setup does not require Docker.
++Hosted setup does not require Docker. For AI-assisted integration, install the
++[official Supagame agent skill](Agent-Skill) in your game repository.
+@@ -9 +10,2 @@ Hosted setup does not require Docker.
+-From your game project's directory:
++From your game project's directory (or a separate tooling directory for native
++projects; pass `--workdir <game-root>` to Supagame commands there):
+@@ -45,0 +48,2 @@ Replace `YOUR_PROJECT_REF` with the reference selected during initialization:
++npx supagame deploy --project-ref YOUR_PROJECT_REF --dry-run
++# After reviewing the exact destination and proposed changes:
+@@ -50 +54,3 @@ Review the destination and pending changes, then type `deploy YOUR_PROJECT_REF`
+-when prompted. Supagame installs the backend, enables anonymous player sign-in
++when prompted. The preview includes all pending project migrations, including
++unrelated ones; review them too. An agent must obtain your explicit authorization
++for these hosted changes. Supagame installs the backend, enables anonymous player sign-in
+@@ -63 +69 @@ Keep privileged keys and database credentials out of game clients.
+-- **Other engines:** use the [HTTP API](API) with a Supabase Auth player session for score submissions.
++- **Other engines:** use the [HTTP API](API) with a Supabase Auth player session for score submissions. There are no official Supagame Unity, Godot, Unreal, C# or GDScript packages. Preserve your engine's existing project structure.
+@@ -67 +73,3 @@ If setup needs attention, run `npx supagame doctor --remote --project-ref YOUR_P
+-and follow [Troubleshooting](Troubleshooting).
++and follow [Troubleshooting](Troubleshooting). Doctor checks configuration and
++objects; also verify actual gameplay HTTP requests, exact browser origins, and
++WebSocket delivery when using live updates.
+diff --git a/Security-Review.md b/Security-Review.md
+index ce80afc..f2aab80 100644
+--- a/Security-Review.md
++++ b/Security-Review.md
+@@ -2,0 +3,4 @@
++> Current interfaces and commands: [Cloud Saves](Cloud-Saves), [Upgrades](Upgrades)
++> and [Local development](Local-Development). Old generationless save examples and
++> permanent-replay claims in this record are not valid for module 0.1.5.
++
 diff --git a/Security.md b/Security.md
 index c98804b..a4fa30d 100644
 --- a/Security.md
@@ -83,11 +521,51 @@ index c98804b..a4fa30d 100644
 +reservations after deletion. Independent per-player mutation/reservation/abort
 +allowances and bounded generation-fenced metadata complement Auth signup limits.
 +See [Cloud Saves](Cloud-Saves) for exact limits and offline reconciliation.
+diff --git a/Troubleshooting.md b/Troubleshooting.md
+index ab751c7..95aa02c 100644
+--- a/Troubleshooting.md
++++ b/Troubleshooting.md
+@@ -10,0 +11,2 @@ A “cannot verify” finding is incomplete evidence, not a successful check.
++Check actual HTTP behavior separately. Browser verification needs both preflight
++and the application request from the exact origin; native/curl success is insufficient.
+@@ -25 +27 @@ A “cannot verify” finding is incomplete evidence, not a successful check.
+-| Missing/disabled leaderboard | The API intentionally returns the same 404. Ensure its generated migration was applied to the selected database. |
++| Missing/disabled leaderboard | Submissions return the same 404 for missing and disabled boards. Without Admin this also applies to reads; Admin preserves disabled-board reads. Ensure the board migration reached the selected database. |
+@@ -27,2 +29,2 @@ A “cannot verify” finding is incomplete evidence, not a successful check.
+-| `DUPLICATE_KEY_CONFLICT` | A key was reused with a different score for the same player/board. Retry unchanged attempts; use a new UUID only for a genuinely new attempt. |
+-| `RATE_LIMITED` | Ten valid new attempts per player/board in rolling 60 seconds. Equal/worse attempts count. Wait before retrying; same-key replays do not consume more quota. |
++| `DUPLICATE_KEY_CONFLICT` | A score key or retained save operation ID was reused with a different payload. Retry the original intent unchanged; a new UUID requires a genuinely new attempt or explicit reconciliation. |
++| `RATE_LIMITED` | Scores: ten new valid attempts per player/board in rolling 60 seconds. Cloud Saves: independent allowances of 60 completed mutations, reservations and first state-changing aborts per rolling minute. Follow the feature-specific retry rules; cleanup does not reset counters. |
+@@ -33,0 +36,14 @@ A “cannot verify” finding is incomplete evidence, not a successful check.
++## Cloud Saves after an upgrade
++
++`INVALID_SAVE` from an old raw writer can mean missing `generation`. Durable SDK
++writes supplying `operationId` must also supply their originally observed generation.
++Do not fill old queued operations with today's generation to get them accepted.
++
++For `SAVE_CONFLICT`, preserve the payload/Blob and original options, review current
++cloud state, and explicitly create a new intent with its paired generation/revision.
++Offline `resolve`, `resolveBinary` and `resolveDelete` preserve replaced queues in
++local history; `sync` sends the newly chosen intent afterward. Exact replay covers
++the latest 3,072 completed operations that are also younger than 30 days; a lost
++response is not proof of failure. See [Cloud Saves](Cloud-Saves) and
++[Account recovery](Account-Recovery) for migration and conflict handling.
++
 diff --git a/Upgrades.md b/Upgrades.md
-index afabd59..b772fad 100644
+index afabd59..e53ed81 100644
 --- a/Upgrades.md
 +++ b/Upgrades.md
-@@ -39,0 +40,9 @@ See [Troubleshooting](Troubleshooting) for interrupted deployments and configura
+@@ -8,0 +9,2 @@ npx supagame upgrade
++npx supagame deploy --project-ref YOUR_PROJECT_REF --dry-run
++# After approval of the exact hosted destination and changes:
+@@ -16 +18,2 @@ confirmation. It never resets your database. Package versions and installed modu
+-versions are separate.
++versions are separate: public npm packages are 0.1.0 and current module templates
++are 0.1.5. Do not manually set module versions to the npm version.
+@@ -24,0 +28,2 @@ npx supagame add achievements
++npx supagame deploy --project-ref YOUR_PROJECT_REF --dry-run
++# After approval:
+@@ -39,0 +45,9 @@ See [Troubleshooting](Troubleshooting) for interrupted deployments and configura
 +
 +## Cloud Saves generation protocol (module 0.1.5)
 +
@@ -97,3 +575,18 @@ index afabd59..b772fad 100644
 +operations. Prepared legacy uploads cannot commit without generation context;
 +abort/collect them and explicitly prepare again. Replay is finite: the latest
 +3,072 completed operations that are also less than 30 days old. See [Cloud Saves](Cloud-Saves).
+diff --git a/Verification.md b/Verification.md
+index dbea445..e904e3f 100644
+--- a/Verification.md
++++ b/Verification.md
+@@ -2,0 +3,4 @@
++> Current interfaces and commands: [Cloud Saves](Cloud-Saves), [Upgrades](Upgrades)
++> and [Local development](Local-Development). Old generationless save examples and
++> permanent-replay claims in this record are not valid for module 0.1.5.
++
+diff --git a/_Sidebar.md b/_Sidebar.md
+index 0508331..2e0b7f6 100644
+--- a/_Sidebar.md
++++ b/_Sidebar.md
+@@ -3,0 +4 @@
++- [AI agent skill](Agent-Skill)

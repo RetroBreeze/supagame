@@ -119,11 +119,12 @@ evaluation, not claims that the backend or those engines are incompatible.
 
 ## Gaps and follow-up
 
-The public Cloud Saves Wiki still contains older durable examples omitting
-generation and a permanent-receipt-retention claim. The skill explicitly routes
-to the current repository protocol and includes the correct finite guarantee.
-Update that Wiki during the separately authorized documentation publication;
-this task did not push to the Wiki. No API changes are needed for this skill.
+At initial validation, the public Cloud Saves Wiki contained older durable examples
+omitting generation and a permanent-receipt-retention claim. The subsequent
+user-authorized [documentation review and Wiki update](../wiki/Cloud-Saves-retention-update.md)
+prepares the corrections; publication is blocked by unavailable GitHub Git credentials.
+The initial skill-creation task itself did not push to the Wiki.
+No API changes are needed for this skill.
 
 No official native SDK is promised. Arbitrary/manual/cumulative achievement rules,
 ascending-board achievement conditions, multiplayer, friends, seasons, streaming
@@ -134,3 +135,29 @@ Pre-existing modified/untracked release/npm paths were hashed before work and
 checked afterward; their bytes were preserved. Only skill, installation docs,
 this validation record and its focused tests belong to the task commit. No package
 publication, push, tag, visibility change or hosted mutation occurred.
+
+
+## Latest-main documentation review — 2026-11-16
+
+Reviewed main `998b2c94408a2f8adf5b71f08c01d929b1a9a936`. The npm migration did
+not change the gameplay API. Updated skill references for contributor tooling and
+Admin's disabled-board read behavior, synchronized active repository guides, and
+prepared 30 Wiki pages including the new skill installation page. The
+[Wiki review record](../wiki/Cloud-Saves-retention-update.md) contains the exact
+base, proposed commit, portable patch and publication blocker.
+
+Fresh checks for this review: official `skills-ref validate` and skill-creator
+quick validation passed; `node --test tests/e2e/agent-skill.test.ts` passed all 3
+checks (Godot ran); `npm test` passed 655 tests in 45 files; `npm run typecheck`,
+`npm run lint`, `npm run contracts:check` and `npm run test:edge` (84 tests) passed.
+The updated Wiki Cloud Saves and recovery TypeScript excerpts compiled in strict
+mode against the actual packed SDK with typed declarations for application-owned
+helpers. A temporary link check resolved repository/Wiki page and file targets;
+external sites and individual heading anchors were not exhaustively checked.
+CLI help was reviewed for current setup/deploy/save flags, and the packaged skill
+test exercised local command examples in fresh, existing and native consumers.
+
+No runtime code, manifests, lockfiles or release behavior changed. The full release
+matrix and local database/API/SDK integration suites were not rerun for this review;
+the earlier results above belong to the initial skill task. No hosted Supabase
+resources, packages or tags were changed. No main-repository push was attempted.

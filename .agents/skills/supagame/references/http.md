@@ -40,7 +40,7 @@ all other routes require the player's JWT as well as the project key.
 
 | Method/path | Body/result |
 | --- | --- |
-| `GET /leaderboards` | Array of enabled board summaries |
+| `GET /leaderboards` | Board summaries; enabled boards by default, also disabled boards when Admin is installed |
 | `GET /leaderboards/arcade/entries?limit=10` | `{entries, nextCursor}`; limit 1–100, default 50; URL-encode opaque cursor on subsequent requests |
 | `GET /leaderboards/arcade/me` | Personal entry or JSON `null` |
 | `POST /leaderboards/arcade/scores` | `{"score":1250,"submissionKey":"<new UUID>"}` → `{outcome,score,bestScore}` |
@@ -53,6 +53,8 @@ all other routes require the player's JWT as well as the project key.
 
 Use integer JSON scores within ±9,007,199,254,740,991, including in C#/C++.
 Equal scores share competition ranks (1,1,3). Never derive rank from array index.
+Admin preserves disabled-board reads, but submissions to disabled boards fail.
+An Admin board reset invalidates old cursors; start paging again.
 A retry preserves UUID/body/board/player; a new UUID means a new submission.
 Leaderboard/profile bodies are limited to 4,096 UTF-8 bytes. Unknown fields and
 query parameters are rejected. Errors are flat `{code,message}` objects, with

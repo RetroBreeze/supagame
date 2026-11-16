@@ -127,8 +127,15 @@ a trusted endpoint. Never put privileged credentials in a game client.
 [HTTP API](https://github.com/RetroBreeze/supagame/wiki/API) ·
 [Target Rush example](https://github.com/RetroBreeze/supagame/tree/main/examples/target-rush)
 
-Cloud Saves durable retries now require `generation` alongside `operationId`.
+## Cloud Saves retries
+
+Cloud Saves durable retries require `generation` alongside `operationId`.
 Keep the original payload and context on `SAVE_CONFLICT`; resolve explicitly.
 The guarantee covers the latest 3,072 completed operations that are also younger
 than 30 days. See the [protocol guide](https://github.com/RetroBreeze/supagame/blob/main/docs/guides/cloud-save-protocol.md)
 for SDK examples, uploads, offline queues and migration behavior.
+
+For AI-assisted integration, the separate
+[Supagame agent skill](https://github.com/RetroBreeze/supagame/wiki/Agent-Skill)
+covers this SDK and HTTP clients for other engines. Install it in the consumer
+repository; npm installation does not activate it.

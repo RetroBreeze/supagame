@@ -11,5 +11,9 @@
 - Hosted operator verification uses the operator transport while ordinary queries remain read-only.
 - Node.js 24/26 and Supabase CLI 3.0.0/3.1.0 support, with isolated package and local integration tests.
 - Standalone Target Rush example and npm-based setup guides.
+- Generation-protected Cloud Saves with bounded metadata, a finite replay guarantee, independent upload/abort throttling and deleted-account authorization; coordinate matching database, Edge and SDK upgrades.
+- Indexed leaderboard pagination with exact ranks and documented scaling limits.
+- Official portable `supagame` agent skill for TypeScript and engine-independent HTTP integrations, diagnostics and consent-based deployment.
+- npm 12.2.0 workspace tooling and reproducible package-lock installs; isolated npm-distributed Deno for Edge validation. Contributor commands require Node 24.15+ (24.x) or 26.x.
 
 Installed module versions have their own upgrade history and need not match the npm version.

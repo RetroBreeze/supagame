@@ -13,6 +13,9 @@ import type { LeaderboardPage, SubmitScoreRequest } from '@retrobreeze/supagame-
 The [TypeScript SDK](https://github.com/RetroBreeze/supagame/blob/main/packages/sdk-ts/README.md)
 installs this dependency automatically and re-exports its public types.
 For other engines, use `@retrobreeze/supagame-contracts/openapi.yaml` to build an HTTP client.
+There are no official Supagame Unity, Godot, Unreal, C# or GDScript packages.
+The [agent integration skill](https://github.com/RetroBreeze/supagame/wiki/Agent-Skill)
+includes native HTTP guidance without imposing a JavaScript runtime.
 
 See the [HTTP API reference](https://github.com/RetroBreeze/supagame/wiki/API)
 for authentication, endpoints and examples.

@@ -30,11 +30,15 @@ for setup and connecting your game. Hosted setup does not require Docker.
 - **Players:** anonymous sign-in, display names and account linking.
 - **Leaderboards:** personal bests, tied ranks and optional live updates.
 - **Achievements:** permanent unlocks based on leaderboard scores.
-- **Cloud saves:** player-owned JSON and binary saves with revision handling.
+- **Cloud saves:** player-owned JSON and binary saves with generation/revision protection and explicit offline reconciliation.
 - **Admin tools:** inspect players, moderate scores and manage boards through the CLI or local dashboard.
 
 Your data stays in your Supabase project. Scores are validated and rate-limited;
 these checks do not prove that a submitted score came from honest gameplay.
+
+Cloud Saves durable writes retain generation context and have a finite replay
+guarantee. See the [protocol and retention guide](docs/guides/cloud-save-protocol.md)
+before implementing offline queues or upgrading older writers.
 
 ## Documentation
 
@@ -79,7 +83,3 @@ installing the npm CLI/SDK does not install or activate it in an agent.
 ## License
 
 [MIT](LICENSE)
-
-Cloud Saves writers must retain generation context with durable operations. The
-[protocol and retention guide](docs/guides/cloud-save-protocol.md) defines the
-finite replay guarantee, upload limits and explicit offline reconciliation.

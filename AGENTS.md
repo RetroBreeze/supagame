@@ -1,14 +1,15 @@
 # Supabase Game Services — Agent Instructions
 
-This repository contains **Supabase Game Services**, an MIT-licensed, open-source toolkit that installs reusable gaming services into developers' own Supabase projects. The first release provides anonymous player identities and leaderboards. Developers provision services with a CLI; games use a versioned HTTP API or a thin language SDK.
+This repository contains **Supabase Game Services (Supagame)**, an MIT-licensed toolkit that installs game services into developers' own Supabase projects. The v0.1.0 candidate includes player identities, leaderboards, score-based achievements, Cloud Saves, optional live leaderboard updates and trusted operator tools. Developers provision services with a CLI; games use a versioned HTTP API or the TypeScript SDK.
 
 ## Source of truth
 
 Read these files before implementing a task:
 
-1. `docs/superpowers/specs/2026-11-08-supabase-game-services-design.md` — approved product and technical design.
-2. `docs/superpowers/plans/2026-11-08-supabase-game-services-v01.md` — task order, exact interfaces, tests and acceptance criteria.
-3. The relevant source files, tests and existing repository conventions.
+1. `docs/superpowers/specs/2026-11-08-supabase-game-services-design.md` — original product and technical design; its initial feature exclusions are historical.
+2. `docs/superpowers/plans/2026-11-08-supabase-game-services-v01.md` — original implementation plan, supplemented by the approved feature/remediation plans relevant to the task.
+3. Current source, OpenAPI, SDK exports, module inventories, tests and repository conventions. These define the shipped interfaces; older plans contain provisional names and commands.
+4. For saves, `docs/guides/cloud-save-protocol.md`; for source development, `RELEASING.md` and `package.json`. The workspace uses npm 12.2.0, `npm ci` and `package-lock.json`, Node 24.15+ (24.x) or 26.x, and npm-installed Deno for Edge checks.
 
 If either document is absent, ask for it rather than reconstructing requirements from memory. The task given by the user takes precedence over the plan when the user explicitly changes scope. Flag contradictions before making a consequential design change.
 
@@ -25,9 +26,9 @@ If either document is absent, ask for it rather than reconstructing requirements
 
 ## Scope for v0.1
 
-**Included:** CLI installation/configuration, Supabase Auth anonymous identities, player display names, ascending/descending best-score leaderboards, atomic score submission, read/rank API, basic server-side validation/rate limiting, TypeScript SDK, tests and documentation.
+**Included:** CLI installation/configuration and upgrades, anonymous identities and account linking/recovery, display names, ascending/descending best-score leaderboards, atomic submissions, read/rank API, score-threshold achievements on descending boards, private Broadcast leaderboard invalidation, generation-protected JSON/binary Cloud Saves and offline reconciliation, optional Admin CLI/local dashboard, server validation/rate limiting, TypeScript SDK, tests, documentation and the consumer integration skill.
 
-**Excluded:** multiplayer, achievements, cloud saves, friends, seasons, replay verification, real-time score broadcasts, a hosted dashboard, native Unity/Godot SDKs and multi-game tenancy. Do not add these without a separate approved design.
+**Excluded:** multiplayer, friends, seasons, replay verification, arbitrary/manual/cumulative achievement rules, streaming save uploads, a hosted dashboard, native Unity/Godot/Unreal SDKs and multi-game tenancy. Live notifications contain board IDs, not score rows; HTTP remains authoritative. Do not add excluded features without a separate approved design.
 
 - Each installation belongs to the developer's Supabase project. Never build a centralized service owned by this project.
 - Anonymous authentication is the default for users without a session. Reuse an existing Supabase Auth session; never silently replace an authenticated user with an anonymous one.
@@ -42,7 +43,9 @@ If either document is absent, ask for it rather than reconstructing requirements
 - `packages/cli/`: setup, module staging, leaderboard configuration, deployment, diagnostics and upgrades.
 - `modules/core/`: player profiles, database policies, SQL helpers.
 - `modules/leaderboards/`: versioned SQL migrations and Supabase Edge Function routes.
+- `modules/achievements/`, `modules/cloud-saves/`, `modules/live-leaderboards/`, `modules/admin/`: optional module migrations. Player-facing HTTP features share the Supagame Edge Function; Admin uses trusted operator commands.
 - `packages/sdk-ts/`: client-side TypeScript SDK using an existing Supabase client for Auth.
+- `.agents/skills/supagame/`: portable integration guidance for consumers, distinct from these contributor instructions.
 - `tests/`: database, API, CLI, SDK and end-to-end tests.
 - `examples/`: minimal standalone integration example. Do **not** modify the real Toy Tanks project as part of this SDK unless separately requested.
 
@@ -59,6 +62,7 @@ Follow existing conventions once the repository has evolved; the implementation 
 - Never describe range checks or rate limits as complete anti-cheat protection. Modified clients can still submit plausible fabricated scores.
 - Validate request sizes, pagination limits, display names and public error responses. Don't leak internal SQL details or tokens.
 - Treat public read routes separately from authenticated write/profile routes; test that missing, invalid or expired credentials fail closed where authentication is required.
+- Persist save generation, operation ID, expected revision, player and payload together. Exact replay is guaranteed for the latest 3,072 completed operations that are also less than 30 days old. Never silently attach fresh context to a stale offline write; preserve both copies and reconcile explicitly.
 
 ## Database migrations and CLI deployment
 
@@ -82,8 +86,9 @@ Cover behavior and security, not only happy-path types. In particular:
 - Public reads, unauthorized writes, expired JWTs, RLS isolation and hidden player entries.
 - Wrong Supabase project selection and declined/unattended deployment confirmation.
 - Raw HTTP compatibility as well as TypeScript SDK behavior.
+- Save generations, finite replay, deleted identities, upload limits and explicit offline/account-switch reconciliation; actual private Broadcast delivery when testing live updates.
 
-Use the relevant test command listed in the plan. For a full release candidate, run the repository's database tests, API/CLI/SDK unit tests, typechecks, build and local end-to-end suite. Never report tests as passing unless their actual output confirms it.
+Use current scripts in `package.json` and the checklist in `RELEASING.md`; historical plans may use pnpm commands. For a full release candidate, run database, API/CLI/SDK, typecheck, lint, build, packaged-consumer and local end-to-end checks. Run `node --test tests/e2e/agent-skill.test.ts` for skill examples. Never report tests as passing unless their actual output confirms it.
 
 ## End-of-task report
 
