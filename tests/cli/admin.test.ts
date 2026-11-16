@@ -15,7 +15,7 @@ it('stages optional admin repeatably and previews without writes', () => {
   expect(cli(root, 'add', 'admin', '--dry-run').status).toBe(0);
   expect(snapshot(root)).toEqual(before);
   expect(cli(root, 'add', 'admin').status).toBe(0);
-  expect(manifest(root).modules.admin).toBe('0.1.4');
+  expect(manifest(root).modules.admin).toBe('0.1.5');
   const installed = snapshot(root);
   expect(cli(root, 'add', 'admin').status).toBe(0);
   expect(snapshot(root)).toEqual(installed);

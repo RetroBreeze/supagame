@@ -8,8 +8,18 @@ export type ModuleName =
   | "achievements"
   | "cloud-saves"
   | "admin";
-export const MODULE_VERSION = "0.1.4";
+export const MODULE_VERSION = "0.1.5";
 export const moduleMigrations = [
+  ["modules/cloud-saves/migrations/008_deleted_identities.sql", "20261116000100_deleted_save_identities.sql"],
+  ["modules/cloud-saves/migrations/009_bounded_history.sql", "20261116000200_bounded_save_history.sql"],
+  ["modules/cloud-saves/migrations/010_soft_delete_reads.sql", "20261116000300_soft_deleted_save_reads.sql"],
+  ["modules/cloud-saves/migrations/011_receipt_order.sql", "20261116000800_save_receipt_order.sql"],
+  ["modules/cloud-saves/migrations/012_read_only_identity.sql", "20261116000900_read_only_save_identity.sql"],
+  ["modules/leaderboards/migrations/004_foreign_key_indexes.sql", "20261116000400_leaderboard_fk_indexes.sql"],
+  ["modules/achievements/migrations/002_foreign_key_index.sql", "20261116000500_achievement_fk_index.sql"],
+  ["modules/leaderboards/migrations/005_rank_performance.sql", "20261116000600_rank_performance.sql"],
+  ["modules/admin/migrations/002_rank_performance.sql", "20261116000700_admin_rank_performance.sql"],
+
   ["modules/live-leaderboards/migrations/002_admin_reads.sql", "20261111000200_live_admin_reads.sql"],
   ["modules/admin/migrations/001_admin.sql", "20261111000100_admin.sql"],
   [
@@ -92,7 +102,7 @@ export function currentInventory(files: readonly DesiredFile[]): Inventory {
   const releases = names.map((module) => ({
     module,
     version: MODULE_VERSION,
-    previous: module === "admin" ? undefined : "0.1.3",
+    previous: "0.1.4",
     ...(module === "leaderboards" ? { requiresCore: MODULE_VERSION } : {}),
     ...(["live-leaderboards", "achievements", "cloud-saves", "admin"].includes(module)
       ? { requiresLeaderboards: MODULE_VERSION }
@@ -119,7 +129,7 @@ export function currentInventory(files: readonly DesiredFile[]): Inventory {
         ...release,
         version,
         previous:
-          version === "0.1.3" ? "0.1.2" : version === "0.1.2" && module !== "cloud-saves"
+          version === "0.1.4" ? (module === "admin" ? undefined : "0.1.3") : version === "0.1.3" ? "0.1.2" : version === "0.1.2" && module !== "cloud-saves"
             ? "0.1.1"
             : version === "0.1.1" && module !== "achievements"
               ? "0.1.0"
@@ -149,6 +159,7 @@ export function currentInventory(files: readonly DesiredFile[]): Inventory {
     ]),
     ...old("0.1.2", names.filter(n => n !== "admin")),
     ...old("0.1.3", names.filter(n => n !== "admin")),
+    ...old("0.1.4", names),
     ...releases,
   ];
 }

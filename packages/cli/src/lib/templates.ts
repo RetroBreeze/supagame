@@ -26,6 +26,7 @@ export const templateSources = [
   'modules/legacy/0.1.1.json',
   'modules/legacy/0.1.2.json',
   'modules/legacy/0.1.3.json',
+  'modules/legacy/0.1.4.json',
 ];
 export function templateFiles(): DesiredFile[] {
   // Built packages carry the same inventory inside dist/assets; source development

@@ -17,6 +17,7 @@ export function saveSecurityChecks(): SecurityCheck[] {
     "sg_private.save_objects",
     "sg_private.save_operations",
     "sg_private.save_revisions",
+    "sg_private.save_state",
   ]) {
     add(
       `saves:rls:${table}`,
@@ -36,8 +37,18 @@ export function saveSecurityChecks(): SecurityCheck[] {
   }
   add(
     "saves:owner-policy",
-    "(select count(*)=1 and bool_and(cmd='SELECT' and roles=array['authenticated']::name[] and replace(replace(regexp_replace(qual,'\\s+','','g'),'public.',''),'auth.','')='(user_id=(SELECTuid()ASuid))') from pg_policies where schemaname='public' and tablename='game_saves')",
+    "(select count(*)=1 and bool_and(cmd='SELECT' and roles=array['authenticated']::name[] and replace(replace(regexp_replace(qual,'\\s+','','g'),'public.',''),'auth.','')='(user_id=(SELECTuid()ASuid))') from pg_policies where schemaname='public' and tablename='game_saves' and permissive='PERMISSIVE')",
   );
+  add(
+    "saves:active-identity-policy",
+    "exists(select 1 from pg_policies where schemaname='public' and tablename='game_saves' and policyname='supagame_saves_active_identity' and permissive='RESTRICTIVE' and cmd='SELECT' and roles=array['authenticated']::name[] and replace(regexp_replace(qual,'\\s+','','g'),'public.','')='(SELECTsg_save_identity_active()ASsg_save_identity_active)')",
+  );
+  for (const role of ["anon", "authenticated", "service_role"]) {
+    add(`saves:private-helpers:${role}`,
+      ["lock_save_identity()", "advance_save_generation(uuid)", "maintain_save_history(uuid)", "consume_save_rate(uuid,text)", "order_save_receipt()"]
+        .map(fn => `not has_function_privilege('${role}','sg_private.${fn}','EXECUTE')`).join(" and ")
+      + ` and not has_table_privilege('${role}','sg_private.save_state','SELECT')`);
+  }
   const policies = [
     ["read", "SELECT", "qual"],
     ["insert", "INSERT", "with_check"],
@@ -55,6 +66,7 @@ export function saveSecurityChecks(): SecurityCheck[] {
     ["sg_cloud_save", "text,text,jsonb", false],
     ["sg_save_object_access", "text,text", true],
     ["sg_save_upload_size", "text,text", true],
+    ["sg_save_identity_active", "", false],
   ] as const) {
     add(
       `saves:rpc:${name}`,

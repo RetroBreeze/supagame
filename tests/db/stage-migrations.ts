@@ -2,6 +2,15 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 const migrations = [
+  ["../../modules/cloud-saves/migrations/008_deleted_identities.sql", "20261116000100_deleted_save_identities.sql"],
+  ["../../modules/cloud-saves/migrations/009_bounded_history.sql", "20261116000200_bounded_save_history.sql"],
+  ["../../modules/cloud-saves/migrations/010_soft_delete_reads.sql", "20261116000300_soft_deleted_save_reads.sql"],
+  ["../../modules/cloud-saves/migrations/011_receipt_order.sql", "20261116000800_save_receipt_order.sql"],
+  ["../../modules/cloud-saves/migrations/012_read_only_identity.sql", "20261116000900_read_only_save_identity.sql"],
+  ["../../modules/leaderboards/migrations/004_foreign_key_indexes.sql", "20261116000400_leaderboard_fk_indexes.sql"],
+  ["../../modules/achievements/migrations/002_foreign_key_index.sql", "20261116000500_achievement_fk_index.sql"],
+  ["../../modules/leaderboards/migrations/005_rank_performance.sql", "20261116000600_rank_performance.sql"],
+
  ['../../modules/live-leaderboards/migrations/002_admin_reads.sql','20261111000200_live_admin_reads.sql'],
  ['../../modules/cloud-saves/migrations/007_save_revisions.sql','20261110000306_save_revisions.sql'],
  ['../../modules/cloud-saves/migrations/006_save_throttling.sql','20261110000305_save_throttling.sql'],

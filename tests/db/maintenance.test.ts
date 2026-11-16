@@ -25,6 +25,8 @@ for (
     ["grant update(threshold) on public.game_achievements to authenticated;", 'writes:authenticated:game_achievements'],
     ["alter policy supagame_saves_read_guard on storage.objects using (true);", 'saves:storage-guards'],
     ["update storage.buckets set public=true where id='supagame-saves';", 'saves:bucket'],
+    ["alter policy supagame_saves_active_identity on public.game_saves using (true);", "saves:active-identity-policy"],
+    ["grant execute on function sg_private.lock_save_identity() to authenticated;", "saves:private-helpers:authenticated"],
     ["alter policy supagame_saves_owner on public.game_saves using (true);", 'saves:owner-policy'],
     ['grant update(score) on public.game_best_scores to anon;', 'writes:anon:game_best_scores'],
     [

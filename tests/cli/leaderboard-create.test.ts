@@ -36,7 +36,7 @@ it('records the definition and deterministic additive SQL without altering unrel
     minValue: -10,
     maxValue: 100,
   }]);
-  expect(migration(root)).toBe('20261108000501_supagame_board_level-1.sql');
+  expect(migration(root)).toBe('20261116000601_supagame_board_level-1.sql');
   const sql = readFileSync(
     join(root, 'supabase/migrations', migration(root)),
     'utf8',

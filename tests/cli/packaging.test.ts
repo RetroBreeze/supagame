@@ -100,6 +100,17 @@ it('bundles only the versioned allowlist, excluding local or hidden module files
     'modules/cloud-saves/migrations/005_garbage_collection.sql',
     'modules/cloud-saves/migrations/006_save_throttling.sql',
     'modules/cloud-saves/migrations/007_save_revisions.sql',
+    'modules/cloud-saves/migrations/008_deleted_identities.sql',
+    'modules/cloud-saves/migrations/009_bounded_history.sql',
+    'modules/cloud-saves/migrations/010_soft_delete_reads.sql',
+    'modules/cloud-saves/migrations/011_receipt_order.sql',
+    'modules/cloud-saves/migrations/012_read_only_identity.sql',
+    'modules/leaderboards/migrations/004_foreign_key_indexes.sql',
+    'modules/leaderboards/migrations/005_rank_performance.sql',
+    'modules/achievements/migrations/002_foreign_key_index.sql',
+    'modules/admin/migrations/002_rank_performance.sql',
+    'modules/legacy/0.1.4.json',
+
   ].sort();
   expect(Object.keys(snapshot(join(tool, 'dist/assets'))).sort()).toEqual(expected);
 });

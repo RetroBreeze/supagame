@@ -342,7 +342,7 @@ it('function failure preserves successful database progress; a new attempt previ
   const f = fixture();
   f.fail('function');
   await expect(deploy(f.options, f.deps)).rejects.toThrow(/function.*failed/i);
-  expect(f.applied.size).toBe(6);
+  expect(f.applied.size).toBe(8);
   f.fail(undefined);
   await deploy(f.options, f.deps);
   expect(f.confirm).toHaveBeenCalledTimes(2);

@@ -30,6 +30,8 @@ const migrations = [
   ['core/002_player_functions.sql', '20261108000300_core_player_functions.sql'],
   ['leaderboards/002_submit_score.sql', '20261108000400_submit_score.sql'],
   ['leaderboards/003_rank_reads.sql', '20261108000500_rank_reads.sql'],
+  ['leaderboards/004_foreign_key_indexes.sql','20261116000400_leaderboard_fk_indexes.sql'],
+  ['leaderboards/005_rank_performance.sql','20261116000600_rank_performance.sql'],
 ];
 describe('add leaderboards', () => {
   it('installs exact migration versions and a self-contained Edge function, preserving unrelated files', () => {
@@ -45,7 +47,7 @@ describe('add leaderboards', () => {
         readFileSync(join(repo, 'modules', module!, 'migrations', file!)),
       );
     }
-    expect(readdirSync(join(root, 'supabase/migrations'))).toHaveLength(6);
+    expect(readdirSync(join(root, 'supabase/migrations'))).toHaveLength(migrations.length + 1);
     for (
       const name of [
         'index.ts',
@@ -71,8 +73,8 @@ describe('add leaderboards', () => {
       ),
     ).toEqual(readFileSync(join(repo, 'packages/contracts/src/generated.ts')));
     expect(manifest(root).modules).toEqual({
-      core: '0.1.4',
-      leaderboards: '0.1.4',
+      core: '0.1.5',
+      leaderboards: '0.1.5',
     });
     expect(readFileSync(join(root, 'supabase/config.toml'), 'utf8')).toContain(
       config,
