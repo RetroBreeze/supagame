@@ -28,7 +28,7 @@ test("optional Admin migration, authorization and lifecycle (transaction rolled 
     "-v",
     "ON_ERROR_STOP=1",
   ], {
-    input: "begin;\n" + migration + "\n" + tests.replace(/^begin;/, ""),
+    input: "begin;\n" + migration + "\n" + readFileSync(new URL("../../modules/admin/migrations/002_rank_performance.sql", import.meta.url), "utf8") + "\n" + tests.replace(/^begin;/, ""),
     encoding: "utf8",
   });
   assert.doesNotMatch(output, /not ok/);
