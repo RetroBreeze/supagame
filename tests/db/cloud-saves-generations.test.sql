@@ -1,0 +1,40 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select no_plan();
+insert into auth.users(id,is_anonymous) values('c6000000-0000-4000-8000-000000000001',true);
+set local request.jwt.claims='{"sub":"c6000000-0000-4000-8000-000000000001"}';
+create temporary table requests(name text primary key, payload jsonb);
+insert into requests values
+ ('save','{"generation":"1","operationId":"d6000000-0000-4000-8000-000000000001","expectedRevision":0,"schemaVersion":1,"metadata":{},"data":{"coins":7}}'),
+ ('upload','{"generation":"1","operationId":"d6000000-0000-4000-8000-000000000002","expectedRevision":1,"schemaVersion":1,"metadata":{},"sizeBytes":8,"checksum":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}');
+grant select on requests to authenticated;
+set local role authenticated;
+select throws_ok($$select public.sg_cloud_save('save','state',(select payload-'generation' from requests where name='save'))$$,'22023','INVALID_SAVE','generationless legacy writes fail closed');
+select is(public.sg_cloud_save('save','state',(select payload from requests where name='save'))->'save'->>'revision','1','generation-aware create');
+select public.sg_cloud_save('prepare','state',(select payload from requests where name='upload'));
+reset role;
+-- The operator's cleanup/retention transaction has advanced context elsewhere.
+select sg_private.advance_save_generation(auth.uid());
+set local role authenticated;
+select is(public.sg_cloud_save('save','state',(select payload from requests where name='save'))->'save'->>'revision','1','guaranteed exact replay survives generation change');
+select throws_ok($$select public.sg_cloud_save('save','state',(select payload||'{"data":{"coins":8}}'::jsonb from requests where name='save'))$$,'23505','DUPLICATE_KEY_CONFLICT','conflicting ID reuse still fails across generation change');
+select is(public.sg_cloud_save('save','other',(select payload||'{"operationId":"d6000000-0000-4000-8000-000000000003"}'::jsonb from requests where name='save'))->>'code','SAVE_CONFLICT','stale unrecorded create requires reconciliation');
+select is(public.sg_cloud_save('commit','state','{"generation":"1","operationId":"d6000000-0000-4000-8000-000000000002"}')->>'code','SAVE_CONFLICT','in-flight stale commit cannot replace live save');
+select is(public.sg_cloud_save('load','state','{}')->'save'->'data','{"coins":7}'::jsonb,'failed stale commit preserves live payload');
+select lives_ok($$select public.sg_cloud_save('abort','state','{"generation":"1","operationId":"d6000000-0000-4000-8000-000000000002"}')$$,'stale upload remains abortable');
+reset role;
+select is((select state from sg_private.save_objects where operation_id='d6000000-0000-4000-8000-000000000002'),'garbage','stale upload is reclaimable');
+select is(sg_private.finish_save_cleanup(array['c6000000-0000-4000-8000-000000000001/d6000000-0000-4000-8000-000000000002']),1,'operator removes registry only when physical object is absent');
+select is((select generation from sg_private.save_state where user_id=auth.uid()),3::bigint,'operator cleanup fences forgotten operation IDs');
+set local role authenticated;
+select is(public.sg_cloud_save('save','state',(select payload from requests where name='save'))->'save'->>'revision','1','receipt remains replayable after operator cleanup');
+select public.sg_cloud_save('delete','state','{"generation":"3","operationId":"d6000000-0000-4000-8000-000000000004","expectedRevision":1}');
+reset role;
+update sg_private.save_operations set created_at=clock_timestamp()-interval '31 days' where user_id=auth.uid();
+update public.game_saves set updated_at=clock_timestamp()-interval '31 days' where user_id=auth.uid() and deleted;
+set local role authenticated;
+select is(public.sg_cloud_save('list',null,'{}')->>'generation','4','expired receipts and tombstone are fenced atomically');
+select is(public.sg_cloud_save('save','state',(select payload from requests where name='save'))->>'code','SAVE_CONFLICT','expired retry cannot resurrect deleted slot');
+select is(public.sg_cloud_save('save','state',(select payload||'{"generation":"4","operationId":"d6000000-0000-4000-8000-000000000005"}'::jsonb from requests where name='save'))->'save'->>'revision','1','explicitly reconciled fresh creation after maintenance works');
+reset role;
+select * from finish();rollback;

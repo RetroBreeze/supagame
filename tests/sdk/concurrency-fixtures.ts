@@ -16,7 +16,7 @@ export function memoryStore<T>(): LocalStore<T> {
   };
 }
 export const saveRecord = {
-  slot: 'profile', revision: 1, schemaVersion: 1, kind: 'json' as const, metadata: {},
+  slot: 'profile', generation: '1', revision: 1, schemaVersion: 1, kind: 'json' as const, metadata: {},
   sizeBytes: 20, deleted: false, objectPath: null,
   createdAt: '2026-11-12T00:00:00Z', updatedAt: '2026-11-12T00:00:00Z', data: { coins: 1 },
 };

@@ -552,12 +552,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
-      description: JSON save/delete, binary prepare/commit/abort, or revisions/loadRevision/restore.
-        backupExisting=true archives the displaced valid save transactionally (five per slot,
-        30 days, counted against player quota). Restore always archives the current save.
-        Revisions returns SaveRevisionList; loadRevision returns SaveResult. Prepare returns
-        SaveUpload; abort returns SaveObjects. expectedRevision=0 is
-        create-only. Every successful mutation is idempotent by operationId.
+      description: JSON save/delete, binary prepare/commit/abort, or
+        revisions/loadRevision/restore. Mutations require observed generation
+        context. Exact retries of the latest 3072 completed operations younger
+        than 30 days remain replayable across generation changes; at most 4096
+        receipts are retained. Other expired or stale intents require explicit
+        reconciliation. Aborts remain available for stale reservations; a stale
+        commit cannot replace a save. backupExisting preserves five prior
+        revisions per slot for up to 30 days. expectedRevision=0 is create-only
+        within the observed generation.
       requestBody:
         required: true
         content:
@@ -755,6 +758,8 @@ components:
             - type: "null"
           description: Latest slot on SAVE_CONFLICT (null if absent); keep the attempted
             local copy.
+        generation:
+          $ref: "#/components/schemas/SaveGeneration"
     Achievement:
       type: object
       additionalProperties: false
@@ -829,6 +834,7 @@ components:
         - createdAt
         - updatedAt
         - objectPath
+        - generation
       properties:
         slot: *a3
         revision:
@@ -864,29 +870,38 @@ components:
             - string
             - "null"
         data: {}
+        generation:
+          $ref: "#/components/schemas/SaveGeneration"
     SaveList:
       type: object
       additionalProperties: false
       required:
         - slots
+        - generation
       properties:
         slots:
           type: array
           items:
             $ref: "#/components/schemas/SaveRecord"
+        generation:
+          $ref: "#/components/schemas/SaveGeneration"
     SaveResult:
       type: object
       additionalProperties: false
       required:
         - save
+        - generation
       properties:
         save:
           $ref: "#/components/schemas/SaveRecord"
+        generation:
+          $ref: "#/components/schemas/SaveGeneration"
     SaveUpload:
       type: object
       additionalProperties: false
       required:
         - upload
+        - generation
       properties:
         upload:
           type: object
@@ -904,20 +919,25 @@ components:
             operationId:
               type: string
               format: uuid
+        generation:
+          $ref: "#/components/schemas/SaveGeneration"
     SaveObjects:
       type: object
       additionalProperties: false
       required:
         - objects
+        - generation
       properties:
         objects:
           type: array
           items:
             type: string
+        generation:
+          $ref: "#/components/schemas/SaveGeneration"
     SaveRevision:
       type: object
       additionalProperties: false
-      required: [save, archivedAt, expiresAt]
+      required: [ save, archivedAt, expiresAt ]
       properties:
         save:
           $ref: "#/components/schemas/SaveRecord"
@@ -930,13 +950,15 @@ components:
     SaveRevisionList:
       type: object
       additionalProperties: false
-      required: [revisions]
+      required: [ revisions, generation ]
       properties:
         revisions:
           type: array
           maxItems: 5
           items:
             $ref: "#/components/schemas/SaveRevision"
+        generation:
+          $ref: "#/components/schemas/SaveGeneration"
     SaveMutation:
       oneOf:
         - type: object
@@ -948,6 +970,7 @@ components:
             - schemaVersion
             - metadata
             - data
+            - generation
           properties:
             action:
               const: save
@@ -969,12 +992,15 @@ components:
               type: object
               additionalProperties: true
             data: {}
+            generation:
+              $ref: "#/components/schemas/SaveGeneration"
         - type: object
           additionalProperties: false
           required:
             - action
             - expectedRevision
             - operationId
+            - generation
           properties:
             action:
               const: delete
@@ -983,6 +1009,8 @@ components:
               type: boolean
             expectedRevision: *a4
             operationId: *a5
+            generation:
+              $ref: "#/components/schemas/SaveGeneration"
         - type: object
           additionalProperties: false
           required:
@@ -993,6 +1021,7 @@ components:
             - metadata
             - sizeBytes
             - checksum
+            - generation
           properties:
             action:
               const: prepare
@@ -1010,36 +1039,44 @@ components:
             checksum:
               type: string
               pattern: ^[0-9a-f]{64}$
+            generation:
+              $ref: "#/components/schemas/SaveGeneration"
         - type: object
           additionalProperties: false
           required:
             - action
             - operationId
+            - generation
           properties:
             action:
               const: commit
               type: string
             operationId: *a5
+            generation:
+              $ref: "#/components/schemas/SaveGeneration"
         - type: object
           additionalProperties: false
           required:
             - action
             - operationId
+            - generation
           properties:
             action:
               const: abort
               type: string
             operationId: *a5
+            generation:
+              $ref: "#/components/schemas/SaveGeneration"
         - type: object
           additionalProperties: false
-          required: [action]
+          required: [ action ]
           properties:
             action:
               type: string
               const: revisions
         - type: object
           additionalProperties: false
-          required: [action, revision]
+          required: [ action, revision ]
           properties:
             action:
               type: string
@@ -1050,7 +1087,7 @@ components:
               maximum: 9007199254740991
         - type: object
           additionalProperties: false
-          required: [action, revision, expectedRevision, operationId]
+          required: [ action, revision, expectedRevision, operationId, generation ]
           properties:
             action:
               type: string
@@ -1058,10 +1095,17 @@ components:
             revision: *backupRevision
             expectedRevision: *a4
             operationId: *a5
+            generation:
+              $ref: "#/components/schemas/SaveGeneration"
     SavePreparation:
       oneOf:
         - $ref: "#/components/schemas/SaveUpload"
         - $ref: "#/components/schemas/SaveResult"
+    SaveGeneration:
+      type: string
+      pattern: ^[1-9][0-9]{0,18}$
+      description: Opaque per-player history generation. Persist with the write
+        intent; never silently replace it when retrying.
   responses:
     BadRequest:
       description: INVALID_REQUEST, INVALID_SCORE, INVALID_CURSOR or INVALID_DISPLAY_NAME.

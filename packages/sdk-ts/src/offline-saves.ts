@@ -2,7 +2,7 @@ import type { TransferSave } from './account-saves.js';
 import { AccountError } from './accounts.js';
 import type { SaveRecord } from "@retrobreeze/supagame-contracts";
 import type { Saves, SaveOptions, Saved } from "./saves.js";
-import { AuthenticationError, SaveConflictError } from "./errors.js";
+import { AuthenticationError, SaveConflictError, InvalidParameterError } from "./errors.js";
 import { operationId, validateJson } from "./save-values.js";
 
 /** update must be an atomic read/modify/write transaction, including across tabs. */
@@ -19,6 +19,7 @@ export interface OfflineEntry {
   cloud: Saved | null;
   pending: PendingSave[];
   conflict?: SaveRecord | null;
+  conflictGeneration?: string;
   /** Explicit resolutions retain the replaced local queue for application recovery. */
   history?: PendingSave[][];
   binary?: Blob;
@@ -56,18 +57,55 @@ export function createOfflineSaves(options: {
     checked(player, () => options.store.update(key, change));
   const matchesPending = (state: OfflineEntry, pending: PendingSave) =>
     state.pending[0]?.options.operationId === pending.options.operationId &&
-    state.pending[0]?.options.expectedRevision === pending.options.expectedRevision;
+    state.pending[0]?.options.expectedRevision === pending.options.expectedRevision &&
+    state.pending[0]?.options.generation === pending.options.generation;
   function hydrate(previous: OfflineEntry | null, cloud: Saved, binary?: Blob): OfflineEntry {
     const state = previous ?? empty();
-    if (cloud.revision < Math.max(state.cloud?.revision ?? 0, state.conflict?.revision ?? 0)) return state;
+    const previousGeneration = state.conflictGeneration ?? state.conflict?.generation ?? state.cloud?.generation;
+    if (previousGeneration && (BigInt(cloud.generation) < BigInt(previousGeneration) ||
+      (cloud.generation === previousGeneration && cloud.revision < Math.max(state.cloud?.revision ?? 0, state.conflict?.revision ?? 0)))) return state;
     const next = { ...state, cloud };
     if (binary) next.binary = binary;
-    else if (cloud.kind !== 'binary' || cloud.revision !== state.cloud?.revision) delete next.binary;
+    else if (cloud.kind !== 'binary' || cloud.revision !== state.cloud?.revision ||
+      cloud.generation !== state.cloud?.generation || cloud.objectPath !== state.cloud?.objectPath) delete next.binary;
     return next;
   }
   const paused = new Set<string>();
   function writable(player: string) { if (paused.has(player)) throw new AccountError('TRANSITION_PENDING', 'Account transition prepared. Resume this identity explicitly before changing its offline saves.'); }
   const active = new Map<string, Promise<OfflineEntry | null>>();
+  async function resolvePending(slot: string, data: unknown, expectedRevision: number, kind: "json" | "binary" | "delete"): Promise<OfflineEntry> {
+      const { key, player } = await scope(slot);
+      writable(player);
+      await same(player);
+      const observed = await read(key, player) ?? empty();
+      const context = await checked(player, () => options.saves.context());
+      const queue = (s: OfflineEntry) => JSON.stringify(s.pending.map(p => [p.options.operationId, p.options.expectedRevision]));
+      return update(key, player, (previous) => {
+        writable(player);
+        const state = previous ?? empty();
+        if (queue(state) !== queue(observed) || state.cloud?.revision !== observed.cloud?.revision || state.cloud?.generation !== observed.cloud?.generation ||
+          state.conflict?.generation !== observed.conflict?.generation || state.conflictGeneration !== observed.conflictGeneration ||
+          state.conflict?.revision !== observed.conflict?.revision ||
+          (context.generation === (state.conflictGeneration ?? state.cloud?.generation) && expectedRevision < Math.max(state.cloud?.revision ?? 0, state.conflict?.revision ?? 0)))
+          throw new SaveConflictError(state.conflict ?? state.cloud, 'The local queue changed during resolution. Review it again.');
+        return {
+          cloud: state.cloud,
+          pending: [
+            {
+              kind,
+              data: structuredClone(data),
+              options: {
+                ...state.pending.at(-1)?.options,
+                expectedRevision,
+                generation: context.generation,
+                operationId: operationId(),
+              },
+            },
+          ],
+          history: [...(state.history ?? []), state.pending],
+        };
+      });
+  }
   const api = {
     async prepareAccountSwitch(slots: readonly string[]) {
       const player = await options.playerId();
@@ -128,6 +166,7 @@ export function createOfflineSaves(options: {
               data: snapshot,
               options: {
                 ...settings,
+                ...((settings.generation ?? last?.options.generation ?? state.cloud?.generation) ? {generation: settings.generation ?? last?.options.generation ?? state.cloud!.generation} : {}),
                 operationId: settings.operationId ?? operationId(),
                 expectedRevision,
               },
@@ -163,6 +202,7 @@ export function createOfflineSaves(options: {
               data,
               options: {
                 ...settings,
+                ...((settings.generation ?? last?.options.generation ?? state.cloud?.generation) ? {generation: settings.generation ?? last?.options.generation ?? state.cloud!.generation} : {}),
                 operationId: settings.operationId ?? operationId(),
                 expectedRevision:
                   settings.expectedRevision ??
@@ -191,6 +231,7 @@ export function createOfflineSaves(options: {
               kind: "delete",
               data: null,
               options: {
+                ...(last?.options.generation ?? state.cloud?.generation ? {generation: last?.options.generation ?? state.cloud!.generation} : {}),
                 operationId: operationId(),
                 expectedRevision: last
                   ? last.options.expectedRevision + 1
@@ -201,39 +242,16 @@ export function createOfflineSaves(options: {
         };
       });
     },
-    async resolve(
-      slot: string,
-      data: unknown,
-      expectedRevision: number,
-    ): Promise<OfflineEntry> {
+    async resolve(slot: string, data: unknown, expectedRevision: number): Promise<OfflineEntry> {
       validateJson(data);
-      const { key, player } = await scope(slot);
-      writable(player);
-      await same(player);
-      const observed = await read(key, player) ?? empty();
-      const queue = (s: OfflineEntry) => JSON.stringify(s.pending.map(p => [p.options.operationId, p.options.expectedRevision]));
-      return update(key, player, (previous) => {
-        writable(player);
-        const state = previous ?? empty();
-        if (queue(state) !== queue(observed) || state.cloud?.revision !== observed.cloud?.revision ||
-          state.conflict?.revision !== observed.conflict?.revision ||
-          expectedRevision < Math.max(state.cloud?.revision ?? 0, state.conflict?.revision ?? 0))
-          throw new SaveConflictError(state.conflict ?? state.cloud, 'The local queue changed during resolution. Review it again.');
-        return {
-          cloud: state.cloud,
-          pending: [
-            {
-              data: structuredClone(data),
-              options: {
-                ...state.pending.at(-1)?.options,
-                expectedRevision,
-                operationId: operationId(),
-              },
-            },
-          ],
-          history: [...(state.history ?? []), state.pending],
-        };
-      });
+      return resolvePending(slot, data, expectedRevision, "json");
+    },
+    async resolveBinary(slot: string, data: Blob, expectedRevision: number): Promise<OfflineEntry> {
+      if (!(data instanceof Blob) || data.size < 1) throw new InvalidParameterError("data", "Binary saves require a nonempty Blob.");
+      return resolvePending(slot, data, expectedRevision, "binary");
+    },
+    async resolveDelete(slot: string, expectedRevision: number): Promise<OfflineEntry> {
+      return resolvePending(slot, null, expectedRevision, "delete");
     },
     async sync(slot: string): Promise<OfflineEntry | null> {
       const { key, player } = await scope(slot);
@@ -249,6 +267,7 @@ export function createOfflineSaves(options: {
           if (state && Object.hasOwn(state, "conflict"))
             throw new SaveConflictError(state.conflict ?? null);
           try {
+            if (!pending.options.generation) throw new SaveConflictError(null, 'This offline write predates generation fencing. Keep the payload and reconcile explicitly.');
             const settings = { ...pending.options, expectedPlayerId: player };
             const cloud = await checked(player, () => (pending.kind === "delete"
               ? options.saves.delete(slot, settings)
@@ -268,8 +287,8 @@ export function createOfflineSaves(options: {
               await update(key, player, (current) => {
                 const next = current ?? empty();
                 if (!matchesPending(next, pending) ||
-                  (error.current?.revision ?? 0) < Math.max(next.cloud?.revision ?? 0, next.conflict?.revision ?? 0)) return next;
-                return { ...next, conflict: error.current };
+                  (error.current !== null && error.current.generation === next.cloud?.generation && error.current.revision < Math.max(next.cloud?.revision ?? 0, next.conflict?.revision ?? 0))) return next;
+                return { ...next, conflict: error.current, ...(error.generation ? {conflictGeneration: error.generation} : {}) };
               });
             throw error; // Auth/permission/server errors are never offline successes.
           }

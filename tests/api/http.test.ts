@@ -663,6 +663,7 @@ Deno.test('cloud saves authenticate, preserve arbitrary JSON scores, and expose 
       body: JSON.stringify({
         action: 'save',
         expectedRevision: 0,
+        generation: '1',
         operationId: submissionKey,
         schemaVersion: 1,
         metadata: {},
@@ -692,7 +693,12 @@ Deno.test('cloud saves authenticate, preserve arbitrary JSON scores, and expose 
   const rejected = await conflict.handle(
     request('/saves/profile', {
       method: 'POST',
-      body: JSON.stringify({ action: 'delete', expectedRevision: 0, operationId: submissionKey }),
+      body: JSON.stringify({
+        action: 'delete',
+        expectedRevision: 0,
+        generation: '1',
+        operationId: submissionKey,
+      }),
     }),
   );
   assert.equal(rejected.status, 409);
@@ -716,13 +722,20 @@ Deno.test('revision recovery authenticates, validates exact fields and never acc
     const body of [
       { action: 'revisions' },
       { action: 'loadRevision', revision: 1 },
-      { action: 'restore', revision: 1, expectedRevision: 2, operationId: submissionKey },
+      {
+        action: 'restore',
+        revision: 1,
+        expectedRevision: 2,
+        generation: '1',
+        operationId: submissionKey,
+      },
       {
         action: 'save',
         data: { coins: 9 },
         metadata: {},
         schemaVersion: 1,
         expectedRevision: 2,
+        generation: '1',
         operationId: submissionKey,
         backupExisting: true,
       },
@@ -740,10 +753,23 @@ Deno.test('revision recovery authenticates, validates exact fields and never acc
     const body of [
       { action: 'revisions', userId },
       { action: 'loadRevision', revision: 0 },
-      { action: 'restore', revision: 1, operationId: submissionKey },
-      { action: 'restore', revision: 1, expectedRevision: 2, operationId: submissionKey, userId },
-      { action: 'delete', expectedRevision: 2, operationId: submissionKey, backupExisting: 'true' },
-      { action: 'commit', operationId: submissionKey, backupExisting: true },
+      { action: 'restore', revision: 1, generation: '1', operationId: submissionKey },
+      {
+        action: 'restore',
+        revision: 1,
+        expectedRevision: 2,
+        generation: '1',
+        operationId: submissionKey,
+        userId,
+      },
+      {
+        action: 'delete',
+        expectedRevision: 2,
+        generation: '1',
+        operationId: submissionKey,
+        backupExisting: 'true',
+      },
+      { action: 'commit', generation: '1', operationId: submissionKey, backupExisting: true },
     ]
   ) {
     await error(

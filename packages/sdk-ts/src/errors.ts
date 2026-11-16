@@ -7,6 +7,8 @@ export class GameServicesError extends Error {
   /** Reuse this key when manually retrying a failed score submission. */
   submissionKey?: string;
   operationId?: string;
+  generation?: string;
+  operationGeneration?: string;
   constructor(kind: ErrorKind, message: string) {
     super(message);
     this.name = new.target.name;
@@ -37,7 +39,7 @@ export class UnexpectedResponseError extends GameServicesError {
 }
 
 export class SaveConflictError extends ApiError {
-  constructor(readonly current: SaveRecord | null, message = 'The save changed. Resolve using the latest revision; keep your local copy.') { super(409, 'SAVE_CONFLICT', message); }
+  constructor(readonly current: SaveRecord | null, message = 'The save changed. Resolve using the latest revision; keep your local copy.', generation?: string) { super(409, 'SAVE_CONFLICT', message); if (generation) this.generation = generation; }
 }
 export class StorageError extends ApiError {
   constructor(code = 'STORAGE_UNAVAILABLE', status = 503) { super(status, code, 'The Storage operation failed. The previous committed save is preserved.'); }

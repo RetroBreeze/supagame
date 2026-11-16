@@ -3,6 +3,7 @@ import { createGameServices } from "../../packages/sdk-ts/src/index.js";
 import { fixture, session } from "./fixtures.js";
 const record = {
   slot: "profile",
+  generation: "1",
   revision: 1,
   schemaVersion: 1,
   kind: "json",
@@ -17,28 +18,28 @@ const record = {
 afterEach(() => vi.restoreAllMocks());
 it("saves JSON with explicit revisions and stable retry keys; loads, lists and deletes", async () => {
   const f = fixture();
-  f.fetcher.mockResolvedValue(Response.json({ save: record }));
+  f.fetcher.mockResolvedValue(Response.json({ generation:"1", save: record }));
   const saves = createGameServices({ supabase: f.supabase }).saves;
   const saved = await saves.save(
     "profile",
     { coins: 4 },
-    { operationId: "10000000-0000-4000-8000-000000000001" },
+    { generation: "1", operationId: "10000000-0000-4000-8000-000000000001" },
   );
   expect(saved.revision).toBe(1);
   expect(JSON.parse(f.fetcher.mock.calls[0]![1]!.body as string)).toMatchObject(
     { action: "save", expectedRevision: 0, schemaVersion: 1 },
   );
-  f.fetcher.mockImplementation(async () => Response.json({ save: record }));
+  f.fetcher.mockImplementation(async () => Response.json({ generation:"1", save: record }));
   expect((await saves.load("profile")).data).toEqual({ coins: 4 });
   await saves.save("profile", { coins: 5 });
   expect(
     JSON.parse(f.fetcher.mock.calls.at(-1)![1]!.body as string)
       .expectedRevision,
   ).toBe(1);
-  f.fetcher.mockImplementation(async () => Response.json({ slots: [record] }));
+  f.fetcher.mockImplementation(async () => Response.json({ generation:"1", slots: [record] }));
   expect(await saves.list()).toHaveLength(1);
   f.fetcher.mockImplementation(async () =>
-    Response.json({ save: { ...record, revision: 2, deleted: true } }),
+    Response.json({ generation:"1", save: { ...record, revision: 2, deleted: true } }),
   );
   expect((await saves.delete("profile")).deleted).toBe(true);
 });
@@ -65,12 +66,12 @@ it("rejects invalid JSON instead of silently dropping values and isolates cached
   await expect(saves.save("profile", { x: Infinity })).rejects.toMatchObject({
     kind: "invalid_parameter",
   });
-  f.fetcher.mockImplementation(async () => Response.json({ save: record }));
+  f.fetcher.mockImplementation(async () => Response.json({ generation:"1", save: record }));
   await saves.load("profile");
   const other = session();
   other.user = { ...other.user, id: "00000000-0000-4000-8000-000000000002" };
   f.getSession.mockResolvedValue({ data: { session: other }, error: null });
-  await saves.save("profile", {});
+  await saves.save("profile", {}, {generation:"1"});
   expect(
     JSON.parse(f.fetcher.mock.calls.at(-1)![1]!.body as string)
       .expectedRevision,
@@ -91,7 +92,7 @@ it("bounds binary downloads and rejects changed metadata before reading object b
   const f = fixture();
   f.fetcher.mockImplementation(async () =>
     Response.json({
-      save: {
+      generation:"1", save: {
         ...record,
         kind: "binary",
         objectPath: `${session().user.id}/object`,
@@ -115,13 +116,13 @@ it("bounds binary downloads and rejects changed metadata before reading object b
 });
 it("requests transactional server backups for JSON, deletion and binary reservations", async () => {
   const f = fixture();
-  f.fetcher.mockImplementation(async () => Response.json({ save: record }));
+  f.fetcher.mockImplementation(async () => Response.json({ generation:"1", save: record }));
   const saves = createGameServices({ supabase: f.supabase }).saves;
-  await saves.save("profile", {}, { backupExisting: true });
+  await saves.save("profile", {}, { backupExisting: true, generation:"1" });
   expect(
     JSON.parse(f.fetcher.mock.calls.at(-1)![1]!.body as string).backupExisting,
   ).toBe(true);
-  await saves.delete("profile", { backupExisting: true });
+  await saves.delete("profile", { backupExisting: true, generation:"1" });
   expect(
     JSON.parse(f.fetcher.mock.calls.at(-1)![1]!.body as string).backupExisting,
   ).toBe(true);
@@ -141,12 +142,12 @@ it("lists, reads and explicitly restores server revisions without advancing the 
     expiresAt: "2026-12-10T00:00:00Z",
   };
   f.fetcher.mockImplementation(async () =>
-    Response.json({ revisions: [archived] }),
+    Response.json({ generation:"1", revisions: [archived] }),
   );
   expect(await saves.listRevisions("profile")).toEqual([archived]);
-  f.fetcher.mockImplementation(async () => Response.json({ save: record }));
+  f.fetcher.mockImplementation(async () => Response.json({ generation:"1", save: record }));
   expect((await saves.loadRevision("profile", 1)).data).toEqual({ coins: 4 });
-  await saves.save("profile", {});
+  await saves.save("profile", {}, {generation:"1"});
   expect(
     JSON.parse(f.fetcher.mock.calls.at(-1)![1]!.body as string)
       .expectedRevision,
@@ -155,12 +156,14 @@ it("lists, reads and explicitly restores server revisions without advancing the 
   await saves.restoreRevision("profile", 1, {
     expectedRevision: 4,
     operationId,
+    generation:"1",
   });
   expect(JSON.parse(f.fetcher.mock.calls.at(-1)![1]!.body as string)).toEqual({
     action: "restore",
     revision: 1,
     expectedRevision: 4,
     operationId,
+    generation:"1",
   });
   const before = f.fetcher.mock.calls.length;
   await expect(
@@ -178,7 +181,7 @@ it("bounds binary revision downloads before Storage access", async () => {
   const f = fixture();
   f.fetcher.mockImplementation(async () =>
     Response.json({
-      save: {
+      generation:"1", save: {
         ...record,
         kind: "binary",
         objectPath: `${session().user.id}/object`,

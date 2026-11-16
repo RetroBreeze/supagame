@@ -26,7 +26,7 @@ it.each([false, true])('cleans failed SDK test users after prepare (uploaded: %s
       const checksum = Buffer.from(await crypto.subtle.digest('SHA-256', bytes)).toString('hex');
       const prepared = await client.rpc('sg_cloud_save', {
         p_action: 'prepare', p_slot: 'cleanup-regression',
-        p_request: { operationId: crypto.randomUUID(), expectedRevision: 0, schemaVersion: 1, metadata: {}, sizeBytes: bytes.length, checksum },
+        p_request: { generation:'1', operationId: crypto.randomUUID(), expectedRevision: 0, schemaVersion: 1, metadata: {}, sizeBytes: bytes.length, checksum },
       });
       expect(prepared.error).toBeNull();
       paths.push(prepared.data.upload.path);

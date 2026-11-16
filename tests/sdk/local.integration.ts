@@ -112,31 +112,37 @@ it('Cloud Saves round-trips JSON, detects races, isolates players and preserves 
   expect((await game.saves.list()).some(s=>s.slot===slot)).toBe(true);
   const other=makeClient(),otherGame=createGameServices({supabase:other});users.push((await otherGame.players.ensureAnonymousSession()).userId);
   await expect(otherGame.saves.load(slot)).rejects.toMatchObject({code:'SAVE_NOT_FOUND'});
-  const direct=await other.from('game_saves').select('*');expect(direct.data).toEqual([]);
+  const direct=await other.from('game_saves').select('*');expect(direct.error).toBeNull();expect(direct.data).toEqual([]);
   const denied=await other.storage.from('supagame-saves').upload(`${users[0]}/${crypto.randomUUID()}`,new Blob(['no']));expect(denied.error).not.toBeNull();
   const binarySlot=`rpg-${crypto.randomUUID()}`,id=crypto.randomUUID();
-  const binary=await game.saves.saveBinary(binarySlot,new Blob(['RPG save data']),{operationId:id,expectedRevision:0});
+  const generation=(await game.saves.context()).generation;
+  const binary=await game.saves.saveBinary(binarySlot,new Blob(['RPG save data']),{generation,operationId:id,expectedRevision:0});
   expect(binary.revision).toBe(1);expect((await game.saves.loadBinary(binarySlot)).data.size).toBe(13);
-  expect((await game.saves.saveBinary(binarySlot,new Blob(['RPG save data']),{operationId:id,expectedRevision:0})).revision).toBe(1);
-  await expect(game.saves.saveBinary(binarySlot,new Blob(['RPG save datb']),{operationId:id,expectedRevision:0})).rejects.toMatchObject({code:'DUPLICATE_KEY_CONFLICT'});
+  expect((await game.saves.saveBinary(binarySlot,new Blob(['RPG save data']),{generation,operationId:id,expectedRevision:0})).revision).toBe(1);
+  await expect(game.saves.saveBinary(binarySlot,new Blob(['RPG save datb']),{generation,operationId:id,expectedRevision:0})).rejects.toMatchObject({code:'DUPLICATE_KEY_CONFLICT'});
   const read=await other.storage.from('supagame-saves').download(binary.objectPath!);expect(read.error).not.toBeNull();
   const remove=await supabase.storage.from('supagame-saves').remove([binary.objectPath!]);expect(remove.data??[]).toHaveLength(0);
   expect(await (await game.saves.loadBinary(binarySlot)).data.text()).toBe('RPG save data');
   const replacement=await game.saves.saveBinary(binarySlot,new Blob(['updated RPG data']),{expectedRevision:1});expect(replacement.revision).toBe(2);
   expect(await game.saves.cleanup()).toBeGreaterThanOrEqual(1);
+  await game.saves.cleanup();
+  expect((await game.saves.saveBinary(binarySlot,new Blob(['RPG save data']),{generation,operationId:id,expectedRevision:0})).revision).toBe(1);
+  const commitReplay=await supabase.rpc('sg_cloud_save',{p_action:'commit',p_slot:binarySlot,p_request:{generation,operationId:id}});
+  expect(commitReplay.error).toBeNull();expect(commitReplay.data.save.revision).toBe(1);
   expect(await (await game.saves.loadBinary(binarySlot)).data.text()).toBe('updated RPG data');
   await game.saves.delete(binarySlot,{expectedRevision:2});await game.saves.cleanup();await game.saves.cleanup();
-  await game.saves.delete(slot,{expectedRevision:2});await expect(game.saves.load(slot)).rejects.toMatchObject({code:'SAVE_NOT_FOUND'});
+  await game.saves.load(slot);await game.saves.delete(slot,{expectedRevision:2});await expect(game.saves.load(slot)).rejects.toMatchObject({code:'SAVE_NOT_FOUND'});
 },30000);
 
 it('recovers after upload succeeds but its acknowledgement or metadata commit is interrupted',async()=>{
  const slot=`interrupted-${crypto.randomUUID()}`,operationId=crypto.randomUUID(),blob=new Blob(['unfinished']);
  const checksum=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join('');
- const request={operationId,expectedRevision:0,schemaVersion:1,metadata:{},sizeBytes:blob.size,checksum};
+ const generation=(await game.saves.context()).generation;
+ const request={generation,operationId,expectedRevision:0,schemaVersion:1,metadata:{},sizeBytes:blob.size,checksum};
  const prepared=await supabase.rpc('sg_cloud_save',{p_action:'prepare',p_slot:slot,p_request:request});expect(prepared.error).toBeNull();
  const path=prepared.data.upload.path;
  expect((await supabase.storage.from('supagame-saves').upload(path,await blob.arrayBuffer(),{upsert:false,contentType:'application/octet-stream'})).error).toBeNull();
- const recovered=await game.saves.saveBinary(slot,blob,{operationId,expectedRevision:0});expect(recovered.revision).toBe(1);
+ const recovered=await game.saves.saveBinary(slot,blob,{generation,operationId,expectedRevision:0});expect(recovered.revision).toBe(1);
  expect(await(await game.saves.loadBinary(slot)).data.text()).toBe('unfinished');
  await game.saves.delete(slot,{expectedRevision:1});await game.saves.cleanup();await game.saves.cleanup();
 });
@@ -176,14 +182,15 @@ it('imports guest JSON and binary into an authenticated permanent account throug
  await recovered.cleanup();
  expect(await(await recovered.loadBinaryRevision('binary',1)).data.text()).toBe('cloud binary');
  const restoreId=crypto.randomUUID();
- expect((await recovered.restoreRevision('state',1,{expectedRevision:2,operationId:restoreId})).revision).toBe(3);
- expect((await recovered.restoreRevision('state',1,{expectedRevision:2,operationId:restoreId})).revision).toBe(3);
+ expect((await recovered.restoreRevision('state',1,{generation:(await recovered.context()).generation,expectedRevision:2,operationId:restoreId})).revision).toBe(3);
+ expect((await recovered.restoreRevision('state',1,{generation:(await recovered.context()).generation,expectedRevision:2,operationId:restoreId})).revision).toBe(3);
  expect((await recovered.loadRevision('state',2)).data).toEqual({coins:12});
  await expect(recovered.restoreRevision('state',2,{expectedRevision:2})).rejects.toMatchObject({code:'SAVE_CONFLICT',current:{revision:3}});
+ await recovered.load('binary');
  expect((await recovered.restoreRevision('binary',1,{expectedRevision:2})).revision).toBe(3);
  expect(await(await recovered.loadBinary('binary')).data.text()).toBe('cloud binary');
  expect(await(await recovered.loadBinaryRevision('binary',2)).data.text()).toBe('guest binary');
  query(`update sg_private.save_revisions set expires_at=now()-interval '1 second' where user_id='${signed.data.user!.id}'`);
- for(const api of [services.saves,targetGame.saves]){await api.delete('state',{expectedRevision:api===services.saves?1:3});await api.delete('binary',{expectedRevision:api===services.saves?1:3});await api.cleanup();await api.cleanup();}
+ for(const api of [services.saves,targetGame.saves]){await api.load('state');await api.load('binary');await api.delete('state',{expectedRevision:api===services.saves?1:3});await api.delete('binary',{expectedRevision:api===services.saves?1:3});await api.cleanup();await api.cleanup();}
 
 },30000);

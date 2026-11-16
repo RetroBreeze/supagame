@@ -11,6 +11,7 @@ import {
 import type { Saves } from "../../packages/sdk-ts/src/saves.js";
 const record = {
   slot: "profile",
+  generation: "1",
   revision: 1,
   schemaVersion: 1,
   kind: "json" as const,
@@ -35,6 +36,7 @@ function fixture() {
     },
   };
   const saves = {
+    context: vi.fn().mockResolvedValue({generation:"1"}),
     load: vi.fn().mockResolvedValue(record),
     save: vi.fn().mockResolvedValue({ ...record, revision: 2 }),
   } as unknown as Saves;
@@ -123,7 +125,7 @@ it("stages binary bytes durably and replays deletion through the same revision q
   f.saves.delete = vi
     .fn()
     .mockResolvedValue({ ...record, revision: 2, deleted: true });
-  await a.stageBinary("profile", new Blob(["rpg"]));
+  await a.stageBinary("profile", new Blob(["rpg"]), {generation:"1"});
   expect(
     await ((await a.local("profile"))!.pending[0]!.data as Blob).text(),
   ).toBe("rpg");

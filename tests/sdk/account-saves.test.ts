@@ -24,6 +24,7 @@ function setup() {
   });
   const record = (data: unknown, revision = 1) => ({
     slot: "workshop",
+    generation: "1",
     revision,
     schemaVersion: 1,
     kind: "json" as "json" | "binary",
@@ -38,6 +39,7 @@ function setup() {
   let remote = record({ coins: 9 }),
     lost = false;
   const receipts = new Map<string, unknown>();
+  vi.spyOn(game.saves, "context").mockResolvedValue({generation:"1"});
   vi.spyOn(game.saves, "list").mockImplementation(async () => [remote]);
   vi.spyOn(game.saves, "load").mockImplementation(async () =>
     structuredClone(remote),
@@ -343,6 +345,7 @@ it("rejects oversized metadata before making a transition durable", async () => 
       local: [
         {
           slot: "workshop",
+    generation: "1",
           kind: "json",
           data: {},
           metadata: { huge: "x".repeat(5000) },
@@ -442,4 +445,21 @@ it("defers only save resolution and explicitly retains the authenticated target 
     { coins: 9 },
     expect.objectContaining({ backupExisting: true }),
   );
+});
+it('requires explicit re-review of a legacy target snapshot without generation',async()=>{
+ const f=setup(),t=await f.game.saves.prepareAccountSwitch(),flowId=await f.auth(t);
+ await f.game.saves.inspectAccountSwitch(t,{flowId});
+ const key=JSON.stringify(['project','transition',t.id]);
+ await f.store.update(key,old=>{
+  const journal=old as {slots:{cloud:{generation?:string}}[]};
+  for(const slot of journal.slots)delete slot.cloud.generation;
+  return journal;
+ });
+ vi.mocked(f.game.saves.context).mockResolvedValue({generation:'2'});
+ await expect(f.game.saves.resolveAccountSwitch(t,{strategy:'keepGuest',targetPlayerId:'target',confirmed:true})).rejects.toMatchObject({code:'SAVE_CONFLICT'});
+ expect(f.game.saves.save).not.toHaveBeenCalled();
+ expect((await f.game.saves.getAccountSwitchRecovery(t)).slots[0]?.guest?.data).toEqual({coins:9});
+ await f.game.saves.inspectAccountSwitch(t,{flowId,restart:true});
+ await f.game.saves.resolveAccountSwitch(t,{strategy:'keepGuest',targetPlayerId:'target',confirmed:true});
+ expect(f.game.saves.save).toHaveBeenCalledTimes(1);
 });

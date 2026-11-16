@@ -36,7 +36,7 @@ async function httpFailure(response: Response, assertIdentity: () => Promise<voi
   await assertIdentity();
   if (!matches('ApiError', body)) throw new UnexpectedResponseError();
   const error = body as ApiErrorBody;
-  if (error.code === 'SAVE_CONFLICT' && Object.hasOwn(error, 'current')) throw new SaveConflictError(error.current ?? null, error.message);
+  if (error.code === 'SAVE_CONFLICT' && Object.hasOwn(error, 'current')) throw new SaveConflictError(error.current ?? null, error.message, error.generation);
   throw new ApiError(response.status, error.code, error.message);
 }
 function customBase(options: GameServicesOptions): string | undefined {

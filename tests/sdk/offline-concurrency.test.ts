@@ -5,14 +5,14 @@ import type { OfflineEntry } from '../../packages/sdk-ts/src/offline-saves.js';
 import { deferred, memoryStore, saveRecord } from './concurrency-fixtures.js';
 function setup() {
   const store = memoryStore<OfflineEntry>(); let player: string | null = 'one';
-  const saves = { load: vi.fn(async () => saveRecord), save: vi.fn(async () => ({ ...saveRecord, revision: 2 })) } as unknown as Saves;
+  const saves = { context: vi.fn(async () => ({generation:'1'})), load: vi.fn(async () => saveRecord), save: vi.fn(async () => ({ ...saveRecord, revision: 2 })) } as unknown as Saves;
   const make = () => createOfflineSaves({ saves, store, namespace: 'project', playerId: async () => player });
   return { store, saves, make, switch: () => { player = 'two'; } };
 }
 it.each(['empty', 'conflict'] as const)('checks identity after a delayed offline read (%s)', async kind => {
   const f = setup(), a = f.make(); await a.load('profile');
   if (kind === 'conflict') {
-    await a.stage('profile', {});
+    await a.stage('profile', {}, {generation:'1'});
     await f.store.update(JSON.stringify(['project', 'one', 'profile']), s => ({ ...s!, conflict: saveRecord }));
   }
   const started = deferred<void>(), finish = deferred<void>(), read = f.store.read.bind(f.store);
@@ -24,13 +24,13 @@ it.each(['stage', 'load', 'resolve'] as const)('withholds storage results after 
   const f = setup(), a = f.make(); await a.load('profile');
   const started = deferred<void>(), finish = deferred<void>(), update = f.store.update.bind(f.store);
   f.store.update = async (k, fn) => { const result = await update(k, fn); started.resolve(); await finish.promise; return result; };
-  const result = (method === 'stage' ? a.stage('profile', {}) : method === 'load' ? a.load('profile') : a.resolve('profile', {}, 1)).catch(e => e);
+  const result = (method === 'stage' ? a.stage('profile', {}, {generation:'1'}) : method === 'load' ? a.load('profile') : a.resolve('profile', {}, 1)).catch(e => e);
   await started.promise; f.switch(); finish.resolve(); expect(await result).toBeInstanceOf(AuthenticationError);
   expect(await a.local('profile')).toBeNull();
 });
 it('ignores a conflict for an operation already resolved by another client', async () => {
   const f = setup(), a = f.make(), b = f.make(), old = deferred<never>(), started = deferred<void>();
-  await a.stage('profile', {});
+  await a.stage('profile', {}, {generation:'1'});
   vi.mocked(f.saves.save).mockImplementationOnce(async () => { started.resolve(); return old.promise; });
   const late = b.sync('profile').catch(e => e); await started.promise;
   await a.resolve('profile', { coins: 10 }, 3);
@@ -38,17 +38,17 @@ it('ignores a conflict for an operation already resolved by another client', asy
   await a.sync('profile'); old.reject(new SaveConflictError({ ...saveRecord, revision: 3 })); await late;
   const state = await a.local('profile'); expect(state?.cloud?.revision).toBe(4);
   expect(state).not.toHaveProperty('conflict');
-  await a.stage('profile', { coins: 11 }); await expect(a.sync('profile')).resolves.toMatchObject({ pending: [] });
+  await a.stage('profile', { coins: 11 }, {generation:'1'}); await expect(a.sync('profile')).resolves.toMatchObject({ pending: [] });
 });
 it('does not overwrite an acknowledged cloud revision with a delayed hydration', async () => {
   const f = setup(), a = f.make(), b = f.make(), started = deferred<void>(), finish = deferred<void>();
   vi.mocked(f.saves.load).mockImplementation(async () => { started.resolve(); await finish.promise; return saveRecord; });
   const pending = a.load('profile'); await started.promise;
-  await b.stage('profile', { coins: 2 }); await b.sync('profile'); finish.resolve();
+  await b.stage('profile', { coins: 2 }, {generation:'1'}); await b.sync('profile'); finish.resolve();
   expect((await pending).cloud?.revision).toBe(2);
 });
 it('does not let a delayed explicit resolution discard another client\'s new queue entry', async () => {
-  const f = setup(), a = f.make(), b = f.make(); await a.stage('profile', { coins: 1 });
+  const f = setup(), a = f.make(), b = f.make(); await a.stage('profile', { coins: 1 }, {generation:'1'});
   const started = deferred<void>(), finish = deferred<void>(), update = f.store.update.bind(f.store);
   let delay = true;
   f.store.update = async (k, fn) => {
@@ -56,7 +56,19 @@ it('does not let a delayed explicit resolution discard another client\'s new que
     return update(k, fn);
   };
   const resolving = a.resolve('profile', { coins: 10 }, 0).catch(e => e);
-  await started.promise; await b.stage('profile', { coins: 20 }); finish.resolve();
+  await started.promise; await b.stage('profile', { coins: 20 }, {generation:'1'}); finish.resolve();
   expect(await resolving).toBeInstanceOf(SaveConflictError);
   expect((await b.local('profile'))?.pending.at(-1)?.data).toEqual({ coins: 20 });
+});
+it('rejects resolution when another tab observes a new generation at the same revision', async () => {
+  const f = setup(), a = f.make(), b = f.make();
+  await a.load('profile'); await a.stage('profile', { coins: 1 }, {generation:'1'});
+  const started = deferred<void>(), finish = deferred<void>();
+  vi.mocked(f.saves.context).mockImplementationOnce(async () => { started.resolve(); await finish.promise; return {generation:'1'}; });
+  const resolving = a.resolve('profile', {coins:10}, 1).catch(e => e);
+  await started.promise;
+  vi.mocked(f.saves.load).mockResolvedValue({...saveRecord,generation:'2'});
+  await b.load('profile'); finish.resolve();
+  expect(await resolving).toBeInstanceOf(SaveConflictError);
+  expect((await b.local('profile'))?.pending[0]?.data).toEqual({coins:1});
 });

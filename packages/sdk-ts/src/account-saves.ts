@@ -19,6 +19,7 @@ export interface TransferSave {
   schemaVersion?: number;
   metadata?: Record<string, JsonValue>;
   revision?: number;
+  generation?: string;
 }
 export interface AccountTransition {
   id: string;
@@ -79,6 +80,7 @@ export interface AccountSaves {
   ): Promise<void>;
 }
 interface Write {
+  saveGeneration?: string;
   value: TransferSave;
   operationId: string;
   expectedRevision: number;
@@ -178,6 +180,7 @@ function snapshot(record: SaveRecord, binary?: Blob): TransferSave {
     slot: record.slot,
     kind: record.deleted ? "delete" : record.kind,
     revision: record.revision,
+    generation: record.generation,
     schemaVersion: record.schemaVersion,
     metadata: record.metadata as Record<string, JsonValue>,
     ...(record.kind === "json"
@@ -438,10 +441,13 @@ export function createAccountSaves(
               if (!value) continue;
               if (value.slot !== s.slot) throw invalid();
               size(value);
+              if (s.cloud && !s.cloud.generation)
+                throw new SaveConflictError(null, "This target review predates generation fencing. Keep the journal and explicitly restart its review.");
               writes.push({
                 value: structuredClone(value),
                 operationId: operationId(),
                 expectedRevision: s.cloud?.revision ?? 0,
+                saveGeneration: s.cloud?.generation ?? (await sessionResult(client, session, () => saves.context())).generation,
               });
             }
           validate(
@@ -488,6 +494,7 @@ export function createAccountSaves(
             expectedPlayerId: options.targetPlayerId,
             expectedRevision: w.expectedRevision,
             operationId: w.operationId,
+            ...(w.saveGeneration ? {generation: w.saveGeneration} : {}),
             ...(w.value.schemaVersion
               ? { schemaVersion: w.value.schemaVersion }
               : {}),

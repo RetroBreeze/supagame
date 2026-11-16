@@ -21,6 +21,8 @@ import {
 import { operationId, validateJson, type JsonValue } from "./save-values.js";
 
 export interface SaveOptions {
+  /** Persist this observed context with every durable write/retry. */
+  generation?: string;
   /** Atomically retain the previous cloud revision; fails closed on older servers. */
   backupExisting?: boolean;
   expectedPlayerId?: string;
@@ -31,10 +33,11 @@ export interface SaveOptions {
 }
 export type RestoreRevisionOptions = Pick<
   SaveOptions,
-  "expectedPlayerId" | "operationId"
+  "expectedPlayerId" | "operationId" | "generation"
 > & { expectedRevision: number };
 export type Saved<T = unknown> = Omit<SaveRecord, "data"> & { data?: T };
 export interface Saves extends importAccountSaves {
+  context(): Promise<{ generation: string }>;
   save<T>(slot: string, data: T, options?: SaveOptions): Promise<Saved<T>>;
   load<T = unknown>(slot: string): Promise<Saved<T>>;
   list(): Promise<SaveRecord[]>;
@@ -54,7 +57,7 @@ export interface Saves extends importAccountSaves {
     slot: string,
     options?: Pick<
       SaveOptions,
-      "expectedRevision" | "operationId" | "expectedPlayerId" | "backupExisting"
+      "expectedRevision" | "operationId" | "expectedPlayerId" | "backupExisting" | "generation"
     >,
   ): Promise<SaveRecord>;
   saveBinary(
@@ -82,10 +85,28 @@ export function createSaves(
   transport: Transport,
 ): Omit<Saves, keyof importAccountSaves> {
   const revisions = new Map<string, number>();
+  const generations = new Map<string, string>();
   const key = (session: Session, slot: string) => `${session.user.id}:${slot}`;
   const same = (session: Session) => assertSession(client, session);
-  function remember(session: Session, slot: string, revision: number) {
-    revisions.set(key(session, slot), Math.max(revision, revisions.get(key(session, slot)) ?? 0));
+  function remember(session: Session, slot: string, revision: number, generation: string) {
+    const k = key(session, slot), previous = generations.get(k);
+    // A replay is historical acknowledgment, never a newer snapshot.
+    if (previous && BigInt(generation) < BigInt(previous)) return;
+    revisions.set(k, previous === generation ? Math.max(revision, revisions.get(k) ?? 0) : revision);
+    generations.set(k, generation);
+  }
+  async function contextFor(session: Session) {
+    const result = await transport.request<SaveList>('/saves', 'GET', 'SaveList', {session});
+    await same(session);
+    return {generation: result.generation};
+  }
+  async function observedGeneration(session: Session, slot: string, options: SaveOptions) {
+    if (options.generation !== undefined) return options.generation;
+    if (options.operationId !== undefined) throw new SaveConflictError(null, 'This durable write has no generation. Keep its payload and reconcile explicitly.');
+    const observed = generations.get(key(session, slot));
+    if (observed) return observed;
+    if (options.expectedRevision) throw new SaveConflictError(null, 'Load the current save and retain its generation before replacing it.');
+    return (await contextFor(session)).generation;
   }
   const storage = () => {
     if (!client.storage) throw new StorageError();
@@ -120,7 +141,9 @@ export function createSaves(
     )
       throw new AuthenticationError("The save belongs to another player.");
     const id = options.operationId ?? operationId();
+    const generation = await observedGeneration(session, slot, options);
     const body = {
+      generation,
       action,
       expectedRevision:
         options.expectedRevision ?? revisions.get(key(session, slot)) ?? 0,
@@ -151,10 +174,10 @@ export function createSaves(
       );
       await same(session);
       if ("save" in result)
-        remember(session, slot, result.save.revision);
+        remember(session, slot, result.save.revision, result.save.generation);
       return result;
     } catch (error) {
-      if (error instanceof GameServicesError) error.operationId = id;
+      if (error instanceof GameServicesError) { error.operationId = id; error.operationGeneration = generation; }
       throw error;
     }
   }
@@ -224,6 +247,7 @@ export function createSaves(
     return result.objects.length;
   }
   const api: Omit<Saves, keyof importAccountSaves> = {
+    async context() { return contextFor(await requireSession(client)); },
     async save(slot, data, options = {}) {
       validateJson(data);
       const session = await requireSession(client);
@@ -245,7 +269,7 @@ export function createSaves(
         { session },
       );
       await same(session);
-      remember(session, slot, result.save.revision);
+      remember(session, slot, result.save.revision, result.save.generation);
       return result.save as Saved<T>;
     },
     async list() {
@@ -303,22 +327,24 @@ export function createSaves(
       )
         throw new AuthenticationError("The save belongs to another player.");
       const id = options.operationId ?? operationId();
+      const generation = await observedGeneration(session, slot, options);
       try {
         const result = await revisionRequest<SaveResult>(
           session,
           slot,
           {
             action: "restore",
+            generation,
             revision,
             expectedRevision: options.expectedRevision,
             operationId: id,
           },
           "SaveResult",
         );
-        remember(session, slot, result.save.revision);
+        remember(session, slot, result.save.revision, result.save.generation);
         return result.save;
       } catch (error) {
-        if (error instanceof GameServicesError) error.operationId = id;
+        if (error instanceof GameServicesError) { error.operationId = id; error.operationGeneration = generation; }
         throw error;
       }
     },
@@ -345,11 +371,13 @@ export function createSaves(
         options.expectedPlayerId !== session.user.id
       )
         throw new AuthenticationError("The save belongs to another player.");
+      const generation = await observedGeneration(session, slot, options);
       try {
         // On a lost commit response, prepare may return its receipt. Request it
         // with the union-compatible path below rather than allocating another object.
         const payload = {
           action: "prepare",
+          generation,
           ...(options.backupExisting !== undefined
             ? { backupExisting: options.backupExisting }
             : {}),
@@ -380,7 +408,7 @@ export function createSaves(
         );
         await same(session);
         if ("save" in prepared) {
-          remember(session, slot, prepared.save.revision);
+          remember(session, slot, prepared.save.revision, prepared.save.generation);
           return prepared.save;
         }
         const path = prepared.upload.path;
@@ -412,13 +440,13 @@ export function createSaves(
           slotPath(slot),
           "POST",
           "SaveResult",
-          { session, body: { action: "commit", operationId: id } },
+          { session, body: { action: "commit", operationId: id, generation } },
         );
         await same(session);
-        remember(session, slot, result.save.revision);
+        remember(session, slot, result.save.revision, result.save.generation);
         return result.save;
       } catch (error) {
-        if (error instanceof GameServicesError) error.operationId = id;
+        if (error instanceof GameServicesError) { error.operationId = id; error.operationGeneration = generation; }
         throw error;
       }
     },
@@ -449,7 +477,7 @@ export function createSaves(
       const session = await requireSession(client);
       await transport.request(slotPath(slot), "POST", "SaveObjects", {
         session,
-        body: { action: "abort", operationId: id },
+        body: { action: "abort", operationId: id, generation: (await contextFor(session)).generation },
       });
       await same(session);
       await sessionResult(client, session, () => cleanupFor(session));

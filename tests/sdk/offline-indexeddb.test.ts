@@ -12,13 +12,13 @@ it('serializes two browser tabs and rejects a stale conflict after another tab a
     for (const page of [first, second]) {
       await page.goto('http://127.0.0.1:41999/');
       await page.addScriptTag({ content: bundle.outputFiles[0]!.text });
-      await page.evaluate(`globalThis.record = { slot:'profile',revision:4,schemaVersion:1,kind:'json',metadata:{},sizeBytes:2,deleted:false,objectPath:null,createdAt:'2026-11-12T00:00:00Z',updatedAt:'2026-11-12T00:00:00Z',data:{coins:10} };
+      await page.evaluate(`globalThis.record = { slot:'profile',generation:'1',revision:4,schemaVersion:1,kind:'json',metadata:{},sizeBytes:2,deleted:false,objectPath:null,createdAt:'2026-11-12T00:00:00Z',updatedAt:'2026-11-12T00:00:00Z',data:{coins:10} };
         globalThis.store = SDK.createIndexedDbStore('shared-concurrency');
-        globalThis.saves = { save: async()=>record };
+        globalThis.saves = { context: async()=>({generation:'1'}), save: async()=>record };
         globalThis.offline = SDK.createOfflineSaves({saves,store,namespace:'project',playerId:async()=>'one'});`);
     }
     await first.evaluate(`(async()=>{
-      await offline.stage('profile',{coins:1});
+      await offline.stage('profile',{coins:1},{generation:'1'});
       saves.save = async()=>{globalThis.started=true;return new Promise((_,reject)=>globalThis.rejectOld=reject);};
       globalThis.pending=offline.sync('profile').catch(e=>e.code);
     })()`);

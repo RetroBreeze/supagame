@@ -178,7 +178,7 @@ export interface paths {
         };
         get: operations["loadSave"];
         put?: never;
-        /** @description JSON save/delete, binary prepare/commit/abort, or revisions/loadRevision/restore. backupExisting=true archives the displaced valid save transactionally (five per slot, 30 days, counted against player quota). Restore always archives the current save. Revisions returns SaveRevisionList; loadRevision returns SaveResult. Prepare returns SaveUpload; abort returns SaveObjects. expectedRevision=0 is create-only. Every successful mutation is idempotent by operationId. */
+        /** @description JSON save/delete, binary prepare/commit/abort, or revisions/loadRevision/restore. Mutations require observed generation context. Exact retries of the latest 3072 completed operations younger than 30 days remain replayable across generation changes; at most 4096 receipts are retained. Other expired or stale intents require explicit reconciliation. Aborts remain available for stale reservations; a stale commit cannot replace a save. backupExisting preserves five prior revisions per slot for up to 30 days. expectedRevision=0 is create-only within the observed generation. */
         post: operations["mutateSave"];
         delete?: never;
         options?: never;
@@ -255,6 +255,7 @@ export interface components {
             message: string;
             /** @description Latest slot on SAVE_CONFLICT (null if absent); keep the attempted local copy. */
             current?: components["schemas"]["SaveRecord"] | null;
+            generation?: components["schemas"]["SaveGeneration"];
         };
         Achievement: {
             id: string;
@@ -292,12 +293,15 @@ export interface components {
             updatedAt: string;
             objectPath: string | null;
             data?: unknown;
+            generation: components["schemas"]["SaveGeneration"];
         };
         SaveList: {
             slots: components["schemas"]["SaveRecord"][];
+            generation: components["schemas"]["SaveGeneration"];
         };
         SaveResult: {
             save: components["schemas"]["SaveRecord"];
+            generation: components["schemas"]["SaveGeneration"];
         };
         SaveUpload: {
             upload: {
@@ -307,9 +311,11 @@ export interface components {
                 /** Format: uuid */
                 operationId: string;
             };
+            generation: components["schemas"]["SaveGeneration"];
         };
         SaveObjects: {
             objects: string[];
+            generation: components["schemas"]["SaveGeneration"];
         };
         SaveRevision: {
             save: components["schemas"]["SaveRecord"];
@@ -320,6 +326,7 @@ export interface components {
         };
         SaveRevisionList: {
             revisions: components["schemas"]["SaveRevision"][];
+            generation: components["schemas"]["SaveGeneration"];
         };
         SaveMutation: {
             /** @constant */
@@ -333,6 +340,7 @@ export interface components {
                 [key: string]: unknown;
             };
             data: unknown;
+            generation: components["schemas"]["SaveGeneration"];
         } | {
             /** @constant */
             action: "delete";
@@ -340,6 +348,7 @@ export interface components {
             expectedRevision: number;
             /** Format: uuid */
             operationId: string;
+            generation: components["schemas"]["SaveGeneration"];
         } | {
             /** @constant */
             action: "prepare";
@@ -353,16 +362,19 @@ export interface components {
             };
             sizeBytes: number;
             checksum: string;
+            generation: components["schemas"]["SaveGeneration"];
         } | {
             /** @constant */
             action: "commit";
             /** Format: uuid */
             operationId: string;
+            generation: components["schemas"]["SaveGeneration"];
         } | {
             /** @constant */
             action: "abort";
             /** Format: uuid */
             operationId: string;
+            generation: components["schemas"]["SaveGeneration"];
         } | {
             /** @constant */
             action: "revisions";
@@ -377,8 +389,11 @@ export interface components {
             expectedRevision: number;
             /** Format: uuid */
             operationId: string;
+            generation: components["schemas"]["SaveGeneration"];
         };
         SavePreparation: components["schemas"]["SaveUpload"] | components["schemas"]["SaveResult"];
+        /** @description Opaque per-player history generation. Persist with the write intent; never silently replace it when retrying. */
+        SaveGeneration: string;
     };
     responses: {
         /** @description INVALID_REQUEST, INVALID_SCORE, INVALID_CURSOR or INVALID_DISPLAY_NAME. */

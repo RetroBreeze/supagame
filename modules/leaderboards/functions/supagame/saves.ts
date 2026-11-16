@@ -32,6 +32,9 @@ export async function saveCall(request: Request, slot: string): Promise<RpcCall>
     restore: ['action', 'revision', 'expectedRevision', 'operationId'],
   };
   const action = value.action;
+  for (const name of ['save', 'delete', 'prepare', 'commit', 'abort', 'restore']) {
+    fields[name]!.push('generation');
+  }
   let expected = typeof action === 'string' && Object.hasOwn(fields, action)
     ? fields[action]
     : undefined;
@@ -47,6 +50,10 @@ export async function saveCall(request: Request, slot: string): Promise<RpcCall>
     !expected.every((key) => Object.hasOwn(value, key)) ||
     (expected.includes('operationId') &&
       (typeof value.operationId !== 'string' || !UUID.test(value.operationId)))
+  ) throw new ApiFailure('INVALID_SAVE');
+  if (
+    expected.includes('generation') &&
+    (typeof value.generation !== 'string' || !/^[1-9][0-9]{0,18}$/.test(value.generation))
   ) throw new ApiFailure('INVALID_SAVE');
   for (const key of ['expectedRevision', 'schemaVersion', 'sizeBytes', 'revision']) {
     if (

@@ -23,8 +23,8 @@ it.each(['recovery', 'status', 'ensure'] as const)('rejects account switching du
   const f = fixture(), store = memoryStore<unknown>(), started = deferred<void>(), finish = deferred<void>();
   const transition = { id: 'review', sourcePlayerId: userId };
   await store.update(JSON.stringify(['project', 'transition', 'review']), () => ({
-    version: 1, ...transition, phase: 'prepared', slots: [{ slot: 'profile', cloud: null,
-      guest: { slot: 'profile', kind: 'json', data: { private: 'original player' } } }],
+    version: 1, ...transition, phase: 'prepared', slots: [{ slot: 'profile', generation: '1', cloud: null,
+      guest: { slot: 'profile', generation: '1', kind: 'json', data: { private: 'original player' } } }],
   }));
   f.getUser.mockImplementation(async () => { started.resolve(); await finish.promise; return { data: { user: session().user }, error: null }; });
   const game = createGameServices({ supabase: f.supabase, accounts: { namespace: 'project', store } });
@@ -65,8 +65,8 @@ it('rejects recovery if identity changes during journal loading, even to the aut
   const target = session(false); target.user.id = '00000000-0000-4000-8000-000000000099';
   const t = { id: 'journal', sourcePlayerId: userId };
   await store.update(JSON.stringify(['project', 'transition', t.id]), () => ({ version: 1, ...t, targetPlayerId: target.user.id,
-    phase: 'review', slots: [{ slot: 'profile', guest: { slot: 'profile', kind: 'json', data: { guest: true } },
-      cloud: { slot: 'profile', kind: 'json', data: { private: true } } }] }));
+    phase: 'review', slots: [{ slot: 'profile', generation: '1', guest: { slot: 'profile', generation: '1', kind: 'json', data: { guest: true } },
+      cloud: { slot: 'profile', generation: '1', kind: 'json', data: { private: true } } }] }));
   const read = store.read.bind(store);
   store.read = async k => { const value = await read(k); started.resolve(); await finish.promise; return value; };
   const game = createGameServices({ supabase: f.supabase, accounts: { namespace: 'project', store } });
@@ -82,7 +82,7 @@ it('does not expose binary conflict details when identity changes during the nes
   const game = createGameServices({ supabase: f.supabase });
   vi.spyOn(game.saves, 'load').mockImplementation(async () => {
     started.resolve(); await finish.promise;
-    return { slot: 'blob', revision: 2, schemaVersion: 1, kind: 'binary', metadata: { private: true }, sizeBytes: 1,
+    return { slot: 'blob', generation: '1', revision: 2, schemaVersion: 1, kind: 'binary', metadata: { private: true }, sizeBytes: 1,
       deleted: false, objectPath: `${userId}/object`, createdAt: profile.createdAt, updatedAt: profile.createdAt };
   });
   const result = game.saves.loadBinary('blob', { expectedRevision: 1 }).catch(e => e);
@@ -109,9 +109,9 @@ it.each(['functions', 'fetch'] as const)('keeps the revision cache monotonic aft
   if (transport === 'fetch') vi.stubGlobal('fetch', f.fetcher);
   const game = createGameServices({ supabase: f.supabase, ...(transport === 'fetch' ? { baseUrl: 'https://game.example/v1', publishableKey: key } : {}) });
   const { saveRecord } = await import('./concurrency-fixtures.js');
-  f.fetcher.mockImplementationOnce(async () => { started.resolve(); await finish.promise; return Response.json({ save: saveRecord }); });
+  f.fetcher.mockImplementationOnce(async () => { started.resolve(); await finish.promise; return Response.json({ generation:'1', save: saveRecord }); });
   const stale = game.saves.load('profile'); await started.promise;
-  f.fetcher.mockImplementation(async () => Response.json({ save: { ...saveRecord, revision: 2 } }));
+  f.fetcher.mockImplementation(async () => Response.json({ generation:'1', save: { ...saveRecord, revision: 2 } }));
   await game.saves.load('profile'); finish.resolve(); await stale;
   await game.saves.save('profile', { coins: 3 });
   expect(JSON.parse(f.fetcher.mock.calls.at(-1)![1]!.body as string).expectedRevision).toBe(2);

@@ -5,7 +5,7 @@ import { fixture, key, session } from './fixtures.js';
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 const current = {
-  slot: 'profile', revision: 2, schemaVersion: 1, kind: 'json', metadata: {},
+  slot: 'profile', generation:'1', revision: 2, schemaVersion: 1, kind: 'json', metadata: {},
   sizeBytes: 20, deleted: false, objectPath: null,
   createdAt: '2026-11-10T00:00:00Z', updatedAt: '2026-11-10T00:00:00Z',
   data: { privateProgress: 'original player only' },
