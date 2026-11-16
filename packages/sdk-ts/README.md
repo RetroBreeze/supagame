@@ -10,8 +10,14 @@ in JavaScript or TypeScript games. Set up the backend with the
 npm install @retrobreeze/supagame-sdk @supabase/supabase-js@2.119.0
 ```
 
-TypeScript projects also need `npm install -D @types/node@24.19.2` for Supabase's
-declarations, including browser projects. If `compilerOptions.types` is restricted,
+TypeScript projects also need Node declarations for Supabase's types, including
+browser projects:
+
+```sh
+npm install -D @types/node@24.19.2
+```
+
+If `compilerOptions.types` is restricted,
 include `node`. This adds no browser runtime polyfills. Node.js consumers use 24 or 26.
 The contracts package is installed automatically.
 
