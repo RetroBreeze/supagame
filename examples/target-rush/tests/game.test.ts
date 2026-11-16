@@ -3,7 +3,7 @@ import { Game, ROUND_MS, scoreForCombo } from '../src/game';
 import { canvasPoint } from '../src/input';
 
 describe('round rules', () => {
-  it('starts a fresh 30 second round with three bounded targets', () => {
+  it('starts a fresh round with three bounded targets', () => {
     const game = new Game(() => 0.5);
     game.start(100);
     expect(game.remaining(100)).toBe(ROUND_MS);
@@ -39,7 +39,7 @@ describe('round rules', () => {
     expect(game.combo).toBe(0);
     expect(game.expired).toBeGreaterThan(0);
     const early = game.targets[0]!;
-    game.update(25000);
+    game.update(ROUND_MS - 1000);
     const late = game.targets[0]!;
     expect(late.expiresAt - late.bornAt).toBeLessThan(early.expiresAt - early.bornAt);
     expect(game.hit(late.x, late.y, late.expiresAt)).toBeNull();
@@ -62,7 +62,7 @@ describe('round rules', () => {
     expect(game.hits).toBe(0);
     expect(game.shots).toBe(0);
     expect(game.expired).toBe(0);
-    expect(game.remaining(100000)).toBe(30000);
+    expect(game.remaining(100000)).toBe(ROUND_MS);
     game.update(140000);
     expect(results).toEqual([10, 0]);
   });

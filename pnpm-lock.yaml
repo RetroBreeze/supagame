@@ -218,7 +218,7 @@ importers:
         specifier: 2.9.1
         version: 2.9.1
 
-  examples/browser-demo:
+  examples/target-rush:
     dependencies:
       '@retrobreeze/supagame-sdk':
         specifier: workspace:*
@@ -227,9 +227,18 @@ importers:
         specifier: 2.119.0
         version: 2.119.0
     devDependencies:
+      playwright:
+        specifier: 1.65.0
+        version: 1.65.0
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
       vite:
         specifier: 8.3.6
         version: 8.3.6(@types/node@24.19.2)(esbuild@0.28.1)(yaml@2.9.1)
+      vitest:
+        specifier: 5.1.0
+        version: 5.1.0(@types/node@24.19.2)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.1)(yaml@2.9.1))
 
   packages/cli:
     dependencies:

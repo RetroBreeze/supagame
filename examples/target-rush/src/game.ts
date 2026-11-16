@@ -1,6 +1,6 @@
 export const WIDTH = 900;
 export const HEIGHT = 560;
-export const ROUND_MS = 30_000;
+export const ROUND_MS = 5_000;
 export interface Target { id: number; x: number; y: number; radius: number; bornAt: number; expiresAt: number; color: number }
 export interface RoundResult { score: number; hits: number; shots: number; bestCombo: number; expired: number }
 export const scoreForCombo = (combo: number): number => 10 * Math.min(4, 1 + Math.floor(Math.max(0, combo - 1) / 5));

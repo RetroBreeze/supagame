@@ -3,10 +3,16 @@ import { Game, ROUND_MS, scoreForCombo, type RoundResult } from './game';
 import { canvasPoint } from './input';
 import { Renderer } from './renderer';
 import { Sound } from './audio';
+import { setupLeaderboard } from './leaderboard';
 const element = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const canvas = element<HTMLCanvasElement>('game');
 const intro = element('intro'), results = element('results');
 const sound = new Sound();
+element('round-duration').textContent = String(ROUND_MS / 1000);
+const leaderboard = setupLeaderboard();
+const nameInput = element<HTMLInputElement>('player-name');
+let roundName = '';
+void leaderboard.refresh();
 
 /** Integration boundary: fires once per completed round, before showing results. */
 function onRoundEnd(result: Readonly<RoundResult>): void {
@@ -17,11 +23,15 @@ function onRoundEnd(result: Readonly<RoundResult>): void {
   results.hidden = false;
   element('restart').focus({preventScroll:true});
   sound.play('end');
+  void leaderboard.submit(result.score, roundName);
   window.dispatchEvent(new CustomEvent<Readonly<RoundResult>>('targetrush:roundend', { detail: result }));
 }
 const game = new Game(Math.random, onRoundEnd);
 const renderer = new Renderer(canvas,game);
 function start(): void {
+  roundName = nameInput.value.trim();
+  nameInput.value = roundName;
+  if (!nameInput.reportValidity()) return;
   sound.unlock();
   renderer.clear();
   intro.hidden=true;results.hidden=true;
@@ -30,8 +40,13 @@ function start(): void {
   // The hidden start button must not retain keyboard focus during play.
   canvas.tabIndex=-1;canvas.focus({preventScroll:true});
 }
-element('start').addEventListener('click',start);
-element('restart').addEventListener('click',start);
+element('start-form').addEventListener('submit', event => { event.preventDefault(); start(); });
+element('restart').addEventListener('click', () => {
+  results.hidden = true;
+  intro.hidden = false;
+  void leaderboard.refresh();
+  element('start').focus({ preventScroll: true });
+});
 element('mute').addEventListener('click',() => {
   sound.unlock();sound.muted=!sound.muted;
   const button=element('mute');

@@ -11,7 +11,7 @@ import { files, packedConsumer, repo, run } from './packages.ts';
 import { localProject } from './local-project.ts';
 
 test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → browser', { timeout: 600_000 }, async (t) => {
-  assert.ok(existsSync(join(repo, 'examples/browser-demo/src/main.ts')), 'The runnable consumer example must exist');
+  assert.ok(existsSync(join(repo, 'examples/target-rush/src/main.ts')), 'The runnable consumer example must exist');
   const consumer = await packedConsumer();
   t.after(() => consumer.remove());
   const project = await localProject();
@@ -29,6 +29,7 @@ test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → b
     const before = snapshot(); cli('init'); cli('add', 'leaderboards'); cli('add', 'cloud-saves'); assert.deepEqual(snapshot(), before);
     cli('leaderboard', 'create', 'level-1', '--type', 'time', '--order', 'asc', '--keep-best', '--min', '0', '--max', '1000000');
     cli('leaderboard', 'create', 'arcade', '--type', 'points', '--order', 'desc', '--keep-best', '--min', '0', '--max', '1000000');
+    cli('leaderboard', 'create', 'target-rush', '--type', 'points', '--order', 'desc', '--keep-best', '--min', '0');
     const boards = snapshot();
     cli('leaderboard', 'create', 'arcade', '--type', 'points', '--order', 'desc', '--keep-best', '--min', '0', '--max', '1000000');
     assert.deepEqual(snapshot(), boards);
@@ -54,7 +55,7 @@ test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → b
     assert.equal(diagnostic.status,0,diagnostic.stdout);
     assert.match(diagnostic.stdout,/HEALTHY/);
     const listed = await raw('/leaderboards'); assert.equal(listed.status, 200);
-    assert.deepEqual((await listed.json() as { id: string; sortDirection: string }[]).map(({ id, sortDirection }) => [id, sortDirection]).sort(), [['arcade', 'desc'], ['level-1', 'asc']]);
+    assert.deepEqual((await listed.json() as { id: string; sortDirection: string }[]).map(({ id, sortDirection }) => [id, sortDirection]).sort(), [['arcade', 'desc'], ['level-1', 'asc'], ['target-rush', 'desc']]);
     assert.deepEqual(await game.leaderboards.getTop('level-1'), { entries: [], nextCursor: null });
     const player = await game.players.ensureAnonymousSession();
     assert.deepEqual(await game.players.ensureAnonymousSession(), player);
@@ -162,10 +163,10 @@ test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → b
     assert.equal((await game.leaderboards.getMine('arcade'))?.score, 60);
   });
   await t.test('real Chromium consumer uses installed SDK, persists identity and ships no privileged credentials', async () => {
-    const demo = join(consumer.root, 'demo'); cpSync(join(repo, 'examples/browser-demo'), demo, { recursive: true, filter: (source) => !/(?:^|\/)(?:node_modules|dist)(?:\/|$)/.test(source) && !/\/\.env(?:\.|$)/.test(source) });
+    const demo = join(consumer.root, 'demo'); cpSync(join(repo, 'examples/target-rush'), demo, { recursive: true, filter: (source) => !/(?:^|\/)(?:node_modules|dist)(?:\/|$)/.test(source) && !/\/\.env(?:\.|$)/.test(source) });
     // Resolve the SDK from the clean consumer's node_modules, not workspace links.
     const env = { ...process.env, VITE_SUPABASE_URL: project.url, VITE_SUPABASE_PUBLISHABLE_KEY: key, SUPABASE_SERVICE_ROLE_KEY: 'server-only-canary-do-not-ship', VITE_UNUSED_SECRET: 'unused-env-canary-do-not-ship' };
-    run(process.execPath, [join(repo, 'examples/browser-demo/node_modules/vite/bin/vite.js'), 'build', demo], consumer.root, env);
+    run(process.execPath, [join(repo, 'examples/target-rush/node_modules/vite/bin/vite.js'), 'build', demo], consumer.root, env);
     const bundle = files(join(demo, 'dist')).map((path) => readFileSync(path, 'utf8')).join('\n');
     for (const secret of ['server-only-canary-do-not-ship', 'unused-env-canary-do-not-ship', ...Object.entries(status).filter(([name]) => /SECRET|SERVICE_ROLE|JWT_SECRET|DB_URL/.test(name)).map(([, value]) => value)]) {
       if (secret) assert.ok(!bundle.includes(secret), 'Client bundle must not contain privileged configuration');
@@ -182,34 +183,32 @@ test('fresh packaged installation: CLI → local Supabase → SDK/raw HTTP → b
     try {
       browser = await chromium.launch({ headless: true });
       const page = await browser.newPage();
-      await page.goto(`http://127.0.0.1:${project.browserPort}`); await page.getByRole('status').filter({ hasText: 'Ready.' }).waitFor();
-      const identity = await page.locator('#identity').textContent();
-      await page.getByLabel('Display name').fill('Browser player'); await page.getByRole('button', { name: 'Save name' }).click();
-      await page.getByRole('status').filter({ hasText: 'Display name saved.' }).waitFor();
-      for (const [id, value] of [['level-1', '30'], ['arcade', '70']]) {
-        await page.getByLabel('Leaderboard').selectOption(id!);
-        await page.getByRole('status').filter({ hasText: 'Rankings refreshed.' }).waitFor();
-        await page.getByLabel('Score', { exact: true }).fill(value!); await page.getByRole('button', { name: 'Submit score' }).click();
-        await page.getByRole('status').filter({ hasText: 'New personal best.' }).waitFor();
-        assert.match(await page.locator('#personal-best').innerText(), new RegExp(`Personal best: ${value}`));
-      }
-      await page.reload(); await page.getByRole('status').filter({ hasText: 'Ready.' }).waitFor();
-      assert.equal(await page.locator('#identity').textContent(), identity);
-      assert.equal(await page.getByLabel('Display name').inputValue(), 'Browser player');
-      await page.getByLabel('Leaderboard').selectOption('arcade');
-      await page.getByRole('status').filter({ hasText: 'Rankings refreshed.' }).waitFor();
-      await page.getByLabel('Score', { exact: true }).fill('70');
-      for (let attempt = 0; attempt < 10; attempt++) {
-        await page.getByRole('button', { name: 'Submit score' }).click();
-        await page.waitForFunction(() => !document.querySelector<HTMLFieldSetElement>('#controls')!.disabled);
-      }
-      await page.getByRole('status').filter({ hasText: 'RATE_LIMITED' }).waitFor();
-      // A definitive HTTP rejection must not trap the UI in an uncertain retry.
-      await page.getByLabel('Leaderboard').selectOption('level-1');
-      await page.getByRole('status').filter({ hasText: 'Rankings refreshed.' }).waitFor();
-      await page.getByLabel('Score', { exact: true }).fill('20');
-      await page.getByRole('button', { name: 'Submit score' }).click();
-      await page.getByRole('status').filter({ hasText: 'New personal best.' }).waitFor();
+      await page.clock.install();
+      await page.addInitScript(() => { Math.random = () => 0.5; });
+      await page.goto(`http://127.0.0.1:${project.browserPort}`);
+      await page.locator('#leaderboard-status').filter({ hasText: 'No scores yet' }).waitFor();
+      await page.getByLabel('Player name').fill('Browser player');
+      await page.getByRole('button', { name: 'Start', exact: true }).click();
+      await page.clock.runFor(200);
+      const arena = (await page.locator('canvas').boundingBox())!;
+      await page.mouse.click(arena.x + arena.width * 0.1, arena.y + arena.height * 350 / 560);
+      await page.clock.fastForward(30000);
+      await page.locator('#submission-status').filter({ hasText: 'Score saved. Best: 10' }).waitFor();
+      const first = (await game.leaderboards.getTop('target-rush')).entries;
+      assert.equal(first.length, 1);
+      assert.equal(first[0]?.displayName, 'Browser player');
+      assert.equal(first[0]?.score, 10);
+      await page.reload();
+      await page.locator('#leaderboard-entries').filter({ hasText: 'Browser player' }).waitFor();
+      await page.getByLabel('Player name').fill('Browser renamed');
+      await page.getByRole('button', { name: 'Start', exact: true }).click();
+      await page.clock.fastForward(30000);
+      await page.locator('#submission-status').filter({ hasText: 'Score saved. Best: 10' }).waitFor();
+      const second = (await game.leaderboards.getTop('target-rush')).entries;
+      assert.equal(second.length, 1, 'Reload reuses the same player');
+      assert.equal(second[0]?.playerId, first[0]?.playerId);
+      assert.equal(second[0]?.displayName, 'Browser renamed');
+      assert.equal(second[0]?.score, 10, 'A worse round retains the high score');
     } finally { await browser?.close(); await new Promise<void>((resolve) => server.close(() => resolve())); }
   });
   await t.test('installed Live Leaderboards receives a private database broadcast after a synthetic local best', async () => {

@@ -22,8 +22,22 @@
     <section class="arena" aria-label="Target Rush playfield">
       <canvas id="game" width="900" height="675" aria-label="Tap or click the circular targets during a round"></canvas>
       <section id="intro" class="overlay" aria-label="Start round">
-        <p>Hit targets for 30 seconds.</p>
-        <button class="primary" id="start">Start</button>
+        <p>Hit targets for <span id="round-duration"></span> seconds.</p>
+        <form id="start-form">
+          <label for="player-name">Player name</label>
+          <div class="start-controls">
+            <input id="player-name" name="displayName" value="Player" required pattern="[^\p{Cc}]{3,24}" title="Use 3–24 printable characters." autocomplete="nickname">
+            <button class="primary" id="start" type="submit">Start</button>
+          </div>
+        </form>
+        <section class="leaderboard" aria-labelledby="leaderboard-title">
+          <h2 id="leaderboard-title">Top 10</h2>
+          <p id="leaderboard-status" role="status"></p>
+          <table aria-label="Top 10 scores">
+            <thead><tr><th scope="col">Rank</th><th scope="col">Name</th><th scope="col">Score</th></tr></thead>
+            <tbody id="leaderboard-entries"></tbody>
+          </table>
+        </section>
       </section>
       <section id="results" class="overlay" hidden aria-labelledby="result-title">
         <h2 id="result-title">Round complete</h2>
@@ -33,7 +47,7 @@
           <div><strong id="accuracy">0%</strong><span class="label">Accuracy</span></div>
           <div><strong id="best-combo">0</strong><span class="label">Best streak</span></div>
         </div>
-        <div id="leaderboard-slot"></div>
+        <p id="submission-status" role="status"></p>
         <button class="primary" id="restart">Play again</button>
       </section>
     </section>

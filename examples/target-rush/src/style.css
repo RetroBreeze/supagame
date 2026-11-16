@@ -32,7 +32,20 @@ h1 { margin: 0; font-size: 18px; font-weight: 600; }
 .arena { position: relative; aspect-ratio: 4 / 3; border: 1px solid #3b444f; border-radius: 8px; overflow: hidden; background: #1e242d; }
 canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
 .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; background: #1e242d; text-align: center; overflow-y: auto; }
-.overlay[hidden], #leaderboard-slot:empty { display: none; }
+.overlay[hidden] { display: none; }
+#intro { justify-content: flex-start; }
+#start-form { width: 100%; text-align: left; }
+#start-form label { display: block; font-size: 12px; margin-bottom: 4px; }
+.start-controls { display: flex; gap: 8px; }
+#player-name { min-width: 0; width: 100%; font: inherit; padding: 8px; border: 1px solid #414953; border-radius: 6px; background: #171b22; }
+.leaderboard { width: 100%; min-height: 0; overflow-y: auto; }
+.leaderboard h2 { font-size: 16px; }
+.leaderboard table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+.leaderboard th, .leaderboard td { padding: 3px 6px; }
+.leaderboard td:nth-child(2) { overflow-wrap: anywhere; }
+.leaderboard th:last-child, .leaderboard td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+#submission-status { font-size: 12px; }
+#results { justify-content: safe center; }
 p { margin: 0; color: #b5bec9; font-size: 14px; line-height: 1.5; }
 .primary { min-height: 40px; min-width: 112px; padding: 9px 20px; border: 0; border-radius: 6px; background: #a2d5c9; color: #182822; font-size: 14px; font-weight: 600; }
 .primary:hover { background: #b8e1d8; }
