@@ -24,9 +24,9 @@ const result = await build({
   bundle: true, platform: 'browser', format: 'esm', target: 'es2022', write: false,
   minify: true, legalComments: 'none',
 });
-const code = '// @ts-nocheck\n// Generated from packages/contracts/openapi.yaml. Run pnpm --filter @retrobreeze/supagame-sdk validators:generate.\n// Standalone validation: no runtime schema compilation, eval, Node APIs or dependencies.\n// Bundled MIT-licensed helpers: see ../THIRD_PARTY_NOTICES.md.\n' + result.outputFiles[0]!.text;
+const code = '// @ts-nocheck\n// Generated from packages/contracts/openapi.yaml. Run npm run validators:generate --workspace @retrobreeze/supagame-sdk.\n// Standalone validation: no runtime schema compilation, eval, Node APIs or dependencies.\n// Bundled MIT-licensed helpers: see ../THIRD_PARTY_NOTICES.md.\n' + result.outputFiles[0]!.text;
 if (process.argv.includes('--check')) {
-  if (await readFile(output, 'utf8') !== code) throw new Error('SDK validators are stale. Run pnpm --filter @retrobreeze/supagame-sdk validators:generate.');
+  if (await readFile(output, 'utf8') !== code) throw new Error('SDK validators are stale. Run npm run validators:generate --workspace @retrobreeze/supagame-sdk.');
 } else {
   await writeFile(output, code);
 }

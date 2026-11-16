@@ -8,4 +8,5 @@ coverage/
 .superpowers/
 .worktrees/
 *.tgz
+/packages/*/LICENSE
 .supagame-deploy-lock/

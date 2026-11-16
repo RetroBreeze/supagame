@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { lstatSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, lstatSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -34,8 +34,11 @@ if (name === 'cli') {
 }
 
 const directory = join(root, 'packages', name);
+// npm does not inherit the workspace-root license when packing a package.
+// Always ship the canonical text, independently of the package manager.
+copyFileSync(join(root, 'LICENSE'), join(directory, 'LICENSE'));
 const manifest = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'));
-const required = [...targets(manifest.bin), ...targets(manifest.exports)];
+const required = ['LICENSE', 'README.md', ...targets(manifest.bin), ...targets(manifest.exports)];
 if (name === 'cli') {
   const { templateSources } = await import('../packages/cli/src/lib/templates.ts');
   required.push(...templateSources.map((path) => `dist/assets/${path}`));

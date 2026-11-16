@@ -10,11 +10,7 @@ import { installFromRegistry } from './package-registry.ts';
 export const repo = fileURLToPath(new URL('../../', import.meta.url));
 export function run(command: string, args: string[], cwd = repo, env = process.env): string {
   try {
-    // Explicit POSIX shell fallback for pnpm's shebang-less bootstrap shim.
-    // The command text is fixed; every argument is passed literally via argv.
-    const executable = command === 'pnpm' ? 'sh' : command;
-    const argv = command === 'pnpm' ? ['-c', 'exec pnpm "$@"', 'pnpm', ...args] : args;
-    return execFileSync(executable, argv, { cwd, env, encoding: 'utf8', timeout: 300_000, maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+    return execFileSync(command, args, { cwd, env, encoding: 'utf8', timeout: 300_000, maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
   } catch {
     // Subprocess output may contain local Supabase keys. Never attach raw output/cause.
     throw new Error(`${command.split('/').at(-1)} ${args[0] ?? ''} failed in the isolated test fixture; output withheld.`);
@@ -27,12 +23,13 @@ export async function packedConsumer(source = repo) {
   const root = mkdtempSync(join(tmpdir(), 'supagame-packages-'));
   try {
     const tarballs = ['sdk-ts', 'contracts', 'cli'].map((name) => {
-      run('pnpm', ['pack', '--pack-destination', root], join(source, 'packages', name));
+      run('npm', ['pack', '--pack-destination', root], join(source, 'packages', name));
       const archive = join(root, `retrobreeze-supagame-${name === 'sdk-ts' ? 'sdk' : name}-0.1.0.tgz`);
       const entries = run('tar', ['-tzf', archive]).trim().split('\n');
       assert.ok(entries.includes('package/package.json'));
       assert.ok(entries.includes('package/README.md'), `${name} must distribute usage documentation`);
       assert.ok(entries.includes('package/LICENSE'), `${name} must distribute its MIT license`);
+      assert.equal(run('tar', ['-xOzf', archive, 'package/LICENSE']), readFileSync(join(source, 'LICENSE'), 'utf8'));
       assert.ok(entries.includes(`package/dist/${name === 'cli' ? 'cli' : name === 'contracts' ? 'types' : 'index'}.js`), `${name} must build its runtime before packing`);
       assert.ok(!entries.includes('package/dist/stale-review-artifact.js'), 'Packaging must discard stale build output');
       assert.ok(!entries.some((entry) => /(?:^|\/)(?:node_modules|tests|scripts|\.git|\.superpowers)\//.test(entry)));
@@ -68,7 +65,7 @@ export async function packedConsumer(source = repo) {
       assert.ok(realpathSync(installed(name)).startsWith(`${root}/node_modules/`));
       const manifest = JSON.parse(readFileSync(join(installed(name), 'package.json'), 'utf8'));
       assert.equal(manifest.license, 'MIT'); assert.equal(manifest.version, '0.1.0');
-      assert.equal(manifest.private, true, 'Publishing remains separately authorized');
+      assert.notEqual(manifest.private, true, 'Distribution packages must permit publication');
       assert.ok(!JSON.stringify(manifest.dependencies ?? {}).includes('workspace:'));
     }
     assert.ok(readFileSync(join(installed('cli'), 'dist/assets/modules/leaderboards/functions/supagame/index.ts'), 'utf8').includes('Deno.serve'));

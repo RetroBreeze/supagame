@@ -1,7 +1,7 @@
 {
   "name": "@retrobreeze/supagame-contracts",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "description": "Versioned HTTP contract and shared game service DTOs",
   "type": "module",
   "license": "MIT",

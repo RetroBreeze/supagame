@@ -1,7 +1,7 @@
 {
   "name": "@retrobreeze/supagame-sdk",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "description": "Browser-compatible TypeScript client for the Supagame HTTP API",
   "type": "module",
   "license": "MIT",
@@ -32,7 +32,7 @@
   ],
   "sideEffects": false,
   "dependencies": {
-    "@retrobreeze/supagame-contracts": "workspace:*"
+    "@retrobreeze/supagame-contracts": "0.1.0"
   },
   "peerDependencies": {
     "@supabase/supabase-js": "^2.119.0"

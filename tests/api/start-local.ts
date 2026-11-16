@@ -12,7 +12,7 @@ try {
   // than writing it into terminal logs, fixtures or CI artifacts.
   execFileSync('supabase', ['start', '--workdir', 'tests/fixtures/local',
     '--network-id', 'supagame-schema-tests-local'], { stdio: 'ignore' });
-  console.log('Local Supabase API ready at http://127.0.0.1:55431. Run pnpm db:migrate next.');
+  console.log('Local Supabase API ready at http://127.0.0.1:55431. Run npm run db:migrate next.');
 } catch {
   console.error('Local Supabase startup failed. Check Docker availability and fixture ports 55430–55433.');
   process.exitCode = 1;

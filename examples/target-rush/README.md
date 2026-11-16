@@ -18,19 +18,20 @@ backend if needed. Enable anonymous Auth and allow `http://127.0.0.1:5173` in
 `SG_ALLOWED_ORIGINS` (or your exact browser origin). The browser needs only the
 project URL and its `sb_publishable_` key, never a service-role or secret key.
 
-From the repository root, with Node.js 24 or 26 and pnpm:
+From the repository root, with Node.js 24.15+ (24.x) or 26.x and npm 12.2.0:
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm --filter @retrobreeze/supagame-sdk... build
+npm ci
+npm run build --workspace @retrobreeze/supagame-contracts
+npm run build --workspace @retrobreeze/supagame-sdk
 cp examples/target-rush/.env.example examples/target-rush/.env.local
 # Edit .env.local with your backend's URL and publishable key.
-pnpm --filter target-rush dev --port 5173 --strictPort
+npm run dev --workspace target-rush -- --port 5173 --strictPort
 ```
 
 Open `http://127.0.0.1:5173`. Restart Vite after changing `.env.local`.
 Without configuration, gameplay still works and the page explains why scores
-cannot be saved. `pnpm --filter target-rush build` generates static assets in
+cannot be saved. `npm run build --workspace target-rush` generates static assets in
 `examples/target-rush/dist`.
 
 ## The integration
@@ -65,16 +66,16 @@ later hits earn 40. The existing `targetrush:roundend` event remains available.
 ## Verify
 
 ```sh
-pnpm --filter target-rush test
-pnpm --filter target-rush typecheck
-pnpm --filter target-rush lint
-pnpm --filter target-rush build
-pnpm exec playwright install chromium
-pnpm --filter target-rush test:browser
+npm run test --workspace target-rush
+npm run typecheck --workspace target-rush
+npm run lint --workspace target-rush
+npm run build --workspace target-rush
+npm exec -- playwright install chromium
+npm run test:browser --workspace target-rush
 ```
 
 Browser tests exercise the real SDK with synthetic HTTP responses, mouse/touch
 input, and desktop/phone layouts. Screenshots go to `/tmp/target-rush-*.png`.
-The repository's `pnpm test:e2e` builds this example against packed SDK artifacts
+The repository's `npm run test:e2e` builds this example against packed SDK artifacts
 and verifies name/score persistence and best-only updates on a fresh local
 Supabase stack. It requires Docker; no hosted credentials are needed.

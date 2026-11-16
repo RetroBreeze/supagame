@@ -1,7 +1,7 @@
 {
   "name": "@retrobreeze/supagame-cli",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "description": "Provision Supabase Game Services in your own project",
   "type": "module",
   "license": "MIT",

@@ -85,12 +85,12 @@ and run the complete commands in [RELEASING.md](RELEASING.md). Repeat with each
 Supabase version:
 
 ```sh
-pnpm install --frozen-lockfile
+npm ci
 node scripts/select-test-supabase.ts 3.0.0
-SUPABASE_TEST_VERSION=3.0.0 pnpm test:cli:compatibility
+SUPABASE_TEST_VERSION=3.0.0 npm run test:cli:compatibility
 # Repeat the full release-validation suite, then select 3.1.0 and repeat it.
 node scripts/select-test-supabase.ts 3.1.0
-SUPABASE_TEST_VERSION=3.1.0 pnpm test:cli:compatibility
+SUPABASE_TEST_VERSION=3.1.0 npm run test:cli:compatibility
 ```
 
 The selector downloads official Linux AMD64 archives and verifies these SHA256

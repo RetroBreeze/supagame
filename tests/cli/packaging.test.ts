@@ -20,7 +20,7 @@ beforeAll(() => {
   });
   put(tool, 'package.json', '{"type":"module"}');
   symlinkSync(
-    join(repo, 'packages/cli/node_modules'),
+    join(repo, 'node_modules'),
     join(tool, 'node_modules'),
   );
 });
