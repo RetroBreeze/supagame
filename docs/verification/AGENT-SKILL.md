@@ -122,7 +122,7 @@ evaluation, not claims that the backend or those engines are incompatible.
 At initial validation, the public Cloud Saves Wiki contained older durable examples
 omitting generation and a permanent-receipt-retention claim. The subsequent
 user-authorized [documentation review and Wiki update](../wiki/Cloud-Saves-retention-update.md)
-prepares the corrections; publication is blocked by unavailable GitHub Git credentials.
+published the corrections over SSH after the initial HTTPS authentication failure.
 The initial skill-creation task itself did not push to the Wiki.
 No API changes are needed for this skill.
 
@@ -142,9 +142,9 @@ publication, push, tag, visibility change or hosted mutation occurred.
 Reviewed main `998b2c94408a2f8adf5b71f08c01d929b1a9a936`. The npm migration did
 not change the gameplay API. Updated skill references for contributor tooling and
 Admin's disabled-board read behavior, synchronized active repository guides, and
-prepared 30 Wiki pages including the new skill installation page. The
+published 30 Wiki pages including the new skill installation page. The
 [Wiki review record](../wiki/Cloud-Saves-retention-update.md) contains the exact
-base, proposed commit, portable patch and publication blocker.
+base, published commit, archived patch and verified publication result.
 
 Fresh checks for this review: official `skills-ref validate` and skill-creator
 quick validation passed; `node --test tests/e2e/agent-skill.test.ts` passed all 3

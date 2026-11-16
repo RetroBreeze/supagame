@@ -79,6 +79,8 @@ Ask “Use the supagame skill to add leaderboards to my Unity game” or, in Cod
 “$supagame add Cloud Saves to this project.” The authoritative source is
 `.agents/skills/supagame/` in this repository. The skill is distributed from source;
 installing the npm CLI/SDK does not install or activate it in an agent.
+See the [Wiki skill guide](https://github.com/RetroBreeze/supagame/wiki/Agent-Skill)
+for installation and example requests.
 
 ## License
 

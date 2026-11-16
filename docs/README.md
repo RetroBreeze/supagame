@@ -3,7 +3,7 @@
 User guides live in the [Wiki](https://github.com/RetroBreeze/supagame/wiki).
 Start with [Quickstart](https://github.com/RetroBreeze/supagame/wiki/Quickstart).
 For AI-assisted game integration, install the
-[Supagame skill](../README.md#ai-coding-agent-skill).
+[Supagame skill](https://github.com/RetroBreeze/supagame/wiki/Agent-Skill).
 
 ## For contributors
 
